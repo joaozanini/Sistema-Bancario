@@ -27,7 +27,6 @@ public class TelaManterClientes extends JFrame {
         contentPane.setBorder(new EmptyBorder(10, 10, 10, 10));
         setContentPane(contentPane);
 
-        // 1. Painel de Filtro (Norte)
         JPanel painelFiltro = new JPanel(new FlowLayout(FlowLayout.LEFT));
         txtFiltro = new JTextField(20);
         JButton btnFiltrarNome = new JButton("Filtrar por Nome");
@@ -43,11 +42,9 @@ public class TelaManterClientes extends JFrame {
         painelFiltro.add(btnOrdenarSalario);
         contentPane.add(painelFiltro, BorderLayout.NORTH);
 
-        // 2. Painel da Tabela (Centro)
         tableModel = new ClienteTableModel();
         tabelaClientes = new JTable(tableModel);
 
-        // Inicialização do RowSorter
         TableRowSorter<ClienteTableModel> sorter = new TableRowSorter<>(tableModel);
         tabelaClientes.setRowSorter(sorter);
         tabelaClientes.setAutoCreateRowSorter(true);
@@ -55,7 +52,6 @@ public class TelaManterClientes extends JFrame {
         JScrollPane scrollPane = new JScrollPane(tabelaClientes);
         contentPane.add(scrollPane, BorderLayout.CENTER);
 
-        // 3. Painel de Botões (Sul)
         JPanel painelBotoes = new JPanel(new FlowLayout(FlowLayout.CENTER));
         JButton btnIncluir = new JButton("Incluir Cliente");
         JButton btnExcluir = new JButton("Excluir Selecionado");
@@ -63,8 +59,6 @@ public class TelaManterClientes extends JFrame {
         painelBotoes.add(btnIncluir);
         painelBotoes.add(btnExcluir);
         contentPane.add(painelBotoes, BorderLayout.SOUTH);
-
-        // ---- AÇÕES (CONTROLLERS) ----
 
         btnIncluir.addActionListener(e -> abrirTelaCadastroInclusao());
         btnExcluir.addActionListener(e -> excluirCliente());
@@ -77,7 +71,6 @@ public class TelaManterClientes extends JFrame {
         });
 
         btnOrdenarSalario.addActionListener(e -> {
-            // Usa a Coluna 0 (Nome) para aplicar o Comparator de Salário
             sorter.setComparator(0, new ClienteSalarioComparator());
 
             List<RowSorter.SortKey> sortKeys = new ArrayList<>();
@@ -88,15 +81,9 @@ public class TelaManterClientes extends JFrame {
 
             JOptionPane.showMessageDialog(this, "Tabela ordenada por Salário (do maior para o menor).", "Ordenação", JOptionPane.INFORMATION_MESSAGE);
 
-            // Resetar o Comparator
             sorter.setComparator(0, null);
         });
 
-        // -------------------------------------------------------------
-        // 4. CONFIGURAÇÃO FINAL DA TABELA (ButtonColumns) - ORDEM CRÍTICA
-        // -------------------------------------------------------------
-
-        // Ação para o botão "Editar" (Coluna 5)
         ActionListener acaoEditar = new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 int linha = Integer.parseInt(e.getActionCommand());
@@ -105,7 +92,6 @@ public class TelaManterClientes extends JFrame {
         };
         new ButtonColumn(tabelaClientes, acaoEditar, 5);
 
-        // Ação para o botão "Vincular" (Coluna 6)
         ActionListener acaoVincular = new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 int linha = Integer.parseInt(e.getActionCommand());
@@ -114,7 +100,6 @@ public class TelaManterClientes extends JFrame {
         };
         new ButtonColumn(tabelaClientes, acaoVincular, 6);
 
-        // Ação para o botão "Operar" (Coluna 7)
         ActionListener acaoConta = new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 int linha = Integer.parseInt(e.getActionCommand());
@@ -123,9 +108,6 @@ public class TelaManterClientes extends JFrame {
         };
         new ButtonColumn(tabelaClientes, acaoConta, 7);
 
-        // -------------------------------------------------------------
-
-        // Carrega os dados iniciais
         atualizarTabela();
     }
 
@@ -134,7 +116,6 @@ public class TelaManterClientes extends JFrame {
         telaCadastro.setLocationRelativeTo(this);
         telaCadastro.setVisible(true);
 
-        // Após a tela fechar, atualiza a tabela
         atualizarTabela();
     }
 
@@ -153,13 +134,10 @@ public class TelaManterClientes extends JFrame {
         Cliente clienteSelecionado = tableModel.getCliente(indiceModelo);
         if (clienteSelecionado == null) return;
 
-        // Se o cliente já tiver conta, o construtor da TelaVincularConta vai mostrar um aviso e fechar.
         TelaVincularConta telaVincular = new TelaVincularConta(this, clienteSelecionado);
         telaVincular.setLocationRelativeTo(this);
         telaVincular.setVisible(true);
 
-        // Após o fechamento, atualize a tabela.
-        // Isso será importante para o Requisito 3 (Operar Conta)
         atualizarTabela();
     }
 
@@ -177,12 +155,10 @@ public class TelaManterClientes extends JFrame {
             return;
         }
 
-        // Abre a tela de operações, passando a conta
         TelaOperacoesConta telaOperacoes = new TelaOperacoesConta(this, conta);
         telaOperacoes.setLocationRelativeTo(this);
         telaOperacoes.setVisible(true);
 
-        // Atualiza a tabela caso o saldo afete alguma exibição futura
         atualizarTabela();
     }
 
@@ -199,7 +175,6 @@ public class TelaManterClientes extends JFrame {
         int indiceModelo = tabelaClientes.convertRowIndexToModel(linhaSelecionada);
         Cliente clienteParaExcluir = tableModel.getCliente(indiceModelo);
 
-        // Confirmação
         String msg = "Tem certeza que deseja excluir o cliente: "
                 + clienteParaExcluir.getNome()
                 + "?\nTodas as contas vinculadas a ele serão apagadas.";
