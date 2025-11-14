@@ -3,8 +3,6 @@ package view;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import model.Cliente;
 import model.RepositorioDados;
 
@@ -16,11 +14,8 @@ public class TelaCadastroCliente extends JDialog {
     private JTextField txtCpf;
     private JTextField txtEndereco;
 
-    private Cliente clienteParaAtualizar; // Nulo se for inclusão
+    private Cliente clienteParaAtualizar;
 
-    /**
-     * Construtor para INCLUSÃO e ATUALIZAÇÃO
-     */
     public TelaCadastroCliente(Frame owner, Cliente cliente) {
         super(owner, true); // Modal
         
@@ -60,12 +55,10 @@ public class TelaCadastroCliente extends JDialog {
         txtEndereco = new JTextField();
         contentPanel.add(txtEndereco);
 
-        // Se for modo de ATUALIZAÇÃO, preenche os campos
         if (cliente != null) {
             preencherCampos();
         }
 
-        // Painel de Botões (Sul)
         JPanel buttonPane = new JPanel();
         buttonPane.setLayout(new FlowLayout(FlowLayout.RIGHT));
         getContentPane().add(buttonPane, BorderLayout.SOUTH);
@@ -103,7 +96,6 @@ public class TelaCadastroCliente extends JDialog {
         String endereco = txtEndereco.getText();
         
         if (clienteParaAtualizar == null) {
-            // ---- MODO INCLUSÃO ----
             if (RepositorioDados.getInstance().buscarClientePorCpf(cpf) != null) {
                  JOptionPane.showMessageDialog(this, 
                         "Já existe um cliente com este CPF.", 
@@ -116,7 +108,6 @@ public class TelaCadastroCliente extends JDialog {
             JOptionPane.showMessageDialog(this, "Cliente incluído com sucesso!");
 
         } else {
-            // ---- MODO ATUALIZAÇÃO ---- [cite: 7]
             clienteParaAtualizar.setNome(nome);
             clienteParaAtualizar.setSobrenome(sobrenome);
             clienteParaAtualizar.setRg(rg);

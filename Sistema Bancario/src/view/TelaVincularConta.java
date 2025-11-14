@@ -43,14 +43,14 @@ public class TelaVincularConta extends JDialog {
         setLayout(new BorderLayout(10, 10));
         ((JComponent) getContentPane()).setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        // 1. Painel Superior: Seleção de Tipo de Conta
+        // Painel Superior: Seleção de Tipo de Conta
         JPanel painelSuperior = new JPanel(new FlowLayout(FlowLayout.LEFT));
         painelSuperior.add(new JLabel("Tipo de Conta:"));
         cmbTipoConta = new JComboBox<>(new String[]{"Selecione o Tipo...", "Conta Corrente", "Conta Investimento"});
         painelSuperior.add(cmbTipoConta);
         add(painelSuperior, BorderLayout.NORTH);
 
-        // 2. Painel Central: Cartões com Campos Específicos
+        // Painel Central: Cartões com Campos Específicos
         cardLayout = new CardLayout();
         painelCartoes = new JPanel(cardLayout);
         add(painelCartoes, BorderLayout.CENTER);
@@ -62,7 +62,7 @@ public class TelaVincularConta extends JDialog {
         cardLayout.show(painelCartoes, "Vazio");
 
 
-        // 3. Painel de Ação (Sul)
+        // Painel de Ação (Sul)
         JPanel painelBotoes = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton btnSalvar = new JButton("Vincular e Salvar");
         JButton btnCancelar = new JButton("Cancelar");
@@ -90,7 +90,7 @@ public class TelaVincularConta extends JDialog {
         });
     }
 
-    // --- Criação dos Formulários Específicos ---
+    // Criação dos Formulários Específicos
 
     private void criarPainelContaCorrente() {
         JPanel painelCC = new JPanel(new GridLayout(2, 2, 5, 5));
@@ -126,12 +126,12 @@ public class TelaVincularConta extends JDialog {
         painelCartoes.add(painelCI, "Investimento");
     }
 
-    // --- Lógica de Salvamento ---
+    // Lógica de Salvamento
 
     private void salvarConta() {
         String tipo = (String) cmbTipoConta.getSelectedItem();
 
-        // Gera o número da conta automaticamente [cite: 24]
+        // Gera o número da conta automaticamente
         int numConta = RepositorioDados.getInstance().gerarProximoNumeroConta();
 
         ContaCorrente novaCC = null;
@@ -142,7 +142,6 @@ public class TelaVincularConta extends JDialog {
                 double depInicial = Double.parseDouble(txtDepIniCC.getText());
                 double limite = Double.parseDouble(txtLimiteCC.getText());
 
-                // Regra: Valor deve ser positivo no depósito inicial (implícito no construtor)
                 if (depInicial < 0 || limite < 0) throw new NumberFormatException("Valores não podem ser negativos");
 
                 novaCC = new ContaCorrente(cliente, numConta, depInicial, limite);
@@ -166,7 +165,7 @@ public class TelaVincularConta extends JDialog {
             return;
         }
 
-        // Salvar no Repositório e vincular ao cliente [cite: 14]
+        // Salvar no Repositório e vincular ao cliente
         if (novaCC != null) {
             RepositorioDados.getInstance().adicionarContaCorrente(novaCC);
             cliente.setConta(novaCC);
