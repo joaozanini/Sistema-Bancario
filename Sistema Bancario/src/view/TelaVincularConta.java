@@ -50,7 +50,7 @@ public class TelaVincularConta extends JDialog {
         add(painelSuperior, BorderLayout.NORTH);
 
         cardLayout = new CardLayout();
-        painelCartoes = new JPanel(cardLayout);
+        painelCartoes = new JPanel(cardLayout); // Painel que troca formulários dinamicamente a partir do JComboBox
         add(painelCartoes, BorderLayout.CENTER);
 
         criarPainelContaCorrente();

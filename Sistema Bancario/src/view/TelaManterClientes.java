@@ -10,9 +10,9 @@ import java.util.List;
 import java.util.Comparator;
 
 import model.*;
-import Utils.ButtonColumn;
+import Utils.ButtonColumn; // classe customizada para colocar botões dentro da JTable
 
-public class TelaManterClientes extends JFrame {
+public class TelaManterClientes extends JFrame { // JFrame principal
 
     private JTable tabelaClientes;
     private ClienteTableModel tableModel;
@@ -49,7 +49,7 @@ public class TelaManterClientes extends JFrame {
         tableModel = new ClienteTableModel();
         tabelaClientes = new JTable(tableModel);
 
-        TableRowSorter<ClienteTableModel> sorter = new TableRowSorter<>(tableModel);
+        TableRowSorter<ClienteTableModel> sorter = new TableRowSorter<>(tableModel); // permite ordenar e filtrar dados da tabela
         
         // CONFIG COMPARADORES COLUNAS
         configurarComparadores(sorter);
@@ -57,7 +57,7 @@ public class TelaManterClientes extends JFrame {
         tabelaClientes.setRowSorter(sorter);
         tabelaClientes.setAutoCreateRowSorter(false);
 
-        JScrollPane scrollPane = new JScrollPane(tabelaClientes);
+        JScrollPane scrollPane = new JScrollPane(tabelaClientes); // painel com barras de rolagem
         contentPane.add(scrollPane, BorderLayout.CENTER);
 
         // BOTÕES INFERIORES
@@ -84,8 +84,6 @@ public class TelaManterClientes extends JFrame {
             tableModel.recarregar();
         });
 
-        // BOTAO COLUNAS
-
         // BOTÃO EDITAR
         ActionListener acaoEditar = new ActionListener() {
             @Override
@@ -94,7 +92,7 @@ public class TelaManterClientes extends JFrame {
                 try {
                     int linhaView = Integer.parseInt(e.getActionCommand());
                     if (linhaView >= 0) {
-                        int linhaModelo = tabelaClientes.convertRowIndexToModel(linhaView);
+                        int linhaModelo = tabelaClientes.convertRowIndexToModel(linhaView); // converte índice da view para o modelo
                         System.out.println("Abrindo edição para linha modelo: " + linhaModelo);
                         abrirTelaCadastroAtualizacao(linhaModelo);
                     } else {
@@ -252,7 +250,7 @@ public class TelaManterClientes extends JFrame {
     // MÉTODOS PARA ABRIR TELAS
 
     private void abrirTelaCadastroInclusao() {
-        TelaCadastroCliente telaCadastro = new TelaCadastroCliente(this, null);
+        TelaCadastroCliente telaCadastro = new TelaCadastroCliente(this, null); // TelaManterClientes é a tela pai, passa cliente como null para inclusão
         telaCadastro.setLocationRelativeTo(this);
         telaCadastro.setVisible(true);
         atualizarTabela();
