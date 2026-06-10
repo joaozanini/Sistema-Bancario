@@ -1,6 +1,3 @@
--- Script de criação do banco de dados - Sistema Bancário LPOO2
--- Execute este script no MySQL antes de iniciar a aplicação
-
 CREATE DATABASE IF NOT EXISTS sistema_bancario
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;

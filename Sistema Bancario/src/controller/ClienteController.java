@@ -39,7 +39,7 @@ public class ClienteController {
     }
 
     public void excluir(Cliente c) {
-        clienteDAO.excluir(c.getCpf()); // ON DELETE CASCADE remove as contas vinculadas
+        clienteDAO.excluir(c.getCpf());
     }
 
     private Conta carregarConta(Cliente c) {

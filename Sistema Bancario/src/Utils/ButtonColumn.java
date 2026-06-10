@@ -65,7 +65,6 @@ public class ButtonColumn extends AbstractCellEditor implements TableCellRendere
     @Override
     public void actionPerformed(ActionEvent e) {
         fireEditingStopped();
-        // Usa a linha guardada em vez de table.getEditingRow()
         ActionEvent event = new ActionEvent(table, ActionEvent.ACTION_PERFORMED, "" + currentRow);
         action.actionPerformed(event);
     }
