@@ -39,6 +39,13 @@ public class ContaCorrente extends Conta {
         saldo += saldo * 0.01;
     }
 
+    // Factory method para reconstruir conta carregada do banco de dados
+    public static ContaCorrente fromDB(Cliente dono, int numero, double saldo, double limite) {
+        ContaCorrente cc = new ContaCorrente(dono, numero, 0.0, limite);
+        cc.saldo = saldo; // restaura saldo real (pode ser negativo por uso do limite)
+        return cc;
+    }
+
     public double getLimite() {
         return limite;
     }

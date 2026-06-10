@@ -57,6 +57,14 @@ public class ContaInvestimento extends Conta {
         saldo += saldo * 0.02;
     }
 
+    // Factory method para reconstruir conta carregada do banco de dados
+    public static ContaInvestimento fromDB(Cliente dono, int numero, double saldo,
+                                           double montanteMinimo, double depositoMinimo) {
+        ContaInvestimento ci = new ContaInvestimento(dono, numero, montanteMinimo, montanteMinimo, depositoMinimo);
+        ci.saldo = saldo; // restaura saldo real armazenado no banco
+        return ci;
+    }
+
     public double getMontanteMinimo() { return montanteMinimo; }
     public void setMontanteMinimo(double montanteMinimo) { this.montanteMinimo = montanteMinimo; }
 
