@@ -1,6 +1,7 @@
 package view;
 
-import model.*; 
+import model.*;
+import controller.ContaController;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -10,6 +11,7 @@ import java.awt.event.ActionListener;
 public class TelaVincularConta extends JDialog {
 
     private Cliente cliente;
+    private final ContaController contaController = new ContaController();
 
     private JComboBox<String> cmbTipoConta;
 
@@ -122,7 +124,7 @@ public class TelaVincularConta extends JDialog {
     private void salvarConta() {
         String tipo = (String) cmbTipoConta.getSelectedItem();
 
-        int numConta = RepositorioDados.getInstance().gerarProximoNumeroConta();
+        int numConta = contaController.proximoNumeroConta();
 
         ContaCorrente novaCC = null;
         ContaInvestimento novaCI = null;
@@ -165,18 +167,20 @@ public class TelaVincularConta extends JDialog {
             return;
 
         } catch (IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), "Erro ao Criar Conta", JOptionPane.ERROR_MESSAGE);
+            return;
+        } catch (RuntimeException ex) {
             JOptionPane.showMessageDialog(this,
-                    ex.getMessage(),
-                    "Erro ao Criar Conta",
-                    JOptionPane.ERROR_MESSAGE);
+                    "Erro ao salvar no banco de dados:\n" + ex.getMessage(),
+                    "Erro de Banco de Dados", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
         if (novaCC != null) {
-            RepositorioDados.getInstance().adicionarContaCorrente(novaCC);
+            contaController.criarContaCorrente(novaCC);
             cliente.setConta(novaCC);
         } else if (novaCI != null) {
-            RepositorioDados.getInstance().adicionarContaInvestimento(novaCI);
+            contaController.criarContaInvestimento(novaCI);
             cliente.setConta(novaCI);
         }
 

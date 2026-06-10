@@ -10,13 +10,15 @@ import java.util.List;
 import java.util.Comparator;
 
 import model.*;
-import Utils.ButtonColumn; // classe customizada para colocar botões dentro da JTable
+import Utils.ButtonColumn;
+import controller.ClienteController;
 
-public class TelaManterClientes extends JFrame { // JFrame principal
+public class TelaManterClientes extends JFrame {
 
     private JTable tabelaClientes;
     private ClienteTableModel tableModel;
     private JTextField txtFiltro;
+    private final ClienteController clienteController = new ClienteController();
 
     public TelaManterClientes() {
         setTitle("Dashboard de Clientes do Banco");
@@ -330,7 +332,7 @@ public class TelaManterClientes extends JFrame { // JFrame principal
         );
 
         if (resposta == JOptionPane.YES_OPTION) {
-            RepositorioDados.getInstance().removerCliente(clienteParaExcluir);
+            clienteController.excluir(clienteParaExcluir);
             atualizarTabela();
             JOptionPane.showMessageDialog(this, "Cliente excluído com sucesso.");
         }
@@ -339,8 +341,14 @@ public class TelaManterClientes extends JFrame { // JFrame principal
     // ATUALIZAR TABELA
 
     public void atualizarTabela() {
-        List<Cliente> clientes = RepositorioDados.getInstance().getListaClientes();
-        tableModel.setClientes(clientes);
-        System.out.println("Tabela atualizada com " + clientes.size() + " clientes");
+        try {
+            List<Cliente> clientes = clienteController.listarClientes();
+            tableModel.setClientes(clientes);
+        } catch (RuntimeException e) {
+            JOptionPane.showMessageDialog(this,
+                "Erro ao carregar dados do banco:\n" + e.getMessage() +
+                "\n\nVerifique se o MySQL está ativo e as credenciais em ConexaoDB.java estão corretas.",
+                "Erro de Banco de Dados", JOptionPane.ERROR_MESSAGE);
+        }
     }
 }

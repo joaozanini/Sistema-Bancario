@@ -4,7 +4,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import model.Cliente;
-import model.RepositorioDados;
+import controller.ClienteController;
 
 public class TelaCadastroCliente extends JDialog {
 
@@ -15,6 +15,7 @@ public class TelaCadastroCliente extends JDialog {
     private JTextField txtEndereco;
 
     private Cliente clienteParaAtualizar;
+    private final ClienteController clienteController = new ClienteController();
 
     public TelaCadastroCliente(Frame owner, Cliente cliente) {
         super(owner, true); 
@@ -105,48 +106,45 @@ public class TelaCadastroCliente extends JDialog {
     String cpfDigits = cpfRaw.replaceAll("\\D", "");
     String rgDigits = rgRaw.replaceAll("\\D", "");
 
-    RepositorioDados repo = RepositorioDados.getInstance();
-
     try {
         // 1) valida formato e algoritmo usando os validadores do modelo
         Cliente.validarRg(rgDigits);
         Cliente.validarCpf(cpfDigits);
 
-        // 2) verifica unicidade no repositório com CPFs/RGs normalizados
+        // 2) verifica unicidade no banco de dados
         if (clienteParaAtualizar == null) {
-            if (repo.buscarClientePorCpf(cpfDigits) != null) {
+            if (clienteController.buscarPorCpf(cpfDigits) != null) {
                 JOptionPane.showMessageDialog(this,
                         "Já existe um cliente com este CPF.",
                         "Erro", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            if (repo.buscarClientePorRg(rgDigits) != null) {
+            if (clienteController.buscarPorRg(rgDigits) != null) {
                 JOptionPane.showMessageDialog(this,
                         "Já existe um cliente com este RG.",
                         "Erro", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
-            // 3) tudo ok → cria cliente (setters normalizam)
             Cliente novo = new Cliente(nome, sobrenome, rgDigits, cpfDigits, endereco);
-            repo.adicionarCliente(novo);
+            clienteController.incluir(novo);
             JOptionPane.showMessageDialog(this, "Cliente incluído com sucesso!");
 
         } else {
             // atualização: verificar duplicidade de RG com outro cliente
-            Cliente outroRg = repo.buscarClientePorRg(rgDigits);
-            if (outroRg != null && outroRg != clienteParaAtualizar) {
+            Cliente outroRg = clienteController.buscarPorRg(rgDigits);
+            if (outroRg != null && !outroRg.getCpf().equals(clienteParaAtualizar.getCpf())) {
                 JOptionPane.showMessageDialog(this,
                         "Outro cliente já utiliza este RG.",
                         "Erro", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
-            // Atualiza somente depois de validações
             clienteParaAtualizar.setNome(nome);
             clienteParaAtualizar.setSobrenome(sobrenome);
-            clienteParaAtualizar.setRg(rgDigits);    // setter valida e normaliza
+            clienteParaAtualizar.setRg(rgDigits);
             clienteParaAtualizar.setEndereco(endereco);
+            clienteController.atualizar(clienteParaAtualizar);
 
             JOptionPane.showMessageDialog(this, "Cliente atualizado com sucesso!");
         }
@@ -154,10 +152,11 @@ public class TelaCadastroCliente extends JDialog {
         dispose();
 
     } catch (IllegalArgumentException ex) {
+        JOptionPane.showMessageDialog(this, ex.getMessage(), "Erro de Formato", JOptionPane.ERROR_MESSAGE);
+    } catch (RuntimeException ex) {
         JOptionPane.showMessageDialog(this,
-                ex.getMessage(),
-                "Erro de Formato",
-                JOptionPane.ERROR_MESSAGE);
+                "Erro ao salvar no banco de dados:\n" + ex.getMessage(),
+                "Erro de Banco de Dados", JOptionPane.ERROR_MESSAGE);
     }
     }
 }

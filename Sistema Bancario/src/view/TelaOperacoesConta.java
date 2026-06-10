@@ -2,6 +2,7 @@ package view;
 
 import model.Conta;
 import model.ContaCorrente;
+import controller.ContaController;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -13,6 +14,7 @@ public class TelaOperacoesConta extends JDialog {
     private JLabel lblSaldoAtual;
     private JTextField txtValor;
     private final DecimalFormat df = new DecimalFormat("R$ #,##0.00");
+    private final ContaController contaController = new ContaController();
 
     public TelaOperacoesConta(Frame owner, Conta conta) {
         super(owner, true);
@@ -91,6 +93,7 @@ public class TelaOperacoesConta extends JDialog {
 
         try {
             conta.saca(valor);
+            contaController.atualizarConta(conta);
 
             JOptionPane.showMessageDialog(this,
                     "Saque de " + df.format(valor) + " efetuado com sucesso!",
@@ -114,6 +117,7 @@ public class TelaOperacoesConta extends JDialog {
 
         try {
             conta.deposita(valor);
+            contaController.atualizarConta(conta);
 
             JOptionPane.showMessageDialog(this,
                     "Depósito de " + df.format(valor) + " efetuado com sucesso!",
@@ -134,6 +138,7 @@ public class TelaOperacoesConta extends JDialog {
     private void remunerarConta() {
         try {
             conta.remunera();
+            contaController.atualizarConta(conta);
 
             String tipoConta = (conta instanceof ContaCorrente)
                     ? "Conta Corrente (1%)"
