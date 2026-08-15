@@ -1,0 +1,21 @@
+# POR FAVOR NUNCA COMMITAR O .env real (senha do Gmail, JWT secret, etc)
+.env
+.env.local
+*.env
+
+# Node.js / Angular (frontend e gateway)
+node_modules/
+dist/
+.angular/
+
+# Java / Spring Boot — Maven
+target/
+*.class
+*.jar
+*.war
+!.mvn/wrapper/maven-wrapper.jar
+build/
+
+# IDEs
+.idea/
+.vscode/
