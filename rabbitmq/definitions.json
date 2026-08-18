@@ -1,0 +1,27 @@
+{
+  "vhosts": [
+    { "name": "/" }
+  ],
+  "exchanges": [
+    { "name": "main.exchange", "vhost": "/", "type": "direct", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+  "queues": [
+    {
+      "name": "main.queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "main.exchange",
+      "vhost": "/",
+      "destination": "main.queue",
+      "destination_type": "queue",
+      "routing_key": "main",
+      "arguments": {}
+    }
+  ]
+}
