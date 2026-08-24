@@ -1,7 +1,7 @@
 # Configurações do Banco de Dados
-spring.datasource.url=jdbc:postgresql://${DB_HOST:localhost}:5432/bantads
-spring.datasource.username=${POSTGRES_USER:bantads}
-spring.datasource.password=${POSTGRES_PASSWORD:dhhX4whD00iSAF1RwJwkU2k0}
+spring.datasource.url=
+spring.datasource.username=
+spring.datasource.password=
 
 # Validar o schema ao invés de usar auto ddl
 spring.jpa.hibernate.ddl-auto=validate

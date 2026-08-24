@@ -19,3 +19,4 @@ build/
 # IDEs
 .idea/
 .vscode/
+services/ms-conta/src/main/resources/application.properties
