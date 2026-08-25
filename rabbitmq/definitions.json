@@ -2,26 +2,59 @@
   "vhosts": [
     { "name": "/" }
   ],
-  "exchanges": [
-    { "name": "main.exchange", "vhost": "/", "type": "direct", "durable": true, "auto_delete": false, "arguments": {} }
-  ],
+  "exchanges": [],
   "queues": [
+    { "name": "saga.cmd", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "orquestrador.reply", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "ms.email.cmd", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+
     {
-      "name": "main.queue",
+      "name": "ms.cliente.cmd",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
-      "arguments": {}
-    }
-  ],
-  "bindings": [
+      "arguments": {
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "ms.cliente.cmd.dlq"
+      }
+    },
+    { "name": "ms.cliente.cmd.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+
     {
-      "source": "main.exchange",
+      "name": "ms.conta.cmd",
       "vhost": "/",
-      "destination": "main.queue",
-      "destination_type": "queue",
-      "routing_key": "main",
-      "arguments": {}
-    }
-  ]
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "ms.conta.cmd.dlq"
+      }
+    },
+    { "name": "ms.conta.cmd.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+
+    {
+      "name": "ms.gerente.cmd",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "ms.gerente.cmd.dlq"
+      }
+    },
+    { "name": "ms.gerente.cmd.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+
+    {
+      "name": "ms.auth.cmd",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": "ms.auth.cmd.dlq"
+      }
+    },
+    { "name": "ms.auth.cmd.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+  "bindings": []
 }
