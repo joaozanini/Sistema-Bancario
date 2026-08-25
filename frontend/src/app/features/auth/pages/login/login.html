@@ -1,1 +1,23 @@
-<p>login works!</p>
+<p>login</p>
+<main class="login">
+  <form (ngSubmit)="entrar()">
+    <h1>BANTADS</h1>
+    <p>Entre na sua conta</p>
+
+    <input
+      type="email"
+      name="email"
+      placeholder="E-mail"
+      required
+    >
+
+    <input
+      type="password"
+      name="senha"
+      placeholder="Senha"
+      required
+    >
+
+    <button type="submit">Entrar</button>
+  </form>
+</main>
