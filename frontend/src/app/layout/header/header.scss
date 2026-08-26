@@ -1,1 +1,36 @@
+:host {
+  display: block;
+  width: 100%;
+}
 
+.header {
+  box-sizing: border-box;
+  height: 72px;
+  padding: 0 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.notification {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+
+  display: grid;
+  place-items: center;
+
+  color: #475569;
+  background-color: #f8fafc;
+  cursor: pointer;
+}
+
+.notification:hover {
+  color: #2563eb;
+  background-color: #eff6ff;
+}

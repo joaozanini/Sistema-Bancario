@@ -1,28 +1,67 @@
+:host {
+  display: block;
+}
+
 .sidebar {
-  width: 220px;
-  height: 100vh;
-  background-color: #212529;
-  padding: 20px;
-  color: white;
+  box-sizing: border-box;
+  width: 240px;
+  min-height: 100dvh;
+  padding: 24px 20px;
+
+  display: flex;
+  flex-direction: column;
+
+  background-color: #0f172a;
+  color: #f8fafc;
 }
 
 .sidebar h2 {
-  margin-bottom: 30px;
+  margin: 0 0 28px;
+  padding: 0 12px;
+
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
 }
 
 .sidebar nav {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .sidebar a {
-  color: white;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 7px;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 400;
   text-decoration: none;
-  padding: 12px;
-  border-radius: 5px;
+
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
 }
 
 .sidebar a:hover {
-  background-color: #343a40;
+  color: #f8fafc;
+  background-color: #172033;
+}
+
+.sidebar a.active {
+  color: #ffffff;
+  font-weight: 500;
+  background-color: #1e293b;
+}
+
+.sidebar a.logout {
+  margin-top: auto;
 }
