@@ -21,3 +21,6 @@ build/
 .idea/
 .vscode/
 services/ms-conta/src/main/resources/application.properties
+services/ms-cliente/src/main/resources/application.properties
+services/ms-gerente/src/main/resources/application.properties
+services/ms-auth/src/main/resources/application.properties
