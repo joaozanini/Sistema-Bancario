@@ -1,0 +1,33 @@
+<aside class="sidebar">
+  <h2>BANTADS</h2>
+
+  <nav>
+    <a
+      routerLink="/cliente"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      Home
+    </a>
+
+    <a routerLink="/deposito" routerLinkActive="active">
+      Depósito
+    </a>
+
+    <a routerLink="/saque" routerLinkActive="active">
+      Saque
+    </a>
+
+    <a routerLink="/transferencia" routerLinkActive="active">
+      Transferência
+    </a>
+
+    <a routerLink="/extrato" routerLinkActive="active">
+      Extrato
+    </a>
+
+    <a class="logout" routerLink="/login">
+      Sair
+    </a>
+  </nav>
+</aside>
