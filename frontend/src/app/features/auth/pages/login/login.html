@@ -1,4 +1,3 @@
-<p>login</p>
 <main class="login">
   <form (ngSubmit)="entrar()">
     <h1>BANTADS</h1>
@@ -9,7 +8,6 @@
       name="email"
       [(ngModel)]="email"
       placeholder="E-mail"
-      required
     >
 
     <input
@@ -17,9 +15,14 @@
       name="senha"
       [(ngModel)]="senha"
       placeholder="Senha"
-      required
     >
 
-    <button type="submit">Entrar</button>
+    @if (erro) {
+      <p class="erro">{{ erro }}</p>
+    }
+
+    <button type="submit" [disabled]="carregando">
+      {{ carregando ? 'Entrando...' : 'Entrar' }}
+    </button>
   </form>
 </main>

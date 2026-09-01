@@ -12,6 +12,13 @@ export const routes: Routes = [
       import('./features/auth/pages/login/login').then((m) => m.Login),
   },
   {
+    path: '',
+    loadComponent: () =>
+      import('./layout/main-layout/main-layout')
+        .then((m) => m.MainLayout),
+
+        children: [
+  {
     path: 'cliente',
     loadComponent: () =>
       import('./features/cliente/pages/home/home').then(
@@ -31,6 +38,8 @@ export const routes: Routes = [
       import('./features/admin/pages/home/home').then(
         (m) => m.Home,
       ),
+      },
+    ],
   },
   {
     path: '**',
