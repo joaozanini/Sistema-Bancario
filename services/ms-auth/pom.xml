@@ -28,6 +28,8 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<!-- Nao gerenciado pelo BOM do Spring Boot, precisa de versao explicita. -->
+		<bouncycastle.version>1.85.2</bouncycastle.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -37,6 +39,22 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<!-- Apenas o modulo de criptografia do Spring Security: fornece o
+		     Argon2PasswordEncoder sem ativar filtros/autoconfig de seguranca web. -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-crypto</artifactId>
+		</dependency>
+		<!-- Implementacao do Argon2 usada pelo Argon2PasswordEncoder. -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>${bouncycastle.version}</version>
 		</dependency>
 
 		<dependency>

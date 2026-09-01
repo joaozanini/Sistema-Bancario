@@ -1,2 +1,5 @@
 spring.data.mongodb.uri=
 server.port=
+
+# Cria o indice unico de login declarado em Usuario ao subir a aplicação
+spring.data.mongodb.auto-index-creation=true
