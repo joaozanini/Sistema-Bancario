@@ -3,26 +3,19 @@
     <h1>BANTADS</h1>
     <p>Entre na sua conta</p>
 
-    <input
-      type="email"
-      name="email"
-      [(ngModel)]="email"
-      placeholder="E-mail"
-    >
+    <input type="email" name="email" [(ngModel)]="email" placeholder="E-mail">
 
-    <input
-      type="password"
-      name="senha"
-      [(ngModel)]="senha"
-      placeholder="Senha"
-    >
+    <input type="password" name="senha" [(ngModel)]="senha" placeholder="Senha">
 
     @if (erro) {
-      <p class="erro">{{ erro }}</p>
+    <p class="erro">{{ erro }}</p>
     }
 
     <button type="submit" [disabled]="carregando">
       {{ carregando ? 'Entrando...' : 'Entrar' }}
     </button>
+    <a class="register-link" routerLink="/register">
+      Clique aqui para se registrar!
+    </a>
   </form>
 </main>
