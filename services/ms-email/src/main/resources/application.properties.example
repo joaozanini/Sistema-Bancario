@@ -1,0 +1,10 @@
+spring.application.name=ms-email
+server.port=8091
+
+# RabbitMQ
+spring.rabbitmq.host=${RABBITMQ_HOST:localhost}
+spring.rabbitmq.port=${RABBITMQ_PORT:5672}
+spring.rabbitmq.username=${RABBITMQ_USER:admin}
+spring.rabbitmq.password=${RABBITMQ_PASSWORD:}
+
+# SMTP do Gmail — envio real configurado na S6 (GMAIL_USERNAME / GMAIL_APP_PASSWORD via env, nunca no código)
