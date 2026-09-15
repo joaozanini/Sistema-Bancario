@@ -13,6 +13,11 @@ export const routes: Routes = [
       import('./features/auth/pages/login/login').then((m) => m.Login),
   },
   {
+    path: 'register',
+    loadComponent: () =>
+      import('./features/auth/pages/register/register').then((m) => m.Register),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>
