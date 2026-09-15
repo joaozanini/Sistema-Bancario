@@ -1,0 +1,13 @@
+spring.application.name=ms-orquestrador
+server.port=8090
+
+# RabbitMQ
+spring.rabbitmq.host=${RABBITMQ_HOST:localhost}
+spring.rabbitmq.port=${RABBITMQ_PORT:5672}
+spring.rabbitmq.username=${RABBITMQ_USER:admin}
+spring.rabbitmq.password=${RABBITMQ_PASSWORD:}
+
+# Redis (estado das SAGAs a partir da S6)
+spring.data.redis.host=${REDIS_HOST:localhost}
+spring.data.redis.port=${REDIS_PORT:6379}
+spring.data.redis.password=${REDIS_PASSWORD:}
