@@ -25,4 +25,17 @@ export class AuthService {
   salvarToken(token: string) {
     localStorage.setItem('token', token);
   }
+
+  obterToken() {
+    return localStorage.getItem('token');
+  }
+
+  estaAutenticado() {
+    return !!this.obterToken();
+  }
+
+  logout() {
+    localStorage.removeItem('token');
+  }
+
 }

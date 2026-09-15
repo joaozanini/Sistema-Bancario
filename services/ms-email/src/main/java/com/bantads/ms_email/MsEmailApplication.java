@@ -1,13 +1,13 @@
-package com.bantads.ms_orquestrador;
+package com.bantads.ms_email;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class MsOrquestradorApplication {
+public class MsEmailApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(MsOrquestradorApplication.class, args);
+		SpringApplication.run(MsEmailApplication.class, args);
 	}
 
 }

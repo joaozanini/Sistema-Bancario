@@ -1,10 +1,10 @@
-package com.bantads.ms_orquestrador;
+package com.bantads.ms_email;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class MsOrquestradorApplicationTests {
+class MsEmailApplicationTests {
 
 	@Test
 	void contextLoads() {
