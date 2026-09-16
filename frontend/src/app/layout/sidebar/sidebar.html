@@ -1,33 +1,29 @@
 <aside class="sidebar">
   <h2>BANTADS</h2>
-
-  <nav>
+  <nav aria-label="Menu principal">
     <a
       routerLink="/cliente"
       routerLinkActive="active"
       [routerLinkActiveOptions]="{ exact: true }"
+      ariaCurrentWhenActive="page"
+      >Início</a
     >
-      Home
-    </a>
-
-    <a routerLink="/deposito" routerLinkActive="active">
-      Depósito
-    </a>
-
-    <a routerLink="/saque" routerLinkActive="active">
-      Saque
-    </a>
-
-    <a routerLink="/transferencia" routerLinkActive="active">
-      Transferência
-    </a>
-
-    <a routerLink="/extrato" routerLinkActive="active">
-      Extrato
-    </a>
-
-    <a class="logout" routerLink="/login" (click)="sair()">
-      Sair
-    </a>
+    <a
+      routerLink="/cliente"
+      [queryParams]="{ secao: 'conta' }"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      ariaCurrentWhenActive="page"
+      >Minha conta</a
+    >
+    <a
+      routerLink="/cliente"
+      [queryParams]="{ secao: 'extrato' }"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      ariaCurrentWhenActive="page"
+      >Extrato</a
+    >
+    <a class="logout" routerLink="/login" (click)="sair()">Sair</a>
   </nav>
 </aside>

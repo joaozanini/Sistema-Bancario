@@ -2,18 +2,23 @@
   display: flex;
   min-height: 100dvh;
 }
-
 .page {
   display: flex;
   flex: 1;
   min-width: 0;
   flex-direction: column;
-
-  background-color: #f8fafc;
+  background: #f8fafc;
 }
-
 .content {
   flex: 1;
   min-width: 0;
-  padding: 24px;
+  padding: 36px;
+}
+@media (max-width: 760px) {
+  .layout {
+    flex-direction: column;
+  }
+  .content {
+    padding: 24px 16px;
+  }
 }

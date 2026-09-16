@@ -1,1 +1,99 @@
-<p>home works!</p>
+<section class="home" aria-labelledby="titulo">
+  <div class="page-title">
+    <div>
+      <p class="eyebrow">ÁREA DO CLIENTE</p>
+      <h1 id="titulo">
+        {{
+          secao() === 'conta'
+            ? 'Minha conta'
+            : secao() === 'extrato'
+              ? 'Extrato'
+              : 'Olá, boas-vindas!'
+        }}
+      </h1>
+      <p class="subtitle">Acompanhe sua conta em um só lugar.</p>
+    </div>
+    <span class="demo-badge">Demonstração</span>
+  </div>
+
+  <p class="demo-note">
+    Os dados abaixo são de exemplo. A consulta de conta e saldo ainda não está integrada ao banco.
+  </p>
+
+  <div class="summary">
+    <article class="card account-card" aria-labelledby="conta-titulo">
+      <p class="label" id="conta-titulo">{{ conta.tipo }}</p>
+      <h2>{{ conta.numero }}</h2>
+      <p class="muted">Agência {{ conta.agencia }}</p>
+    </article>
+
+    <article class="card balance-card" aria-labelledby="saldo-titulo">
+      <div class="card-heading">
+        <p class="label" id="saldo-titulo">Saldo em conta</p>
+        <button
+          type="button"
+          class="visibility"
+          (click)="alternarSaldo()"
+          [attr.aria-pressed]="!mostrarSaldo()"
+          aria-controls="saldo"
+        >
+          {{ mostrarSaldo() ? 'Ocultar saldo' : 'Mostrar saldo' }}
+        </button>
+      </div>
+      <h2 id="saldo" aria-live="polite">
+        {{ mostrarSaldo() ? (conta.saldo | brlCurrency) : '••••••' }}
+      </h2>
+      <p class="muted">Valor de demonstração</p>
+    </article>
+  </div>
+
+  @if (secao() === 'conta') {
+    <section class="card" aria-labelledby="dados-titulo">
+      <h2 class="section-title" id="dados-titulo">Dados da conta</h2>
+      <dl class="account-details">
+        <div>
+          <dt>Banco</dt>
+          <dd>BANTADS</dd>
+        </div>
+        <div>
+          <dt>Tipo de conta</dt>
+          <dd>{{ conta.tipo }}</dd>
+        </div>
+        <div>
+          <dt>Agência</dt>
+          <dd>{{ conta.agencia }}</dd>
+        </div>
+        <div>
+          <dt>Número da conta</dt>
+          <dd>{{ conta.numero }}</dd>
+        </div>
+      </dl>
+      <a class="text-link" routerLink="/cliente">Voltar ao início →</a>
+    </section>
+  } @else if (secao() === 'extrato') {
+    <section class="card" aria-labelledby="extrato-titulo">
+      <h2 class="section-title" id="extrato-titulo">Movimentações da conta</h2>
+      <div class="empty-state">
+        <span class="empty-icon" aria-hidden="true">↔</span>
+        <h3>Extrato ainda indisponível</h3>
+        <p>As movimentações aparecerão aqui quando a consulta ao banco estiver disponível.</p>
+        <a class="text-link" routerLink="/cliente">Voltar ao início →</a>
+      </div>
+    </section>
+  } @else {
+    <section class="card" aria-labelledby="acessos-titulo">
+      <h2 class="section-title" id="acessos-titulo">Acesso rápido</h2>
+      <div class="shortcuts">
+        <a routerLink="/cliente" [queryParams]="{ secao: 'conta' }"
+          ><span>Minha conta</span><span aria-hidden="true">→</span></a
+        >
+        <a routerLink="/cliente" [queryParams]="{ secao: 'extrato' }"
+          ><span>Ver extrato</span><span aria-hidden="true">→</span></a
+        >
+      </div>
+      <p class="operations-note">
+        Depósitos, saques e transferências estarão disponíveis após a integração dos serviços.
+      </p>
+    </section>
+  }
+</section>
