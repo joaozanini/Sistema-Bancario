@@ -1,6 +1,6 @@
 package com.bantads.ms_orquestrador.messaging;
 
-import com.bantads.ms_orquestrador.config.RabbitConfig;
+import com.bantads.ms_orquestrador.config.RabbitMQConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
@@ -17,13 +17,13 @@ public class SagaCommandListener {
 
     private static final Logger log = LoggerFactory.getLogger(SagaCommandListener.class);
 
-    @RabbitListener(queues = RabbitConfig.SAGA_CMD)
+    @RabbitListener(queues = RabbitMQConfig.FILA_SAGA_CMD)
     public void onSagaCommand(Message message) {
-        log.info("[{}] mensagem recebida: {}", RabbitConfig.SAGA_CMD, new String(message.getBody()));
+        log.info("[{}] mensagem recebida: {}", RabbitMQConfig.FILA_SAGA_CMD, new String(message.getBody()));
     }
 
-    @RabbitListener(queues = RabbitConfig.ORQUESTRADOR_REPLY)
+    @RabbitListener(queues = RabbitMQConfig.FILA_ORQUESTRADOR_REPLY)
     public void onReply(Message message) {
-        log.info("[{}] resposta recebida: {}", RabbitConfig.ORQUESTRADOR_REPLY, new String(message.getBody()));
+        log.info("[{}] resposta recebida: {}", RabbitMQConfig.FILA_ORQUESTRADOR_REPLY, new String(message.getBody()));
     }
 }
