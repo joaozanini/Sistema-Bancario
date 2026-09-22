@@ -12,7 +12,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const request = token ? 
   req.clone({
     setHeaders: {
-      'x-acess-token': token,
+      'x-access-token': token,
     },
   })
   : req;
