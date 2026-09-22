@@ -1,0 +1,221 @@
+:host {
+  display: block;
+}
+
+.extrato-page {
+  max-width: 912px;
+  padding: 32px;
+  color: #172033;
+}
+
+.page-header h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.page-header p {
+  margin: 0 0 24px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.filtro {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.1fr;
+  align-items: end;
+  gap: 16px;
+  padding: 20px;
+  margin-bottom: 26px;
+}
+
+.filtro label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #334155;
+  font-size: 12px;
+}
+
+.filtro input,
+.filtro button {
+  min-height: 38px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.filtro input {
+  padding: 0 12px;
+  border: 1px solid #dbe3ee;
+  background: #f8fafc;
+  color: #172033;
+  outline: none;
+}
+
+.filtro input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.filtro button {
+  border: 0;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filtro button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.filtro button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.filtro button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.28);
+  outline-offset: 2px;
+}
+
+.erro {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.resultado {
+  padding: 20px;
+}
+
+.resultado.atualizando {
+  opacity: 0.6;
+}
+
+.tabela-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+th,
+td {
+  padding: 12px 13px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 500;
+}
+
+th:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+th:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.valor {
+  text-align: right;
+}
+
+.movimentacao td {
+  padding-block: 14px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.movimentacao .operacao {
+  font-weight: 600;
+}
+
+.movimentacao.entrada td {
+  color: #2563eb;
+}
+
+.movimentacao.saida td {
+  color: #dc2626;
+}
+
+.saldo td {
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.saldo .valor {
+  font-size: 12px;
+}
+
+.saldo.sem-movimento td {
+  background: #f7fdf9;
+  font-weight: 500;
+}
+
+.saldo.abertura td {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.sem-mov {
+  margin-left: 8px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.saldo-final {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 18px 16px;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.saldo-final strong {
+  color: #10b981;
+  font-size: 18px;
+}
+
+.vazio {
+  padding: 32px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .extrato-page {
+    padding: 20px 16px;
+  }
+
+  .filtro {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filtro button {
+    grid-column: 1 / -1;
+  }
+}

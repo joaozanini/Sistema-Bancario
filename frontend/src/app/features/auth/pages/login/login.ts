@@ -28,12 +28,10 @@ export class Login {
     this.carregando = true;
 
     this.auth.login(this.email, this.senha).subscribe({
-      next: (resposta) => {
-        if (resposta.token) {
-          this.auth.salvarToken(resposta.token);
-        }
-
-        this.redirecionar(resposta.perfil);
+            next: (resposta) => {
+        this.auth.salvarToken(resposta.token);
+        this.auth.salvarUsuario(resposta.usuario);
+        this.redirecionar(resposta.tipo);
       },
       error: () => {
         this.erro = 'Não foi possível realizar o login.';
@@ -42,8 +40,8 @@ export class Login {
     });
   }
 
-  private redirecionar(perfil: string) {
-    const destino = perfil.toLowerCase();
+   private redirecionar(tipo: string | undefined) {
+    const destino = (tipo ?? '').toLowerCase();
 
     if (['cliente', 'gerente', 'admin'].includes(destino)) {
       this.router.navigate([`/${destino}`]);

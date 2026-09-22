@@ -1,0 +1,99 @@
+<section class="extrato-page">
+  <header class="page-header">
+    <h1>Extrato</h1>
+    <p>Consulte as movimentações da sua conta por período.</p>
+  </header>
+
+  <form class="card filtro" (ngSubmit)="consultar()" novalidate>
+    <label>
+      <span>Data Início</span>
+      <input
+        type="date"
+        name="dataInicio"
+        [(ngModel)]="dataInicio"
+        [max]="dataFim || hojeInput"
+        required
+      >
+    </label>
+
+    <label>
+      <span>Data Fim</span>
+      <input
+        type="date"
+        name="dataFim"
+        [(ngModel)]="dataFim"
+        [min]="dataInicio"
+        [max]="hojeInput"
+        required
+      >
+    </label>
+
+    <button type="submit" [disabled]="carregando()">
+      {{ carregando() ? 'Consultando...' : 'Consultar' }}
+    </button>
+
+    @if (erro()) {
+      <p class="erro" role="alert">{{ erro() }}</p>
+    }
+  </form>
+
+  @if (linhaDoTempo(); as extrato) {
+    <div class="card resultado" [class.atualizando]="carregando()">
+      <div class="tabela-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>Operação</th>
+              <th>Cliente Origem/Destino</th>
+              <th class="valor">Valor (R$)</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr class="saldo abertura">
+              <td colspan="3">Saldo anterior ao período</td>
+              <td class="valor">{{ extrato.saldoAbertura | brlCurrency }}</td>
+            </tr>
+
+            @for (dia of extrato.dias; track dia.rotulo) {
+              @for (mov of dia.movimentacoes; track $index) {
+                <tr
+                  class="movimentacao"
+                  [class.entrada]="mov.natureza === 'ENTRADA'"
+                  [class.saida]="mov.natureza === 'SAIDA'"
+                >
+                  <td>{{ mov.dataHora | brDateTime }}</td>
+                  <td class="operacao">{{ mov.descricao }}</td>
+                  <td>{{ mov.contraparte ?? '—' }}</td>
+                  <td class="valor">
+                    {{ mov.natureza === 'ENTRADA' ? '+' : '-' }} {{ mov.valor | brlCurrency }}
+                  </td>
+                </tr>
+              }
+
+              <tr class="saldo" [class.sem-movimento]="dia.movimentacoes.length === 0">
+                <td colspan="3">
+                  Saldo consolidado em {{ dia.dia | brDate }}
+                  @if (dia.movimentacoes.length === 0) {
+                    <span class="sem-mov">sem movimentações</span>
+                  }
+                </td>
+                <td class="valor">{{ dia.saldoDoDia | brlCurrency }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <footer class="saldo-final">
+        <span>
+          {{ ehHoje(fimConsultado()) ? 'Saldo Atual da Conta' : 'Saldo em ' + (fimConsultado() | brDate) }}
+        </span>
+        <strong>{{ extrato.saldoFinal | brlCurrency }}</strong>
+      </footer>
+    </div>
+  } @else if (carregando()) {
+    <div class="card vazio">Carregando extrato...</div>
+  }
+</section>

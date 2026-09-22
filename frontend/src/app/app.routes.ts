@@ -25,6 +25,11 @@ export const routes: Routes = [
         .then((m) => m.MainLayout),
 
         children: [
+          {
+  path: 'extrato',
+  loadComponent: () =>
+    import('./features/cliente/pages/extrato/extrato').then((m) => m.Extrato),
+},
   {
     path: 'cliente',
     loadComponent: () =>
