@@ -24,3 +24,10 @@ Sistema de Internet Banking desenvolvido para a disciplina DS152 — Desenvolvim
 ## Configuração
 
 Copie `.env.example` para `.env` e preencha as variáveis locais (senha de app do Gmail, chave secreta do JWT etc.). **Nunca** commitar o `.env` com os valores reais.
+
+## CI/CD
+
+O pipeline fica em `.github/workflows/ci-cd.yml` e roda no GitHub Actions:
+
+- **CI** (todo push e pull request para a `main`): `mvnw verify` de cada microsserviço Java contra Postgres e Mongo reais, `npm test` do API Gateway, e lint, testes e build do frontend. Também constrói todas as imagens Docker.
+- **CD** (só em push na `main`, com o CI verde): publica as imagens em `ghcr.io/<dono-do-repo>/bantads-<serviço>`, com a tag do commit e `latest`.
