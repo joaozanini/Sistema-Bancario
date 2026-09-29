@@ -26,3 +26,44 @@
     padding: 16px;
   }
 }
+
+.usuario {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+.dados {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dados strong {
+  color: #172033;
+  font-size: 14px;
+  font-weight: 600;
+}
+.dados .tipo {
+  color: #64748b;
+  font-weight: 500;
+}
+.dados > span {
+  color: #64748b;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

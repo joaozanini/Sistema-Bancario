@@ -31,6 +31,7 @@ export class Login {
             next: (resposta) => {
         this.auth.salvarToken(resposta.token);
         this.auth.salvarUsuario(resposta.usuario);
+        this.auth.salvarTipo(resposta.tipo);
         this.redirecionar(resposta.tipo);
       },
       error: () => {
