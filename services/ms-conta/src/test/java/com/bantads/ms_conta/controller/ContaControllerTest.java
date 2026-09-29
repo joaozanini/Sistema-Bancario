@@ -6,7 +6,6 @@ import com.bantads.ms_conta.dto.TransferenciaResponseDTO;
 import com.bantads.ms_conta.exception.GlobalExceptionHandler;
 import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.service.ContaService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.LocalDateTime;
 
@@ -39,14 +39,14 @@ class ContaControllerTest {
     @InjectMocks
     private ContaController controller;
 
-    private ObjectMapper objectMapper;
+    private JsonMapper jsonMapper;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
-        objectMapper = new ObjectMapper();
+        jsonMapper = JsonMapper.builder().build();
     }
 
     @Test
@@ -67,7 +67,7 @@ class ContaControllerTest {
         mockMvc.perform(post("/contas/1291/transferencia")
                         .header("X-User-CPF", "12912861012")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.contaOrigem").value("1291"))
                 .andExpect(jsonPath("$.contaDestino").value("0950"))
@@ -86,7 +86,7 @@ class ContaControllerTest {
         mockMvc.perform(post("/contas/1291/transferencia")
                         .header("X-User-CPF", "12912861012")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.erro").value("Saldo insuficiente"));
     }
