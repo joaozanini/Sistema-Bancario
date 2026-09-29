@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "eventos_conta")
@@ -19,6 +21,8 @@ public class EventoConta {
     @Column(nullable = false)
     private String tipo;
 
+    // Sem o JdbcTypeCode o Hibernate envia a String como varchar, e o Postgres recusa na coluna jsonb
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private String payload;
 
