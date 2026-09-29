@@ -9,7 +9,6 @@ import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.exception.TransferenciaInvalidaException;
 import com.bantads.ms_conta.model.EventoConta;
 import com.bantads.ms_conta.repository.EventoContaRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,13 +32,13 @@ class ContaServiceTest {
     @Mock
     private EventoContaRepository repository;
 
-    private ObjectMapper objectMapper;
+    private JsonMapper jsonMapper;
     private ContaService service;
 
     @BeforeEach
     void setUp() {
-        objectMapper = new ObjectMapper();
-        service = new ContaService(repository, objectMapper);
+        jsonMapper = JsonMapper.builder().build();
+        service = new ContaService(repository, jsonMapper);
     }
 
     private EventoConta criarEvento(String objetoId, String tipo, String payload, int versao) {

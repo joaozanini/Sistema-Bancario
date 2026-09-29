@@ -9,10 +9,10 @@ import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.exception.TransferenciaInvalidaException;
 import com.bantads.ms_conta.model.EventoConta;
 import com.bantads.ms_conta.repository.EventoContaRepository;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -27,11 +27,11 @@ import java.util.UUID;
 public class ContaService {
 
     private final EventoContaRepository repository;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
-    public ContaService(EventoContaRepository repository, ObjectMapper objectMapper) {
+    public ContaService(EventoContaRepository repository, JsonMapper jsonMapper) {
         this.repository = repository;
-        this.objectMapper = objectMapper;
+        this.jsonMapper = jsonMapper;
     }
 
     /**
@@ -188,34 +188,34 @@ public class ContaService {
             switch (tipoNormalizado) {
                 case "CRIADO" -> {
                     if (payloadNode.has("saldo")) {
-                        estado.adicionarSaldo(new BigDecimal(payloadNode.get("saldo").asText()));
+                        estado.adicionarSaldo(new BigDecimal(payloadNode.get("saldo").asString()));
                     }
                     if (payloadNode.has("cpfCliente")) {
-                        estado.setCpfCliente(payloadNode.get("cpfCliente").asText());
+                        estado.setCpfCliente(payloadNode.get("cpfCliente").asString());
                     } else if (payloadNode.has("cpf")) {
-                        estado.setCpfCliente(payloadNode.get("cpf").asText());
+                        estado.setCpfCliente(payloadNode.get("cpf").asString());
                     }
                     if (payloadNode.has("gerenteCpf")) {
-                        estado.setGerenteCpf(payloadNode.get("gerenteCpf").asText());
+                        estado.setGerenteCpf(payloadNode.get("gerenteCpf").asString());
                     } else if (payloadNode.has("cpfGerente")) {
-                        estado.setGerenteCpf(payloadNode.get("cpfGerente").asText());
+                        estado.setGerenteCpf(payloadNode.get("cpfGerente").asString());
                     }
                 }
                 case "DEPOSITO", "TRANSFERENCIADESTINO" -> {
                     if (payloadNode.has("valor")) {
-                        estado.adicionarSaldo(new BigDecimal(payloadNode.get("valor").asText()));
+                        estado.adicionarSaldo(new BigDecimal(payloadNode.get("valor").asString()));
                     }
                 }
                 case "SAQUE", "TRANSFERENCIAORIGEM" -> {
                     if (payloadNode.has("valor")) {
-                        estado.subtrairSaldo(new BigDecimal(payloadNode.get("valor").asText()));
+                        estado.subtrairSaldo(new BigDecimal(payloadNode.get("valor").asString()));
                     }
                 }
                 case "GERENTEALTERADO" -> {
                     if (payloadNode.has("gerenteCpf")) {
-                        estado.setGerenteCpf(payloadNode.get("gerenteCpf").asText());
+                        estado.setGerenteCpf(payloadNode.get("gerenteCpf").asString());
                     } else if (payloadNode.has("cpfGerente")) {
-                        estado.setGerenteCpf(payloadNode.get("cpfGerente").asText());
+                        estado.setGerenteCpf(payloadNode.get("cpfGerente").asString());
                     }
                 }
                 default -> {
@@ -236,17 +236,17 @@ public class ContaService {
     private JsonNode parseJsonNode(String json) {
         try {
             if (json == null || json.trim().isEmpty()) {
-                return objectMapper.createObjectNode();
+                return jsonMapper.createObjectNode();
             }
-            return objectMapper.readTree(json);
+            return jsonMapper.readTree(json);
         } catch (Exception e) {
-            return objectMapper.createObjectNode();
+            return jsonMapper.createObjectNode();
         }
     }
 
     private String converterParaJson(Object objeto) {
         try {
-            return objectMapper.writeValueAsString(objeto);
+            return jsonMapper.writeValueAsString(objeto);
         } catch (Exception e) {
             throw new RuntimeException("Erro ao serializar payload do evento.", e);
         }
