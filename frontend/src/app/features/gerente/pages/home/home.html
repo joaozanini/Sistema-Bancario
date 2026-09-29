@@ -1,1 +1,147 @@
-<p>home works!</p>
+<section class="gerente-page">
+  <header class="page-header">
+    <h1>Solicitações de Autocadastro</h1>
+    <p>Gerencie as solicitações de abertura de contas.</p>
+  </header>
+
+  <div class="filtros" role="group" aria-label="Filtrar por status">
+    @for (f of filtros; track f.valor) {
+      <button
+        type="button"
+        class="filtro"
+        [class.ativo]="filtro() === f.valor"
+        [attr.aria-pressed]="filtro() === f.valor"
+        (click)="selecionarFiltro(f.valor)"
+      >
+        {{ f.rotulo }}
+        <span class="contador">{{ totalPorFiltro()[f.valor] }}</span>
+      </button>
+    }
+  </div>
+
+  @if (mensagem()) {
+    <p class="aviso sucesso" role="status">{{ mensagem() }}</p>
+  }
+  @if (erro()) {
+    <p class="aviso falha" role="alert">
+      {{ erro() }}
+      <button type="button" class="link" (click)="carregar()">Tentar novamente</button>
+    </p>
+  }
+
+  <div class="card" [class.atualizando]="carregando() && solicitacoes().length > 0">
+    @if (carregando() && solicitacoes().length === 0) {
+      <p class="vazio">Carregando solicitações...</p>
+    } @else if (visiveis().length === 0) {
+      <p class="vazio">Nenhuma solicitação encontrada.</p>
+    } @else {
+      <div class="tabela-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">CPF</th>
+              <th scope="col">Nome</th>
+              <th scope="col" class="valor">Salário</th>
+              <th scope="col">Status</th>
+              <th scope="col">Motivo</th>
+              <th scope="col">Data/Hora</th>
+              <th scope="col" class="acoes">Ações</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (s of visiveis(); track s.id) {
+              <tr>
+                <td>{{ s.cpf | cpf }}</td>
+                <td class="nome">{{ s.nome }}</td>
+                <td class="valor">{{ s.salario | brlCurrency }}</td>
+                <td>
+                  <span
+                    class="badge"
+                    [class.pendente]="s.status === 'PENDENTE'"
+                    [class.aprovado]="s.status === 'APROVADO'"
+                    [class.nao-aprovado]="s.status === 'NAO_APROVADO'"
+                  >
+                    {{ rotuloStatus[s.status] }}
+                  </span>
+                </td>
+                <td class="motivo">{{ s.motivo ?? '—' }}</td>
+                <td>{{ s.dataHora | brDateTime }}</td>
+                <td class="acoes">
+                  <div class="acoes-botoes">
+                    @if (s.status === 'PENDENTE') {
+                      <button
+                        type="button"
+                        class="btn aprovar"
+                        [disabled]="processandoId() !== null"
+                        (click)="aprovar(s)"
+                      >
+                        {{ processandoId() === s.id && !emRecusa() ? 'Aprovando...' : 'Aprovar' }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn recusar"
+                        [disabled]="processandoId() !== null"
+                        (click)="abrirRecusa(s)"
+                      >
+                        Recusar
+                      </button>
+                    } @else {
+                      <span class="processado">Processado</span>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  @if (emRecusa(); as alvo) {
+    <div class="overlay">
+      <form
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-recusa"
+        (ngSubmit)="confirmarRecusa()"
+        (keydown.escape)="fecharRecusa()"
+        novalidate
+      >
+        <h2 id="titulo-recusa">Recusar solicitação</h2>
+        <p class="modal-info">{{ alvo.nome }} — CPF {{ alvo.cpf | cpf }}</p>
+
+        <label for="motivo">Motivo da recusa</label>
+        <textarea
+          id="motivo"
+          name="motivo"
+          rows="4"
+          maxlength="500"
+          [(ngModel)]="motivo"
+          placeholder="Ex.: Documentação incompleta"
+          required
+        ></textarea>
+
+        @if (erroMotivo()) {
+          <p class="erro-motivo" role="alert">{{ erroMotivo() }}</p>
+        }
+
+        <div class="modal-acoes">
+          <button
+            type="button"
+            class="btn secundario"
+            [disabled]="processandoId() !== null"
+            (click)="fecharRecusa()"
+          >
+            Cancelar
+          </button>
+          <button type="submit" class="btn recusar" [disabled]="processandoId() !== null">
+            {{ processandoId() ? 'Recusando...' : 'Confirmar recusa' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+</section>
