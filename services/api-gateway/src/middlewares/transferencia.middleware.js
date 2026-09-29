@@ -1,4 +1,5 @@
 const contaService = require('../services/conta.service');
+const clienteService = require('../services/cliente.service');
 
 // R6: a conta destino tem de existir — o Gateway resolve o CPF do titular antes de rotear ao MS Conta
 async function enriquecerCpfDestino(req, res, next) {
@@ -20,4 +21,30 @@ async function enriquecerCpfDestino(req, res, next) {
   return next();
 }
 
-module.exports = { enriquecerCpfDestino };
+// R6: o MS Conta grava os nomes no evento mas não os conhece — quem resolve é o
+// Gateway. Sem isso o extrato (R7) fica sem o nome da contraparte.
+async function enriquecerNomes(req, res, next) {
+  const cpfOrigem = req.user.cpf;
+  const { cpfDestino } = req.body;
+
+  try {
+    const [nomeOrigem, nomeDestino] = await Promise.all([
+      clienteService.buscarNome(cpfOrigem),
+      clienteService.buscarNome(cpfDestino),
+    ]);
+
+    req.body.cpfOrigem = cpfOrigem;
+    req.body.nomeOrigem = nomeOrigem;
+    req.body.nomeDestino = nomeDestino;
+  } catch (err) {
+    if (err instanceof clienteService.ClienteNaoEncontradoError) {
+      return res.status(404).json({ message: 'Cliente de origem ou destino não encontrado.' });
+    }
+    console.error('Falha ao consultar nomes no MS Cliente:', err.message);
+    return res.status(502).json({ message: 'Serviço de clientes indisponível.' });
+  }
+
+  return next();
+}
+
+module.exports = { enriquecerCpfDestino, enriquecerNomes };
