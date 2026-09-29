@@ -20,6 +20,7 @@ router.post(
   contaProxy,
 );
 
-router.use('/contas', verifyJwtAndSession, injectUserHeaders, contaProxy);
+// router.all (e não router.use) para o Express não tirar o prefixo /contas do req.url repassado ao MS.
+router.all(['/contas', '/contas/*'], verifyJwtAndSession, injectUserHeaders, contaProxy);
 
 module.exports = router;
