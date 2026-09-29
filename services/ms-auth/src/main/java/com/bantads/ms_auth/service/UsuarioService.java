@@ -27,7 +27,9 @@ public class UsuarioService {
         Optional<Usuario> encontrado = repository.findByLogin(login);
         String hashArmazenado = encontrado.map(Usuario::getSenhaHash).orElse(hashDescartavel);
 
-        if (!passwordEncoder.matches(senha, hashArmazenado) || encontrado.isEmpty()) {
+        // o hash roda sempre, mesmo para inativo/inexistente, para nao vazar pelo tempo de resposta
+        boolean senhaConfere = passwordEncoder.matches(senha, hashArmazenado);
+        if (encontrado.isEmpty() || !senhaConfere || !encontrado.get().isAtivo()) {
             throw new CredenciaisInvalidasException();
         }
         return encontrado.get();
