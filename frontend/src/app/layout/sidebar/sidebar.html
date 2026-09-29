@@ -1,29 +1,16 @@
 <aside class="sidebar">
   <h2>BANTADS</h2>
   <nav aria-label="Menu principal">
-    <a
-      routerLink="/cliente"
-      routerLinkActive="active"
-      [routerLinkActiveOptions]="{ exact: true }"
-      ariaCurrentWhenActive="page"
-      >Início</a
-    >
-    <a
-      routerLink="/cliente"
-      [queryParams]="{ secao: 'conta' }"
-      routerLinkActive="active"
-      [routerLinkActiveOptions]="{ exact: true }"
-      ariaCurrentWhenActive="page"
-      >Minha conta</a
-    >
-    <a
-      routerLink="/cliente"
-      [queryParams]="{ secao: 'extrato' }"
-      routerLinkActive="active"
-      [routerLinkActiveOptions]="{ exact: true }"
-      ariaCurrentWhenActive="page"
-      >Extrato</a
-    >
+        @for (item of itens; track item.rotulo) {
+      <a
+        [routerLink]="item.link"
+        [queryParams]="item.queryParams"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        ariaCurrentWhenActive="page"
+        >{{ item.rotulo }}</a
+      >
+    }
     <a class="logout" routerLink="/login" (click)="sair()">Sair</a>
   </nav>
 </aside>

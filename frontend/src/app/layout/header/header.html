@@ -1,4 +1,19 @@
 <header class="header">
-  <span>Internet Banking</span>
+    @if (usuario) {
+    <div class="usuario">
+      <span class="avatar" aria-hidden="true">{{ iniciais }}</span>
+      <div class="dados">
+        <strong>
+          {{ usuario.nome }}
+          @if (rotuloTipo) {
+            <span class="tipo">({{ rotuloTipo }})</span>
+          }
+        </strong>
+        <span>{{ usuario.email }}</span>
+      </div>
+    </div>
+  } @else {
+    <span>Internet Banking</span>
+  }
   <span class="brand">BANTADS</span>
 </header>

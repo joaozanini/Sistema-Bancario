@@ -46,6 +46,15 @@ export class AuthService {
     return usuario ? (JSON.parse(usuario) as UsuarioLogado) : null;
   }
 
+  salvarTipo(tipo: TipoUsuario) {
+    localStorage.setItem('tipo', tipo);
+  }
+
+  obterTipo(): TipoUsuario | null {
+    const tipo = (localStorage.getItem('tipo') ?? '').toUpperCase();
+    return tipo === 'CLIENTE' || tipo === 'GERENTE' || tipo === 'ADMIN' ? tipo : null;
+  }
+
   estaAutenticado() {
     return !!this.obterToken();
   }
@@ -53,5 +62,6 @@ export class AuthService {
   logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
+    localStorage.removeItem('tipo');
   }
 }
