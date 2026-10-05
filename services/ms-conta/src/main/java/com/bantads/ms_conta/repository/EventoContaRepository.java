@@ -2,6 +2,7 @@ package com.bantads.ms_conta.repository;
 
 import com.bantads.ms_conta.model.EventoConta;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -20,4 +21,12 @@ public interface EventoContaRepository extends JpaRepository<EventoConta, String
 
     @Query("SELECT COALESCE(MAX(e.versao), 0) FROM EventoConta e WHERE e.objetoId = :objetoId")
     Integer findMaxVersaoByObjetoId(@Param("objetoId") String objetoId);
+
+    List<EventoConta> findByTipo(String tipo);
+
+    List<EventoConta> findByTipoIn(List<String> tipos);
+
+    @Modifying
+    @Query("DELETE FROM EventoConta e WHERE e.objetoId = :objetoId")
+    void deleteByObjetoId(@Param("objetoId") String objetoId);
 }
