@@ -3,6 +3,7 @@ const cors = require('cors');
 const healthRoutes = require('./routes/health.routes');
 const rebootRoutes = require('./routes/reboot.routes');
 const authRoutes = require('./routes/auth.routes');
+const jobsRoutes = require('./routes/jobs.routes');
 const proxyRoutes = require('./routes/proxy.routes');
 
 const app = express();
@@ -13,6 +14,7 @@ app.use(express.json());
 app.use(healthRoutes);
 app.use(rebootRoutes);
 app.use(authRoutes);
+app.use(jobsRoutes);
 app.use(proxyRoutes);
 
 module.exports = app;
