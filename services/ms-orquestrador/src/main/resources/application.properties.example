@@ -25,3 +25,8 @@ spring.rabbitmq.listener.simple.default-requeue-rejected=false
 spring.data.redis.host=${REDIS_HOST:localhost}
 spring.data.redis.port=${REDIS_PORT:6379}
 spring.data.redis.password=${REDIS_PASSWORD:}
+
+# SAGA (enunciado 5.9): prazo de resposta de cada passo transacional
+saga.timeout-passo=30s
+saga.timeout.verificar=true
+saga.timeout.intervalo-verificacao=1s

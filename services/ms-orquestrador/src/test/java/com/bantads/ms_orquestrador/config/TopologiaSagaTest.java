@@ -11,11 +11,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.amqp.autoconfigure.RabbitProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 
-// Le o application.properties real de producao; so os listeners ficam desligados,
-// senao tentariam conectar num broker que nao existe durante o build.
+// Le o application.properties real de producao; so os listeners e o agendador de timeouts ficam desligados,
+// senao tentariam conectar num broker e num Redis que nao existem durante o build.
 @SpringBootTest(properties = {
         "spring.rabbitmq.listener.simple.auto-startup=false",
-        "spring.rabbitmq.listener.direct.auto-startup=false"
+        "spring.rabbitmq.listener.direct.auto-startup=false",
+        "saga.timeout.verificar=false"
 })
 class TopologiaSagaTest {
 
