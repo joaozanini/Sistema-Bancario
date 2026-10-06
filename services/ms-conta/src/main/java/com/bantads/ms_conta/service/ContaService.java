@@ -1,5 +1,6 @@
 package com.bantads.ms_conta.service;
 
+import com.bantads.ms_conta.config.RabbitMQConfig;
 import com.bantads.ms_conta.dto.ContaDTO;
 import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
 import com.bantads.ms_conta.dto.TransferenciaResponseDTO;
@@ -9,37 +10,185 @@ import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.exception.TransferenciaInvalidaException;
 import com.bantads.ms_conta.model.EventoConta;
 import com.bantads.ms_conta.repository.EventoContaRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class ContaService {
 
-    private final EventoContaRepository repository;
-    private final JsonMapper jsonMapper;
+    private static final Logger log = LoggerFactory.getLogger(ContaService.class);
 
-    public ContaService(EventoContaRepository repository, JsonMapper jsonMapper) {
+    private final EventoContaRepository repository;
+    private final ObjectMapper objectMapper;
+    private final RabbitTemplate rabbitTemplate;
+    private final Random random = new Random();
+
+    public ContaService(
+            EventoContaRepository repository,
+            ObjectMapper objectMapper,
+            @Autowired(required = false) RabbitTemplate rabbitTemplate
+    ) {
         this.repository = repository;
-        this.jsonMapper = jsonMapper;
+        this.objectMapper = objectMapper;
+        this.rabbitTemplate = rabbitTemplate;
+    }
+
+    /**
+     * SAGA Passo 3: Identifica, dentre os gerentes ativos informados pelo Orquestrador,
+     * o que possui menos clientes/contas atreladas (gerentes sem conta possuem 0 clientes).
+     */
+    @Transactional(readOnly = true)
+    public String identificarGerenteComMenosClientes(List<String> gerentesAtivos) {
+        if (gerentesAtivos == null || gerentesAtivos.isEmpty()) {
+            throw new IllegalArgumentException("Lista de gerentes ativos não pode ser vazia.");
+        }
+
+        // Inicializa mapa de contagem para todos os gerentes ativos com 0
+        Map<String, Long> contagemPorGerente = new HashMap<>();
+        for (String cpf : gerentesAtivos) {
+            if (cpf != null && !cpf.isBlank()) {
+                contagemPorGerente.put(cpf.trim(), 0L);
+            }
+        }
+
+        // Busca todos os eventos de criação e alteração de gerente no Event Store
+        List<EventoConta> eventos = repository.findByTipoIn(List.of("Criado", "CRIADO", "GerenteAlterado", "GERENTEALTERADO"));
+        
+        // Mapeia cada conta para seu gerente atual
+        Map<String, String> gerenteAtualPorConta = new HashMap<>();
+        // Ordena por versão para garantir que o último evento de cada conta prevaleça
+        eventos.stream()
+                .sorted(Comparator.comparing(EventoConta::getVersao))
+                .forEach(evento -> {
+                    JsonNode node = parseJsonNode(evento.getPayload());
+                    String gerenteCpf = null;
+                    if (node.has("gerenteCpf")) {
+                        gerenteCpf = node.get("gerenteCpf").asText();
+                    } else if (node.has("cpfGerente")) {
+                        gerenteCpf = node.get("cpfGerente").asText();
+                    }
+                    if (gerenteCpf != null && !gerenteCpf.isBlank()) {
+                        gerenteAtualPorConta.put(evento.getObjetoId(), gerenteCpf.trim());
+                    }
+                });
+
+        // Contabiliza as contas atreladas a cada gerente ativo
+        for (String gerenteCpf : gerenteAtualPorConta.values()) {
+            if (contagemPorGerente.containsKey(gerenteCpf)) {
+                contagemPorGerente.put(gerenteCpf, contagemPorGerente.get(gerenteCpf) + 1);
+            }
+        }
+
+        // Seleciona o gerente com a menor quantidade de contas (em caso de empate, o primeiro)
+        String gerenteEscolhido = null;
+        long menorQuantidade = Long.MAX_VALUE;
+
+        for (Map.Entry<String, Long> entry : contagemPorGerente.entrySet()) {
+            if (entry.getValue() < menorQuantidade) {
+                menorQuantidade = entry.getValue();
+                gerenteEscolhido = entry.getKey();
+            }
+        }
+
+        log.info("Gerente escolhido com menos clientes: {} (total: {})", gerenteEscolhido, menorQuantidade);
+        return gerenteEscolhido != null ? gerenteEscolhido : gerentesAtivos.get(0);
+    }
+
+    /**
+     * SAGA Passo 6: Cria uma nova conta bancária com ID aleatório único de 4 dígitos
+     * e vincula ao gerente responsável, persistindo o evento 'Criado' no Event Store.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> criarConta(String cpfCliente, String gerenteCpf, String salarioStr) {
+        if (cpfCliente == null || cpfCliente.isBlank()) {
+            throw new IllegalArgumentException("CPF do cliente é obrigatório para criação de conta.");
+        }
+        if (gerenteCpf == null || gerenteCpf.isBlank()) {
+            throw new IllegalArgumentException("CPF do gerente é obrigatório para criação de conta.");
+        }
+
+        // Sorteia número de conta único de 4 dígitos com retry em caso de colisão
+        String numeroConta;
+        do {
+            numeroConta = String.format("%04d", random.nextInt(10000));
+        } while (repository.existsByObjetoId(numeroConta));
+
+        LocalDateTime agora = LocalDateTime.now();
+        BigDecimal salario = (salarioStr != null && !salarioStr.isBlank()) ? new BigDecimal(salarioStr) : BigDecimal.ZERO;
+        // Limite padrão inicial proporcional ao salário se >= 2000 (ex: 50%), ou padrão
+        BigDecimal limite = salario.compareTo(new BigDecimal("2000")) >= 0 ? salario.divide(new BigDecimal("2"), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+
+        Map<String, Object> payloadMap = new HashMap<>();
+        payloadMap.put("cpfCliente", cpfCliente.trim());
+        payloadMap.put("gerenteCpf", gerenteCpf.trim());
+        payloadMap.put("saldo", "0.00");
+        payloadMap.put("salario", salario.setScale(2, RoundingMode.HALF_UP).toString());
+        payloadMap.put("limite", limite.setScale(2, RoundingMode.HALF_UP).toString());
+        payloadMap.put("dataCriacao", agora.toString());
+
+        String payloadJson = converterParaJson(payloadMap);
+
+        EventoConta evento = new EventoConta();
+        evento.setId(UUID.randomUUID().toString());
+        evento.setObjetoId(numeroConta);
+        evento.setTipo("Criado");
+        evento.setPayload(payloadJson);
+        evento.setVersao(1);
+        evento.setTimestamp(agora);
+
+        repository.save(evento);
+        log.info("Conta {} criada com sucesso para o cliente {} vinculada ao gerente {}", numeroConta, cpfCliente, gerenteCpf);
+
+        // Publica evento para sincronização CQRS (ms.conta.events)
+        publicarEventoCqrs(evento);
+
+        Map<String, Object> resultado = new HashMap<>();
+        resultado.put("numeroConta", numeroConta);
+        resultado.put("cpfCliente", cpfCliente.trim());
+        resultado.put("gerenteCpf", gerenteCpf.trim());
+        resultado.put("saldo", "0.00");
+        resultado.put("limite", limite.setScale(2, RoundingMode.HALF_UP).toString());
+        return resultado;
+    }
+
+    /**
+     * SAGA Compensação do Passo 6: Remove a conta criada no Event Store caso a SAGA falhe em passo posterior.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void compensarCriacaoConta(String numeroConta, String cpfCliente) {
+        if (numeroConta != null && !numeroConta.isBlank()) {
+            repository.deleteByObjetoId(numeroConta.trim());
+            log.warn("Compensação SAGA executada: Conta {} removida do Event Store.", numeroConta);
+            return;
+        }
+
+        if (cpfCliente != null && !cpfCliente.isBlank()) {
+            List<EventoConta> eventos = repository.findByTipoIn(List.of("Criado", "CRIADO"));
+            for (EventoConta evento : eventos) {
+                JsonNode node = parseJsonNode(evento.getPayload());
+                String cpf = node.has("cpfCliente") ? node.get("cpfCliente").asText() : (node.has("cpf") ? node.get("cpf").asText() : null);
+                if (cpfCliente.trim().equals(cpf)) {
+                    repository.deleteByObjetoId(evento.getObjetoId());
+                    log.warn("Compensação SAGA executada: Conta {} removida para o cliente {}.", evento.getObjetoId(), cpfCliente);
+                }
+            }
+        }
     }
 
     /**
      * Requisito R6: Transferência Atômica entre contas.
-     * Grava dois eventos (TransferênciaOrigem e TransferênciaDestino) de forma atômica
-     * em uma única transação local (@Transactional) no Event Store.
-     * A validação de saldo é feita estritamente através do cálculo dinâmico (replay)
-     * dos eventos anteriores no Command side.
      */
     @Transactional(rollbackFor = Exception.class)
     public TransferenciaResponseDTO transferir(String contaOrigem, TransferenciaRequestDTO dto, String xUserCpf) {
@@ -140,6 +289,10 @@ public class ContaService {
         repository.save(eventoOrigem);
         repository.save(eventoDestino);
 
+        // Publica eventos na fila CQRS
+        publicarEventoCqrs(eventoOrigem);
+        publicarEventoCqrs(eventoDestino);
+
         // 7. Montar resposta HATEOAS
         TransferenciaResponseDTO resposta = new TransferenciaResponseDTO();
         resposta.setIdOrigem(eventoOrigem.getId());
@@ -188,34 +341,34 @@ public class ContaService {
             switch (tipoNormalizado) {
                 case "CRIADO" -> {
                     if (payloadNode.has("saldo")) {
-                        estado.adicionarSaldo(new BigDecimal(payloadNode.get("saldo").asString()));
+                        estado.adicionarSaldo(new BigDecimal(payloadNode.get("saldo").asText()));
                     }
                     if (payloadNode.has("cpfCliente")) {
-                        estado.setCpfCliente(payloadNode.get("cpfCliente").asString());
+                        estado.setCpfCliente(payloadNode.get("cpfCliente").asText());
                     } else if (payloadNode.has("cpf")) {
-                        estado.setCpfCliente(payloadNode.get("cpf").asString());
+                        estado.setCpfCliente(payloadNode.get("cpf").asText());
                     }
                     if (payloadNode.has("gerenteCpf")) {
-                        estado.setGerenteCpf(payloadNode.get("gerenteCpf").asString());
+                        estado.setGerenteCpf(payloadNode.get("gerenteCpf").asText());
                     } else if (payloadNode.has("cpfGerente")) {
-                        estado.setGerenteCpf(payloadNode.get("cpfGerente").asString());
+                        estado.setGerenteCpf(payloadNode.get("cpfGerente").asText());
                     }
                 }
                 case "DEPOSITO", "TRANSFERENCIADESTINO" -> {
                     if (payloadNode.has("valor")) {
-                        estado.adicionarSaldo(new BigDecimal(payloadNode.get("valor").asString()));
+                        estado.adicionarSaldo(new BigDecimal(payloadNode.get("valor").asText()));
                     }
                 }
                 case "SAQUE", "TRANSFERENCIAORIGEM" -> {
                     if (payloadNode.has("valor")) {
-                        estado.subtrairSaldo(new BigDecimal(payloadNode.get("valor").asString()));
+                        estado.subtrairSaldo(new BigDecimal(payloadNode.get("valor").asText()));
                     }
                 }
                 case "GERENTEALTERADO" -> {
                     if (payloadNode.has("gerenteCpf")) {
-                        estado.setGerenteCpf(payloadNode.get("gerenteCpf").asString());
+                        estado.setGerenteCpf(payloadNode.get("gerenteCpf").asText());
                     } else if (payloadNode.has("cpfGerente")) {
-                        estado.setGerenteCpf(payloadNode.get("cpfGerente").asString());
+                        estado.setGerenteCpf(payloadNode.get("cpfGerente").asText());
                     }
                 }
                 default -> {
@@ -224,6 +377,16 @@ public class ContaService {
             }
         }
         return estado;
+    }
+
+    private void publicarEventoCqrs(EventoConta evento) {
+        if (rabbitTemplate != null) {
+            try {
+                rabbitTemplate.convertAndSend(RabbitMQConfig.FILA_CONTA_EVENTS, evento);
+            } catch (Exception e) {
+                log.warn("Não foi possível publicar evento CQRS na fila {}: {}", RabbitMQConfig.FILA_CONTA_EVENTS, e.getMessage());
+            }
+        }
     }
 
     private String normalizarTipoEvento(String tipo) {
@@ -236,17 +399,17 @@ public class ContaService {
     private JsonNode parseJsonNode(String json) {
         try {
             if (json == null || json.trim().isEmpty()) {
-                return jsonMapper.createObjectNode();
+                return objectMapper.createObjectNode();
             }
-            return jsonMapper.readTree(json);
+            return objectMapper.readTree(json);
         } catch (Exception e) {
-            return jsonMapper.createObjectNode();
+            return objectMapper.createObjectNode();
         }
     }
 
     private String converterParaJson(Object objeto) {
         try {
-            return jsonMapper.writeValueAsString(objeto);
+            return objectMapper.writeValueAsString(objeto);
         } catch (Exception e) {
             throw new RuntimeException("Erro ao serializar payload do evento.", e);
         }
