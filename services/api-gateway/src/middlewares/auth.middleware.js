@@ -43,4 +43,13 @@ function injectUserHeaders(req, res, next) {
   next();
 }
 
-module.exports = { verifyJwtAndSession, injectUserHeaders };
+function exigirTipo(tipoPermitido) {
+  return (req, res, next) => {
+    if (String(req.user.tipo).toUpperCase() !== tipoPermitido) {
+      return res.status(403).json({ message: 'Acesso negado.' });
+    }
+    return next();
+  };
+}
+
+module.exports = { verifyJwtAndSession, injectUserHeaders, exigirTipo };
