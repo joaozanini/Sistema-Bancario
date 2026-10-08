@@ -19,4 +19,14 @@ async function buscarCpfTitular(numeroConta) {
   return cpfCliente;
 }
 
-module.exports = { buscarCpfTitular, ContaNaoEncontradaError };
+async function listar() {
+  const resposta = await fetch(`${contaServiceUrl}/contas`);
+
+  if (!resposta.ok) {
+    throw new Error(`MS Conta respondeu ${resposta.status}`);
+  }
+
+  return resposta.json();
+}
+
+module.exports = { buscarCpfTitular, listar, ContaNaoEncontradaError };

@@ -4,6 +4,7 @@ const healthRoutes = require('./routes/health.routes');
 const rebootRoutes = require('./routes/reboot.routes');
 const authRoutes = require('./routes/auth.routes');
 const jobsRoutes = require('./routes/jobs.routes');
+const clientesRoutes = require('./routes/clientes.routes');
 const proxyRoutes = require('./routes/proxy.routes');
 
 const app = express();
@@ -15,6 +16,7 @@ app.use(healthRoutes);
 app.use(rebootRoutes);
 app.use(authRoutes);
 app.use(jobsRoutes);
+app.use(clientesRoutes);
 app.use(proxyRoutes);
 
 module.exports = app;
