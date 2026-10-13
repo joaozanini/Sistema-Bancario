@@ -25,6 +25,10 @@ Sistema de Internet Banking desenvolvido para a disciplina DS152 — Desenvolvim
 
 Copie `.env.example` para `.env` e preencha as variáveis locais (senha de app do Gmail, chave secreta do JWT etc.). **Nunca** commitar o `.env` com os valores reais.
 
+Cada microsserviço Spring Boot lê `src/main/resources/application.properties`, que não é versionado: o repositório traz só o `application.properties.example`, sem segredos (os valores vêm das variáveis do `.env`). Depois de clonar, copie o exemplo em cada serviço:
+
+Sem essa cópia o serviço sobe sem porta, schema do banco e política de retentativa, e os testes do Orquestrador falham. O PostgreSQL usa um schema por serviço (`conta`, `cliente`, `gerente`), criado pelo Flyway na primeira subida.
+
 ## CI/CD
 
 O pipeline fica em `.github/workflows/ci-cd.yml` e roda no GitHub Actions:

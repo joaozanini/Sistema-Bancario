@@ -59,6 +59,11 @@ jobs:
           cache: maven
           cache-dependency-path: services/${{ matrix.service }}/pom.xml
 
+      - name: Configuracao a partir do exemplo
+        run: |
+          f=src/main/resources/application.properties
+          [ -f "$f" ] || cp "$f.example" "$f"
+
       - name: Build e testes
         run: sh mvnw -B -ntp verify
 
