@@ -156,11 +156,24 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
-.success-message {
+button:disabled {
+  background-color: #93b4f5;
+  cursor: not-allowed;
+}
+
+.success-message,
+.error-message {
   margin: 14px 0 0;
-  color: #15803d;
   font-size: 14px;
   text-align: center;
+}
+
+.success-message {
+  color: #15803d;
+}
+
+.error-message {
+  color: #b91c1c;
 }
 
 .login-link {
