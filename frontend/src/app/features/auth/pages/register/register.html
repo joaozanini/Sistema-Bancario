@@ -206,12 +206,18 @@
         </div>
       </fieldset>
 
-      <button type="submit">Enviar solicitação</button>
+      <button type="submit" [disabled]="enviando">
+        {{ enviando ? 'Enviando...' : 'Enviar solicitação' }}
+      </button>
 
       @if (solicitacaoEnviada) {
         <p class="success-message" role="status">
-          Solicitação preenchida com sucesso.
+          Solicitação enviada com sucesso. Você receberá um e-mail quando ela for analisada.
         </p>
+      }
+
+      @if (erro) {
+        <p class="error-message" role="alert">{{ erro }}</p>
       }
     </form>
 
