@@ -2,7 +2,6 @@ package com.bantads.ms_gerente.service;
 
 import com.bantads.ms_gerente.dto.AtualizacaoGerenteDTO;
 import com.bantads.ms_gerente.dto.GerenteDTO;
-import com.bantads.ms_gerente.exception.EmailJaCadastradoException;
 import com.bantads.ms_gerente.exception.GerenteNaoEncontradoException;
 import com.bantads.ms_gerente.model.Gerente;
 import com.bantads.ms_gerente.repository.GerenteRepository;
@@ -34,18 +33,17 @@ class GerenteServiceTest {
     private GerenteService service;
 
     @Test
-    @DisplayName("Deve atualizar nome, e-mail e telefone mantendo CPF e situação")
+    @DisplayName("Deve atualizar nome e telefone mantendo CPF, e-mail e situação")
     void deveAtualizarDadosDoGerente() {
         Gerente gerente = gerenteExistente();
         when(repository.findById(CPF)).thenReturn(Optional.of(gerente));
-        when(repository.existsByEmailAndCpfNot("novo@bantads.com.br", CPF)).thenReturn(false);
         when(repository.save(gerente)).thenReturn(gerente);
 
         GerenteDTO atualizado = service.atualizar(CPF,
-                new AtualizacaoGerenteDTO("Geniéve Silva", "novo@bantads.com.br", "41988887777"));
+                new AtualizacaoGerenteDTO("Geniéve Silva", "41988887777"));
 
         assertThat(atualizado).isEqualTo(
-                new GerenteDTO(CPF, "Geniéve Silva", "novo@bantads.com.br", "41988887777", true));
+                new GerenteDTO(CPF, "Geniéve Silva", "ger1@bantads.com.br", "41988887777", true));
     }
 
     @Test
@@ -54,21 +52,8 @@ class GerenteServiceTest {
         when(repository.findById(CPF)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.atualizar(CPF,
-                new AtualizacaoGerenteDTO("Geniéve", "ger1@bantads.com.br", null)))
+                new AtualizacaoGerenteDTO("Geniéve", null)))
                 .isInstanceOf(GerenteNaoEncontradoException.class);
-
-        verify(repository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("Deve lançar exceção quando o e-mail pertence a outro gerente")
-    void deveFalharQuandoEmailPertenceAOutroGerente() {
-        when(repository.findById(CPF)).thenReturn(Optional.of(gerenteExistente()));
-        when(repository.existsByEmailAndCpfNot("ger2@bantads.com.br", CPF)).thenReturn(true);
-
-        assertThatThrownBy(() -> service.atualizar(CPF,
-                new AtualizacaoGerenteDTO("Geniéve", "ger2@bantads.com.br", null)))
-                .isInstanceOf(EmailJaCadastradoException.class);
 
         verify(repository, never()).save(any());
     }
