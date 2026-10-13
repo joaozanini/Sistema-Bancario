@@ -2,7 +2,7 @@ const { clienteServiceUrl } = require('../config/services');
 
 class ClienteNaoEncontradoError extends Error {}
 
-async function buscarNome(cpf) {
+async function buscar(cpf) {
   const resposta = await fetch(`${clienteServiceUrl}/clientes/${encodeURIComponent(cpf)}`);
 
   if (resposta.status === 404) {
@@ -12,11 +12,15 @@ async function buscarNome(cpf) {
     throw new Error(`MS Cliente respondeu ${resposta.status}`);
   }
 
-  const { nome } = await resposta.json();
+  return resposta.json();
+}
+
+async function buscarNome(cpf) {
+  const { nome } = await buscar(cpf);
   if (!nome) {
     throw new Error(`MS Cliente não retornou o nome do CPF ${cpf}`);
   }
   return nome;
 }
 
-module.exports = { buscarNome, ClienteNaoEncontradoError };
+module.exports = { buscar, buscarNome, ClienteNaoEncontradoError };
