@@ -27,6 +27,9 @@ router.post(
   contaProxy,
 );
 
+// a listagem traz o saldo de todas as contas (R11, R12, R16): só gerente
+router.get('/contas', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, contaProxy);
+
 // router.all (e não router.use) para o Express não tirar o prefixo /contas do req.url repassado ao MS.
 router.all(['/contas', '/contas/*'], verifyJwtAndSession, injectUserHeaders, contaProxy);
 
