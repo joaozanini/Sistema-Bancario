@@ -1,5 +1,5 @@
-spring.data.mongodb.uri=
-server.port=
+spring.mongodb.uri=${MONGO_URI:mongodb://localhost:27017/bantads}
+server.port=${SERVER_PORT:8081}
 
 # Cria o indice unico de login declarado em Usuario ao subir a aplicação
 spring.data.mongodb.auto-index-creation=true
