@@ -106,7 +106,7 @@ public class ContaCommandConsumer {
     private RespostaSagaDTO executarComando(String sagaId, String tipo, Map<String, Object> payload) {
         String tipoNorm = tipo != null ? tipo.toLowerCase().replace("_", "-").trim() : "";
 
-        // 1. Identificar Gerente com Menos Clientes (Passo 3 da SAGA Aprovar Cliente)
+        // 1. Identificar Gerente com Menos Clientes (Passo 3 da SAGA Aprovar Cliente - R9)
         if (tipoNorm.contains("identificar-gerente") || tipoNorm.contains("gerente-menos-clientes") || tipoNorm.equals("conta.identificar-gerente") || tipoNorm.equals("ms.conta.identificar-gerente")) {
             List<String> gerentes = extrairListaGerentes(payload);
             String gerenteEscolhido = contaService.identificarGerenteComMenosClientes(gerentes);
@@ -119,7 +119,47 @@ public class ContaCommandConsumer {
             return RespostaSagaDTO.sucesso(sagaId, tipo, respostaPayload);
         }
 
-        // 2. Criar Conta (Passo 6 da SAGA Aprovar Cliente)
+        // 2. Identificar Conta para Novo Gerente (Passo 3 da SAGA Inserir Gerente - R13)
+        if (tipoNorm.contains("identificar-conta-transferir") || tipoNorm.contains("identificar-conta") || tipoNorm.equals("conta.identificar-transferencia")) {
+            List<String> gerentes = extrairListaGerentes(payload);
+            Map<String, Object> contaTransferir = contaService.identificarContaParaNovoGerente(gerentes);
+
+            Map<String, Object> respostaPayload = new HashMap<>();
+            if (contaTransferir == null) {
+                respostaPayload.put("status", "SEM_CONTA");
+                respostaPayload.put("mensagem", "sem conta");
+                respostaPayload.put("temConta", false);
+            } else {
+                respostaPayload.putAll(contaTransferir);
+                respostaPayload.put("status", "COM_CONTA");
+                respostaPayload.put("temConta", true);
+            }
+            return RespostaSagaDTO.sucesso(sagaId, tipo, respostaPayload);
+        }
+
+        // 3. Atribuição de Conta ao Novo Gerente (Passo 4 da SAGA Inserir Gerente - R13)
+        if (tipoNorm.contains("atribuir-conta") || tipoNorm.contains("atribuir_conta") || tipoNorm.equals("conta.atribuir")) {
+            String numeroConta = extrairString(payload, "numeroConta", "conta", "objetoId");
+            String novoGerenteCpf = extrairString(payload, "novoGerenteCpf", "gerenteCpf", "cpfGerente");
+            String gerenteAntigoCpf = extrairString(payload, "gerenteAntigoCpf", "gerenteOriginalCpf");
+
+            Map<String, Object> resultado = contaService.atribuirConta(numeroConta, novoGerenteCpf, gerenteAntigoCpf);
+            return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
+        }
+
+        // 4. Compensação de Atribuição de Conta (Rollback do Passo 4 - R13)
+        if (tipoNorm.contains("compensar-atribuir") || tipoNorm.contains("reassociar-gerente")) {
+            String numeroConta = extrairString(payload, "numeroConta", "conta", "objetoId");
+            String gerenteOriginalCpf = extrairString(payload, "gerenteOriginalCpf", "gerenteAntigoCpf");
+
+            contaService.compensarAtribuicaoConta(numeroConta, gerenteOriginalCpf);
+
+            Map<String, Object> respostaPayload = new HashMap<>();
+            respostaPayload.put("mensagem", "Compensação de atribuição de conta efetuada.");
+            return RespostaSagaDTO.sucesso(sagaId, tipo, respostaPayload);
+        }
+
+        // 5. Criar Conta (Passo 6 da SAGA Aprovar Cliente - R9)
         if (tipoNorm.contains("criar-conta") || tipoNorm.contains("conta.criar") || tipoNorm.equals("conta.criar") || tipoNorm.equals("ms.conta.criar")) {
             String cpfCliente = extrairString(payload, "cpfCliente", "cpf", "clienteCpf");
             String gerenteCpf = extrairString(payload, "gerenteCpf", "cpfGerente");
@@ -129,8 +169,8 @@ public class ContaCommandConsumer {
             return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
         }
 
-        // 3. Compensação de Criar Conta (Remover Conta)
-        if (tipoNorm.contains("compensar") || tipoNorm.contains("remover-conta") || tipoNorm.contains("remover_conta")) {
+        // 6. Compensação de Criar Conta (Remover Conta - R9)
+        if (tipoNorm.contains("compensar-criar") || tipoNorm.contains("remover-conta") || tipoNorm.contains("remover_conta")) {
             String numeroConta = extrairString(payload, "numeroConta", "objetoId", "conta");
             String cpfCliente = extrairString(payload, "cpfCliente", "cpf", "clienteCpf");
 

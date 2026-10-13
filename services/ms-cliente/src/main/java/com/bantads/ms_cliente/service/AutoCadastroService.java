@@ -4,6 +4,8 @@ import com.bantads.ms_cliente.model.SolicitacaoCadastro;
 import com.bantads.ms_cliente.repository.SolicitacaoCadastroRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class AutoCadastroService {
 
@@ -23,5 +25,12 @@ public class AutoCadastroService {
         
         solicitacao.setStatus("PENDENTE");
         return repository.save(solicitacao);
+    }
+
+    public List<SolicitacaoCadastro> listarSolicitacoes(String status) {
+        if (status != null && !status.isBlank()) {
+            return repository.findByStatusIgnoreCase(status.trim());
+        }
+        return repository.findAll();
     }
 }
