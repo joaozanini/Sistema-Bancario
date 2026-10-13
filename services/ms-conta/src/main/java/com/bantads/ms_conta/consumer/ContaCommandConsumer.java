@@ -107,7 +107,7 @@ public class ContaCommandConsumer {
         String tipoNorm = tipo != null ? tipo.toLowerCase().replace("_", "-").trim() : "";
 
         // 1. Identificar Gerente com Menos Clientes (Passo 3 da SAGA Aprovar Cliente)
-        if (tipoNorm.contains("identificar-gerente") || tipoNorm.contains("identificar_gerente") || tipoNorm.equals("conta.identificar-gerente")) {
+        if (tipoNorm.contains("identificar-gerente") || tipoNorm.contains("gerente-menos-clientes") || tipoNorm.equals("conta.identificar-gerente") || tipoNorm.equals("ms.conta.identificar-gerente")) {
             List<String> gerentes = extrairListaGerentes(payload);
             String gerenteEscolhido = contaService.identificarGerenteComMenosClientes(gerentes);
 
@@ -120,8 +120,8 @@ public class ContaCommandConsumer {
         }
 
         // 2. Criar Conta (Passo 6 da SAGA Aprovar Cliente)
-        if (tipoNorm.contains("criar-conta") || tipoNorm.contains("criar_conta") || tipoNorm.equals("conta.criar") || tipoNorm.equals("ms.conta.criar")) {
-            String cpfCliente = extrairString(payload, "cpfCliente", "cpf");
+        if (tipoNorm.contains("criar-conta") || tipoNorm.contains("conta.criar") || tipoNorm.equals("conta.criar") || tipoNorm.equals("ms.conta.criar")) {
+            String cpfCliente = extrairString(payload, "cpfCliente", "cpf", "clienteCpf");
             String gerenteCpf = extrairString(payload, "gerenteCpf", "cpfGerente");
             String salarioStr = extrairString(payload, "salario", "salarioCliente");
 
@@ -132,7 +132,7 @@ public class ContaCommandConsumer {
         // 3. Compensação de Criar Conta (Remover Conta)
         if (tipoNorm.contains("compensar") || tipoNorm.contains("remover-conta") || tipoNorm.contains("remover_conta")) {
             String numeroConta = extrairString(payload, "numeroConta", "objetoId", "conta");
-            String cpfCliente = extrairString(payload, "cpfCliente", "cpf");
+            String cpfCliente = extrairString(payload, "cpfCliente", "cpf", "clienteCpf");
 
             contaService.compensarCriacaoConta(numeroConta, cpfCliente);
 
@@ -164,7 +164,13 @@ public class ContaCommandConsumer {
             Object obj = payload.get("gerentesAtivos");
             if (obj instanceof List<?> l) {
                 for (Object item : l) {
-                    if (item instanceof String s) listaCpfs.add(s);
+                    if (item instanceof String s) {
+                        listaCpfs.add(s);
+                    } else if (item instanceof Map<?, ?> m) {
+                        if (m.containsKey("cpf")) {
+                            listaCpfs.add(String.valueOf(m.get("cpf")));
+                        }
+                    }
                 }
             }
         } else if (payload.containsKey("cpfs")) {
