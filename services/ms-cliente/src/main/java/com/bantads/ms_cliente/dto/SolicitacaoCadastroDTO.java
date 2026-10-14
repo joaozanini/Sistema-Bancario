@@ -1,5 +1,6 @@
 package com.bantads.ms_cliente.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -29,11 +30,22 @@ public class SolicitacaoCadastroDTO {
     private String motivoRejeicao;
     private LocalDateTime dataAprovacaoRejeicao;
     
+    @JsonProperty("_links")
     private Map<String, Map<String, String>> _links = new HashMap<>();
     
     public void addLink(String rel, String href) {
         Map<String, String> link = new HashMap<>();
         link.put("href", href);
         this._links.put(rel, link);
+    }
+
+    @JsonProperty("_links")
+    public Map<String, Map<String, String>> get_links() {
+        return _links;
+    }
+
+    @JsonProperty("_links")
+    public void set_links(Map<String, Map<String, String>> _links) {
+        this._links = _links;
     }
 }
