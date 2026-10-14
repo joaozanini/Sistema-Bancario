@@ -59,7 +59,7 @@ class ContaServiceTest {
     }
 
     @Test
-    @DisplayName("Deve identificar gerente ativo com menos clientes")
+    @DisplayName("Deve identificar gerente ativo com menos clientes (R9)")
     void deveIdentificarGerenteComMenosClientes() {
         String ger1 = "98574307084";
         String ger2 = "64065268052";
@@ -73,14 +73,87 @@ class ContaServiceTest {
 
         when(repository.findByTipoIn(anyList())).thenReturn(eventos);
 
-        // ger1 tem 2 contas, ger2 tem 1 conta, ger3 tem 0 contas
         String escolhido = service.identificarGerenteComMenosClientes(List.of(ger1, ger2, ger3));
 
         assertEquals(ger3, escolhido);
     }
 
     @Test
-    @DisplayName("Deve criar nova conta com número aleatório de 4 dígitos e persistir evento Criado")
+    @DisplayName("Deve identificar conta de menor saldo do gerente com mais contas (R13)")
+    void deveIdentificarContaParaNovoGerente() {
+        String ger1 = "98574307084"; // tem 2 contas: saldo 800 e 200 (menor conta = 200)
+        String ger2 = "64065268052"; // tem 1 conta
+
+        List<EventoConta> eventosGerentes = List.of(
+                criarEvento("1291", "Criado", "{\"gerenteCpf\":\"" + ger1 + "\"}", 1),
+                criarEvento("8573", "Criado", "{\"gerenteCpf\":\"" + ger1 + "\"}", 1),
+                criarEvento("0950", "Criado", "{\"gerenteCpf\":\"" + ger2 + "\"}", 1)
+        );
+
+        when(repository.findByTipoIn(anyList())).thenReturn(eventosGerentes);
+
+        when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of(
+                criarEvento("1291", "Criado", "{\"cpfCliente\":\"111\",\"gerenteCpf\":\"" + ger1 + "\",\"saldo\":\"800.00\"}", 1)
+        ));
+        when(repository.findByObjetoIdOrderByVersaoAsc("8573")).thenReturn(List.of(
+                criarEvento("8573", "Criado", "{\"cpfCliente\":\"222\",\"gerenteCpf\":\"" + ger1 + "\",\"saldo\":\"200.00\"}", 1)
+        ));
+
+        Map<String, Object> resultado = service.identificarContaParaNovoGerente(List.of(ger1, ger2));
+
+        assertNotNull(resultado);
+        assertEquals("8573", resultado.get("numeroConta"));
+        assertEquals("222", resultado.get("cpfCliente"));
+        assertEquals(ger1, resultado.get("gerenteAntigoCpf"));
+    }
+
+    @Test
+    @DisplayName("Não deve transferir conta se todos os gerentes possuem no máximo 1 conta (R13)")
+    void naoDeveTransferirContaSeGerentesComNoMaximoUmaConta() {
+        String ger1 = "98574307084";
+        String ger2 = "64065268052";
+
+        List<EventoConta> eventosGerentes = List.of(
+                criarEvento("1291", "Criado", "{\"gerenteCpf\":\"" + ger1 + "\"}", 1),
+                criarEvento("0950", "Criado", "{\"gerenteCpf\":\"" + ger2 + "\"}", 1)
+        );
+
+        when(repository.findByTipoIn(anyList())).thenReturn(eventosGerentes);
+
+        Map<String, Object> resultado = service.identificarContaParaNovoGerente(List.of(ger1, ger2));
+
+        assertNull(resultado);
+    }
+
+    @Test
+    @DisplayName("Deve atribuir conta ao novo gerente gerando evento GerenteAlterado (R13)")
+    void deveAtribuirConta() {
+        String numeroConta = "1291";
+        String novoGerente = "40501740066";
+        String antigoGerente = "98574307084";
+
+        when(repository.findByObjetoIdOrderByVersaoAsc(numeroConta)).thenReturn(List.of(
+                criarEvento(numeroConta, "Criado", "{\"gerenteCpf\":\"" + antigoGerente + "\"}", 1)
+        ));
+
+        Map<String, Object> resultado = service.atribuirConta(numeroConta, novoGerente, antigoGerente);
+
+        assertNotNull(resultado);
+        assertEquals("1291", resultado.get("numeroConta"));
+        assertEquals(novoGerente, resultado.get("gerenteCpf"));
+
+        ArgumentCaptor<EventoConta> captor = ArgumentCaptor.forClass(EventoConta.class);
+        verify(repository).save(captor.capture());
+
+        EventoConta evento = captor.getValue();
+        assertEquals(numeroConta, evento.getObjetoId());
+        assertEquals("GerenteAlterado", evento.getTipo());
+        assertEquals(2, evento.getVersao());
+        assertTrue(evento.getPayload().contains(novoGerente));
+    }
+
+    @Test
+    @DisplayName("Deve criar nova conta com número aleatório de 4 dígitos e persistir evento Criado (R9)")
     void deveCriarContaComSucesso() {
         String cpfCliente = "12912861012";
         String gerenteCpf = "98574307084";
@@ -111,7 +184,7 @@ class ContaServiceTest {
     }
 
     @Test
-    @DisplayName("Deve compensar criação de conta removendo os eventos do Event Store")
+    @DisplayName("Deve compensar criação de conta removendo os eventos do Event Store (R9)")
     void deveCompensarCriacaoConta() {
         String numeroConta = "1234";
 
@@ -133,7 +206,6 @@ class ContaServiceTest {
 
         ContaService.EstadoConta estado = service.reconstruirEstadoPorReplay(eventos);
 
-        // 1000 + 500 - 200 - 300 + 150 = 1150
         assertEquals(new BigDecimal("1150.00"), estado.getSaldo());
         assertEquals("12912861012", estado.getCpfCliente());
     }
@@ -179,14 +251,12 @@ class ContaServiceTest {
         List<EventoConta> eventosSalvos = captor.getAllValues();
         assertEquals(2, eventosSalvos.size());
 
-        // Evento Origem
         EventoConta evtOrigem = eventosSalvos.get(0);
         assertEquals(contaOrigem, evtOrigem.getObjetoId());
         assertEquals("TransferênciaOrigem", evtOrigem.getTipo());
         assertEquals(3, evtOrigem.getVersao());
         assertTrue(evtOrigem.getPayload().contains("\"valor\":\"350.00\""));
 
-        // Evento Destino
         EventoConta evtDestino = eventosSalvos.get(1);
         assertEquals(contaDestino, evtDestino.getObjetoId());
         assertEquals("TransferênciaDestino", evtDestino.getTipo());

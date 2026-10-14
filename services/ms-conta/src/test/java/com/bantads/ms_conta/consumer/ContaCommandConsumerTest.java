@@ -48,7 +48,7 @@ class ContaCommandConsumerTest {
     }
 
     @Test
-    @DisplayName("Deve processar comando de identificar gerente com sucesso e enviar resposta ao orquestrador")
+    @DisplayName("Deve processar comando de identificar gerente com sucesso e enviar resposta ao orquestrador (R9)")
     void deveProcessarIdentificarGerenteComSucesso() {
         MensagemSagaDTO mensagem = new MensagemSagaDTO();
         mensagem.setSagaId("saga-123");
@@ -75,7 +75,74 @@ class ContaCommandConsumerTest {
     }
 
     @Test
-    @DisplayName("Deve processar comando de criar conta com sucesso e responder ao orquestrador")
+    @DisplayName("Deve processar comando de identificar conta para transferência com sucesso (R13)")
+    void deveProcessarIdentificarContaParaTransferir() {
+        MensagemSagaDTO mensagem = new MensagemSagaDTO();
+        mensagem.setSagaId("saga-r13-1");
+        mensagem.setTipo("conta.identificar-conta-transferir");
+        mensagem.setPayload(Map.of("gerentes", List.of("98574307084", "64065268052")));
+
+        when(idempotenciaRepository.findBySagaIdAndTipo("saga-r13-1", "conta.identificar-conta-transferir"))
+                .thenReturn(Optional.empty());
+        when(contaService.identificarContaParaNovoGerente(anyList()))
+                .thenReturn(Map.of("numeroConta", "1291", "cpfCliente", "12912861012"));
+
+        consumer.processarComandoSaga(mensagem);
+
+        ArgumentCaptor<RespostaSagaDTO> captor = ArgumentCaptor.forClass(RespostaSagaDTO.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), captor.capture());
+
+        RespostaSagaDTO resposta = captor.getValue();
+        assertEquals("SUCESSO", resposta.getStatus());
+        assertEquals("1291", resposta.getPayload().get("numeroConta"));
+        assertEquals("COM_CONTA", resposta.getPayload().get("status"));
+    }
+
+    @Test
+    @DisplayName("Deve responder sem conta quando nenhum gerente possui mais de 1 conta (R13)")
+    void deveResponderSemConta() {
+        MensagemSagaDTO mensagem = new MensagemSagaDTO();
+        mensagem.setSagaId("saga-r13-2");
+        mensagem.setTipo("conta.identificar-conta-transferir");
+        mensagem.setPayload(Map.of("gerentes", List.of("98574307084")));
+
+        when(idempotenciaRepository.findBySagaIdAndTipo("saga-r13-2", "conta.identificar-conta-transferir"))
+                .thenReturn(Optional.empty());
+        when(contaService.identificarContaParaNovoGerente(anyList()))
+                .thenReturn(null);
+
+        consumer.processarComandoSaga(mensagem);
+
+        ArgumentCaptor<RespostaSagaDTO> captor = ArgumentCaptor.forClass(RespostaSagaDTO.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), captor.capture());
+
+        RespostaSagaDTO resposta = captor.getValue();
+        assertEquals("SUCESSO", resposta.getStatus());
+        assertEquals("SEM_CONTA", resposta.getPayload().get("status"));
+        assertEquals(false, resposta.getPayload().get("temConta"));
+    }
+
+    @Test
+    @DisplayName("Deve processar comando de atribuir conta com sucesso (R13)")
+    void deveProcessarAtribuirConta() {
+        MensagemSagaDTO mensagem = new MensagemSagaDTO();
+        mensagem.setSagaId("saga-r13-3");
+        mensagem.setTipo("conta.atribuir-conta");
+        mensagem.setPayload(Map.of("numeroConta", "1291", "novoGerenteCpf", "40501740066"));
+
+        when(idempotenciaRepository.findBySagaIdAndTipo("saga-r13-3", "conta.atribuir-conta"))
+                .thenReturn(Optional.empty());
+        when(contaService.atribuirConta("1291", "40501740066", null))
+                .thenReturn(Map.of("numeroConta", "1291", "gerenteCpf", "40501740066"));
+
+        consumer.processarComandoSaga(mensagem);
+
+        verify(contaService).atribuirConta("1291", "40501740066", null);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), any(RespostaSagaDTO.class));
+    }
+
+    @Test
+    @DisplayName("Deve processar comando de criar conta com sucesso e responder ao orquestrador (R9)")
     void deveProcessarCriarContaComSucesso() {
         MensagemSagaDTO mensagem = new MensagemSagaDTO();
         mensagem.setSagaId("saga-456");
@@ -103,7 +170,7 @@ class ContaCommandConsumerTest {
     }
 
     @Test
-    @DisplayName("Deve processar comando de compensação de criação de conta com sucesso")
+    @DisplayName("Deve processar comando de compensação de criação de conta com sucesso (R9)")
     void deveProcessarCompensacaoCriarConta() {
         MensagemSagaDTO mensagem = new MensagemSagaDTO();
         mensagem.setSagaId("saga-789");
