@@ -1,8 +1,9 @@
 const { clienteServiceUrl } = require('../config/services');
+const cache = require('./cache.service');
 
 class ClienteNaoEncontradoError extends Error {}
 
-async function buscar(cpf) {
+async function buscarNaOrigem(cpf) {
   const resposta = await fetch(`${clienteServiceUrl}/clientes/${encodeURIComponent(cpf)}`);
 
   if (resposta.status === 404) {
@@ -15,6 +16,10 @@ async function buscar(cpf) {
   return resposta.json();
 }
 
+async function buscar(cpf) {
+  return cache.lerOuBuscar(cache.DOMINIOS.CLIENTE, cpf, () => buscarNaOrigem(cpf));
+}
+
 async function buscarNome(cpf) {
   const { nome } = await buscar(cpf);
   if (!nome) {
@@ -23,4 +28,8 @@ async function buscarNome(cpf) {
   return nome;
 }
 
-module.exports = { buscar, buscarNome, ClienteNaoEncontradoError };
+function invalidar(cpf) {
+  return cache.invalidar(cache.DOMINIOS.CLIENTE, cpf);
+}
+
+module.exports = { buscar, buscarNome, invalidar, ClienteNaoEncontradoError };

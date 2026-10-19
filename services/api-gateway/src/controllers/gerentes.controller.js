@@ -1,4 +1,5 @@
 const sagaService = require('../services/saga.service');
+const gerenteService = require('../services/gerente.service');
 
 const TIPO_REMOVER_GERENTE = 'remover-gerente';
 const DOMINIO = 'gerentes';
@@ -14,6 +15,8 @@ async function remover(req, res) {
 
   try {
     const jobId = await sagaService.iniciar(TIPO_REMOVER_GERENTE, DOMINIO, { cpf });
+    // R15 inativa o gerente: o cadastro em cache deixa de valer
+    await gerenteService.invalidar(cpf);
     return res.status(202).json({ jobId });
   } catch (err) {
     console.error('Falha ao iniciar a SAGA de remoção:', err.message);

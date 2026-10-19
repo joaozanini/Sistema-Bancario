@@ -2,10 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const sagaService = require('../services/saga.service');
-const redis = require('../config/redis');
 const { remover, TIPO_REMOVER_GERENTE, DOMINIO } = require('./gerentes.controller');
-
-test.after(() => redis.destroy());
 
 const CPF_LOGADO = '98574307084';
 const CPF_ALVO = '64065268052';
