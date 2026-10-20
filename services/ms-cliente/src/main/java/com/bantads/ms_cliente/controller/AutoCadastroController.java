@@ -25,13 +25,26 @@ public class AutoCadastroController {
     @PostMapping
     public ResponseEntity<?> criarSolicitacao(@RequestBody SolicitacaoCadastroDTO dto) {
         try {
+            if (dto == null) {
+                return ResponseEntity.badRequest().body(Map.of("erro", "Dados da solicitação não informados."));
+            }
+
+            BigDecimal salario = null;
+            if (dto.getSalario() != null && !dto.getSalario().trim().isBlank()) {
+                try {
+                    salario = new BigDecimal(dto.getSalario().trim());
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().body(Map.of("erro", "Salário inválido."));
+                }
+            }
+
             // Mapeando DTO de entrada para a Entidade
             SolicitacaoCadastro entidade = new SolicitacaoCadastro();
             entidade.setNome(dto.getNome());
             entidade.setCpf(dto.getCpf());
             entidade.setEmail(dto.getEmail());
             entidade.setTelefone(dto.getTelefone());
-            entidade.setSalario(new BigDecimal(dto.getSalario())); 
+            entidade.setSalario(salario); 
             entidade.setLogradouro(dto.getLogradouro());
             entidade.setNumero(dto.getNumero());
             entidade.setComplemento(dto.getComplemento());
@@ -39,7 +52,7 @@ public class AutoCadastroController {
             entidade.setCidade(dto.getCidade());
             entidade.setUf(dto.getUf());
 
-            // Regra de unicidade
+            // Regra de validação e unicidade
             SolicitacaoCadastro salva = service.registrarSolicitacao(entidade);
 
             // Mapeando Entidade salva para DTO de saída
