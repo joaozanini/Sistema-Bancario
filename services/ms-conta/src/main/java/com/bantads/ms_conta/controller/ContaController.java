@@ -1,6 +1,8 @@
 package com.bantads.ms_conta.controller;
 
 import com.bantads.ms_conta.dto.ContaDTO;
+import com.bantads.ms_conta.dto.MovimentacaoRequestDTO;
+import com.bantads.ms_conta.dto.MovimentacaoResponseDTO;
 import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
 import com.bantads.ms_conta.dto.TransferenciaResponseDTO;
 import com.bantads.ms_conta.service.ContaService;
@@ -24,6 +26,25 @@ public class ContaController {
             @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
     ) {
         TransferenciaResponseDTO resposta = service.transferir(numeroContaOrigem, dto, xUserCpf);
+        return ResponseEntity.ok(resposta);
+    }
+
+    @PostMapping("/{numero}/saque")
+    public ResponseEntity<MovimentacaoResponseDTO> sacar(
+            @PathVariable("numero") String numeroConta,
+            @RequestBody MovimentacaoRequestDTO dto,
+            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
+    ) {
+        MovimentacaoResponseDTO resposta = service.sacar(numeroConta, dto, xUserCpf);
+        return ResponseEntity.ok(resposta);
+    }
+
+    @PostMapping("/{numero}/deposito")
+    public ResponseEntity<MovimentacaoResponseDTO> depositar(
+            @PathVariable("numero") String numeroConta,
+            @RequestBody MovimentacaoRequestDTO dto
+    ) {
+        MovimentacaoResponseDTO resposta = service.depositar(numeroConta, dto);
         return ResponseEntity.ok(resposta);
     }
 

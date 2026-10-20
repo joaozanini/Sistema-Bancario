@@ -1,8 +1,7 @@
 package com.bantads.ms_conta.controller;
 
-import com.bantads.ms_conta.dto.ContaDTO;
-import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
-import com.bantads.ms_conta.dto.TransferenciaResponseDTO;
+import com.bantads.ms_conta.dto.*;
+import com.bantads.ms_conta.exception.AcessoNegadoException;
 import com.bantads.ms_conta.exception.GlobalExceptionHandler;
 import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.service.ContaService;
@@ -76,19 +75,79 @@ class ContaControllerTest {
     }
 
     @Test
-    @DisplayName("Deve retornar 400 ao tentar transferir com saldo insuficiente")
-    void deveRetornar400QuandoSaldoInsuficiente() throws Exception {
+    @DisplayName("Deve retornar 422 ao tentar transferir com saldo insuficiente (R6)")
+    void deveRetornar422QuandoSaldoInsuficienteNaTransferencia() throws Exception {
         TransferenciaRequestDTO request = new TransferenciaRequestDTO("0950", "9999.00");
 
         when(service.transferir(eq("1291"), any(TransferenciaRequestDTO.class), eq("12912861012")))
-                .thenThrow(new SaldoInsuficienteException("Saldo insuficiente"));
+                .thenThrow(new SaldoInsuficienteException("Saldo insuficiente para realizar a transferência."));
 
         mockMvc.perform(post("/contas/1291/transferencia")
                         .header("X-User-CPF", "12912861012")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.erro").value("Saldo insuficiente"));
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.erro").value("Saldo insuficiente para realizar a transferência."));
+    }
+
+    @Test
+    @DisplayName("Deve retornar 403 quando posse obrigatória não for atendida (R5, R6)")
+    void deveRetornar403QuandoPosseInvalida() throws Exception {
+        TransferenciaRequestDTO request = new TransferenciaRequestDTO("0950", "100.00");
+
+        when(service.transferir(eq("1291"), any(TransferenciaRequestDTO.class), eq("99999999999")))
+                .thenThrow(new AcessoNegadoException("Usuário não autorizado a realizar operações nesta conta."));
+
+        mockMvc.perform(post("/contas/1291/transferencia")
+                        .header("X-User-CPF", "99999999999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.erro").value("Usuário não autorizado a realizar operações nesta conta."));
+    }
+
+    @Test
+    @DisplayName("Deve retornar 200 ao realizar saque com sucesso (R5)")
+    void deveSacarComSucesso() throws Exception {
+        MovimentacaoRequestDTO request = new MovimentacaoRequestDTO("150.00");
+        MovimentacaoResponseDTO response = new MovimentacaoResponseDTO();
+        response.setNumeroConta("1291");
+        response.setTipo("SAQUE");
+        response.setValor("150.00");
+        response.setSaldo("850.00");
+        response.setDataHora(LocalDateTime.now());
+        response.setMensagem("Saque realizado com sucesso.");
+        response.addLink("self", "http://localhost:8080/contas/1291/saque");
+
+        when(service.sacar(eq("1291"), any(MovimentacaoRequestDTO.class), eq("12912861012")))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/contas/1291/saque")
+                        .header("X-User-CPF", "12912861012")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.numeroConta").value("1291"))
+                .andExpect(jsonPath("$.tipo").value("SAQUE"))
+                .andExpect(jsonPath("$.valor").value("150.00"))
+                .andExpect(jsonPath("$.saldo").value("850.00"))
+                .andExpect(jsonPath("$._links.self.href").exists());
+    }
+
+    @Test
+    @DisplayName("Deve retornar 422 ao tentar sacar com saldo insuficiente (R5)")
+    void deveRetornar422QuandoSaldoInsuficienteNoSaque() throws Exception {
+        MovimentacaoRequestDTO request = new MovimentacaoRequestDTO("5000.00");
+
+        when(service.sacar(eq("1291"), any(MovimentacaoRequestDTO.class), eq("12912861012")))
+                .thenThrow(new SaldoInsuficienteException("Saldo insuficiente para realizar o saque."));
+
+        mockMvc.perform(post("/contas/1291/saque")
+                        .header("X-User-CPF", "12912861012")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.erro").value("Saldo insuficiente para realizar o saque."));
     }
 
     @Test
@@ -103,6 +162,7 @@ class ContaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.numeroConta").value("1291"))
                 .andExpect(jsonPath("$.cpfCliente").value("12912861012"))
+                .andExpect(jsonPath("$.gerenteCpf").value("98574307084"))
                 .andExpect(jsonPath("$._links.self.href").exists());
     }
 }
