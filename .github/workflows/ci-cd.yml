@@ -132,7 +132,7 @@ jobs:
           - { service: api-gateway,     dockerfile: Dockerfile, java: false }
           - { service: ms-auth,         dockerfile: Dockerfile, java: true }
           - { service: ms-cliente,      dockerfile: Dockerfile, java: true }
-          - { service: ms-conta,        dockerfile: DockerFile, java: true }
+          - { service: ms-conta,        dockerfile: Dockerfile, java: true }
           - { service: ms-email,        dockerfile: Dockerfile, java: true }
           - { service: ms-gerente,      dockerfile: Dockerfile, java: true }
           - { service: ms-orquestrador, dockerfile: Dockerfile, java: true }
