@@ -6,6 +6,7 @@ import com.bantads.ms_conta.dto.MovimentacaoResponseDTO;
 import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
 import com.bantads.ms_conta.dto.TransferenciaResponseDTO;
 import com.bantads.ms_conta.service.ContaService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -36,16 +37,17 @@ public class ContaController {
             @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
     ) {
         MovimentacaoResponseDTO resposta = service.sacar(numeroConta, dto, xUserCpf);
-        return ResponseEntity.ok(resposta);
+        return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
     }
 
     @PostMapping("/{numero}/deposito")
     public ResponseEntity<MovimentacaoResponseDTO> depositar(
             @PathVariable("numero") String numeroConta,
-            @RequestBody MovimentacaoRequestDTO dto
+            @RequestBody MovimentacaoRequestDTO dto,
+            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
     ) {
-        MovimentacaoResponseDTO resposta = service.depositar(numeroConta, dto);
-        return ResponseEntity.ok(resposta);
+        MovimentacaoResponseDTO resposta = service.depositar(numeroConta, dto, xUserCpf);
+        return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
     }
 
     @GetMapping("/{numero}")

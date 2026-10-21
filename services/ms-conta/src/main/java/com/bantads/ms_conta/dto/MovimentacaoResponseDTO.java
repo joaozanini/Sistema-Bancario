@@ -12,7 +12,6 @@ public class MovimentacaoResponseDTO {
     private String numeroConta;
     private String tipo;
     private String valor;
-    private String saldo;
     private LocalDateTime dataHora;
     private String mensagem;
 
@@ -58,14 +57,6 @@ public class MovimentacaoResponseDTO {
 
     public void setValor(String valor) {
         this.valor = valor;
-    }
-
-    public String getSaldo() {
-        return saldo;
-    }
-
-    public void setSaldo(String saldo) {
-        this.saldo = saldo;
     }
 
     public LocalDateTime getDataHora() {

@@ -30,12 +30,17 @@ import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 @Service
 public class ContaService {
 
     private static final Logger log = LoggerFactory.getLogger(ContaService.class);
     private static final int MAX_TENTATIVAS_REPLAY = 3;
+
+    // Até 15 dígitos inteiros e 2 casas decimais, o que cabe no NUMERIC(19, 4). Também barra a notação
+    // científica: "1E-99999999" passa no new BigDecimal() e prende a thread por mais de 1 min no setScale
+    private static final Pattern FORMATO_VALOR = Pattern.compile("\\d{1,15}(\\.\\d{1,2})?");
 
     private final EventoContaRepository repository;
     private final ObjectMapper objectMapper;
@@ -347,12 +352,10 @@ public class ContaService {
             throw new TransferenciaInvalidaException("A conta de destino não pode ser igual à conta de origem.");
         }
 
-        BigDecimal valorTransferencia;
-        try {
-            valorTransferencia = new BigDecimal(dto.getValor());
-        } catch (Exception e) {
+        if (!formatoValorValido(dto.getValor())) {
             throw new TransferenciaInvalidaException("Valor da transferência inválido.");
         }
+        BigDecimal valorTransferencia = new BigDecimal(dto.getValor());
 
         if (valorTransferencia.compareTo(BigDecimal.ZERO) <= 0) {
             throw new TransferenciaInvalidaException("O valor da transferência deve ser maior que zero.");
@@ -392,12 +395,7 @@ public class ContaService {
         EstadoConta estadoOrigem = reconstruirEstadoPorReplay(eventosOrigem);
 
         // Posse obrigatória (R6): validação do titular
-        if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
-            throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");
-        }
-        if (estadoOrigem.getCpfCliente() != null && !xUserCpf.trim().equals(estadoOrigem.getCpfCliente().trim())) {
-            throw new AcessoNegadoException("Usuário não autorizado a realizar operações nesta conta.");
-        }
+        validarPosse(estadoOrigem, xUserCpf);
 
         // Validação de saldo estritamente via replay (R6 -> 422 em saldo insuficiente)
         if (estadoOrigem.getSaldo().compareTo(valorTransferencia) < 0) {
@@ -488,12 +486,10 @@ public class ContaService {
             throw new IllegalArgumentException("Valor do saque é obrigatório.");
         }
 
-        BigDecimal valorSaque;
-        try {
-            valorSaque = new BigDecimal(dto.getValor().trim());
-        } catch (Exception e) {
+        if (!formatoValorValido(dto.getValor().trim())) {
             throw new IllegalArgumentException("Valor do saque inválido.");
         }
+        BigDecimal valorSaque = new BigDecimal(dto.getValor().trim());
 
         if (valorSaque.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("O valor do saque deve ser maior que zero.");
@@ -526,12 +522,7 @@ public class ContaService {
         EstadoConta estado = reconstruirEstadoPorReplay(eventos);
 
         // Posse obrigatória (R5)
-        if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
-            throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");
-        }
-        if (estado.getCpfCliente() != null && !xUserCpf.trim().equals(estado.getCpfCliente().trim())) {
-            throw new AcessoNegadoException("Usuário não autorizado a realizar operações nesta conta.");
-        }
+        validarPosse(estado, xUserCpf);
 
         // Validação de saldo estritamente via replay (R5 -> 422 em saldo insuficiente)
         if (estado.getSaldo().compareTo(valorSaque) < 0) {
@@ -559,14 +550,12 @@ public class ContaService {
         repository.flush();
         publicarEventoCqrs(evento);
 
-        BigDecimal novoSaldo = estado.getSaldo().subtract(valorSaque);
-
+        // Sem o novo saldo: o front-end reconsulta o lado query (CQRS)
         MovimentacaoResponseDTO resposta = new MovimentacaoResponseDTO();
         resposta.setId(evento.getId());
         resposta.setNumeroConta(numeroConta.trim());
         resposta.setTipo("SAQUE");
         resposta.setValor(valorStr);
-        resposta.setSaldo(novoSaldo.setScale(2, RoundingMode.HALF_UP).toString());
         resposta.setDataHora(agora);
         resposta.setMensagem("Saque realizado com sucesso.");
 
@@ -579,9 +568,10 @@ public class ContaService {
     }
 
     /**
-     * Depósito (R4) com replay dinâmico e novo replay em conflito de versão.
+     * Depósito (R4) com replay dinâmico, posse obrigatória (X-User-CPF)
+     * e novo replay em conflito de versão.
      */
-    public MovimentacaoResponseDTO depositar(String numeroConta, MovimentacaoRequestDTO dto) {
+    public MovimentacaoResponseDTO depositar(String numeroConta, MovimentacaoRequestDTO dto, String xUserCpf) {
         if (numeroConta == null || numeroConta.trim().isEmpty()) {
             throw new IllegalArgumentException("Número da conta é obrigatório.");
         }
@@ -589,12 +579,10 @@ public class ContaService {
             throw new IllegalArgumentException("Valor do depósito é obrigatório.");
         }
 
-        BigDecimal valorDeposito;
-        try {
-            valorDeposito = new BigDecimal(dto.getValor().trim());
-        } catch (Exception e) {
+        if (!formatoValorValido(dto.getValor().trim())) {
             throw new IllegalArgumentException("Valor do depósito inválido.");
         }
+        BigDecimal valorDeposito = new BigDecimal(dto.getValor().trim());
 
         if (valorDeposito.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("O valor do depósito deve ser maior que zero.");
@@ -604,7 +592,7 @@ public class ContaService {
         while (tentativas < MAX_TENTATIVAS_REPLAY) {
             tentativas++;
             try {
-                return executarEmTransacao(() -> executarDeposito(numeroConta, valorDeposito));
+                return executarEmTransacao(() -> executarDeposito(numeroConta, valorDeposito, xUserCpf));
             } catch (DataIntegrityViolationException ex) {
                 log.warn("Conflito de versão detectado no depósito (tentativa {}/{}). Realizando novo replay...",
                         tentativas, MAX_TENTATIVAS_REPLAY);
@@ -618,13 +606,16 @@ public class ContaService {
         throw new IllegalStateException("Falha ao executar depósito.");
     }
 
-    private MovimentacaoResponseDTO executarDeposito(String numeroConta, BigDecimal valorDeposito) {
+    private MovimentacaoResponseDTO executarDeposito(String numeroConta, BigDecimal valorDeposito, String xUserCpf) {
         List<EventoConta> eventos = repository.findByObjetoIdOrderByVersaoAsc(numeroConta.trim());
         if (eventos.isEmpty()) {
             throw new ContaNaoEncontradaException("Conta não encontrada: " + numeroConta);
         }
 
         EstadoConta estado = reconstruirEstadoPorReplay(eventos);
+
+        // Posse obrigatória (R4): ninguém deposita na conta de outro cliente
+        validarPosse(estado, xUserCpf);
 
         int proximaVersao = eventos.get(eventos.size() - 1).getVersao() + 1;
         LocalDateTime agora = LocalDateTime.now();
@@ -647,14 +638,12 @@ public class ContaService {
         repository.flush();
         publicarEventoCqrs(evento);
 
-        BigDecimal novoSaldo = estado.getSaldo().add(valorDeposito);
-
+        // Sem o novo saldo: o front-end reconsulta o lado query (CQRS)
         MovimentacaoResponseDTO resposta = new MovimentacaoResponseDTO();
         resposta.setId(evento.getId());
         resposta.setNumeroConta(numeroConta.trim());
         resposta.setTipo("DEPOSITO");
         resposta.setValor(valorStr);
-        resposta.setSaldo(novoSaldo.setScale(2, RoundingMode.HALF_UP).toString());
         resposta.setDataHora(agora);
         resposta.setMensagem("Depósito realizado com sucesso.");
 
@@ -753,6 +742,20 @@ public class ContaService {
             } catch (Exception e) {
                 log.warn("Não foi possível publicar evento CQRS na fila {}: {}", RabbitMQConfig.FILA_CONTA_EVENTS, e.getMessage());
             }
+        }
+    }
+
+    private boolean formatoValorValido(String valor) {
+        return valor != null && FORMATO_VALOR.matcher(valor).matches();
+    }
+
+    // Posse obrigatória (R4, R5, R6): só o titular opera a conta
+    private void validarPosse(EstadoConta estado, String xUserCpf) {
+        if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
+            throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");
+        }
+        if (estado.getCpfCliente() == null || !xUserCpf.trim().equals(estado.getCpfCliente().trim())) {
+            throw new AcessoNegadoException("Usuário não autorizado a realizar operações nesta conta.");
         }
     }
 
