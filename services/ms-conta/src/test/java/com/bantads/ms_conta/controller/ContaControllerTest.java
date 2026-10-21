@@ -107,14 +107,13 @@ class ContaControllerTest {
     }
 
     @Test
-    @DisplayName("Deve retornar 200 ao realizar saque com sucesso (R5)")
+    @DisplayName("Deve retornar 201 sem o novo saldo ao realizar saque (R5)")
     void deveSacarComSucesso() throws Exception {
         MovimentacaoRequestDTO request = new MovimentacaoRequestDTO("150.00");
         MovimentacaoResponseDTO response = new MovimentacaoResponseDTO();
         response.setNumeroConta("1291");
         response.setTipo("SAQUE");
         response.setValor("150.00");
-        response.setSaldo("850.00");
         response.setDataHora(LocalDateTime.now());
         response.setMensagem("Saque realizado com sucesso.");
         response.addLink("self", "http://localhost:8080/contas/1291/saque");
@@ -126,12 +125,50 @@ class ContaControllerTest {
                         .header("X-User-CPF", "12912861012")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.numeroConta").value("1291"))
                 .andExpect(jsonPath("$.tipo").value("SAQUE"))
                 .andExpect(jsonPath("$.valor").value("150.00"))
-                .andExpect(jsonPath("$.saldo").value("850.00"))
+                .andExpect(jsonPath("$.saldo").doesNotExist())
                 .andExpect(jsonPath("$._links.self.href").exists());
+    }
+
+    @Test
+    @DisplayName("Deve retornar 201 sem o novo saldo ao realizar depósito (R4)")
+    void deveDepositarComSucesso() throws Exception {
+        MovimentacaoResponseDTO response = new MovimentacaoResponseDTO();
+        response.setNumeroConta("1291");
+        response.setTipo("DEPOSITO");
+        response.setValor("150.00");
+        response.setDataHora(LocalDateTime.now());
+        response.setMensagem("Depósito realizado com sucesso.");
+        response.addLink("self", "http://localhost:8080/contas/1291/deposito");
+
+        when(service.depositar(eq("1291"), any(MovimentacaoRequestDTO.class), eq("12912861012")))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/contas/1291/deposito")
+                        .header("X-User-CPF", "12912861012")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(new MovimentacaoRequestDTO("150.00"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tipo").value("DEPOSITO"))
+                .andExpect(jsonPath("$.saldo").doesNotExist())
+                .andExpect(jsonPath("$._links.self.href").exists());
+    }
+
+    @Test
+    @DisplayName("Deve retornar 403 ao depositar na conta de outro cliente (R4)")
+    void deveRetornar403AoDepositarEmContaAlheia() throws Exception {
+        when(service.depositar(eq("0950"), any(MovimentacaoRequestDTO.class), eq("12912861012")))
+                .thenThrow(new AcessoNegadoException("Usuário não autorizado a realizar operações nesta conta."));
+
+        mockMvc.perform(post("/contas/0950/deposito")
+                        .header("X-User-CPF", "12912861012")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(new MovimentacaoRequestDTO("10.00"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.erro").value("Usuário não autorizado a realizar operações nesta conta."));
     }
 
     @Test

@@ -13,6 +13,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -424,10 +427,13 @@ class ContaServiceTest {
         MovimentacaoResponseDTO res = service.sacar(conta, req, cpf);
 
         assertNotNull(res);
-        assertEquals("700.00", res.getSaldo());
         assertEquals("300.00", res.getValor());
         assertEquals("SAQUE", res.getTipo());
-        verify(repository, times(1)).save(any(EventoConta.class));
+
+        ArgumentCaptor<EventoConta> captor = ArgumentCaptor.forClass(EventoConta.class);
+        verify(repository, times(1)).save(captor.capture());
+        assertEquals("Saque", captor.getValue().getTipo());
+        assertEquals(2, captor.getValue().getVersao());
     }
 
     @Test
@@ -459,6 +465,63 @@ class ContaServiceTest {
         assertThrows(AcessoNegadoException.class, () ->
                 service.sacar(conta, req, null)
         );
+    }
+
+    @Test
+    @DisplayName("Deve realizar depósito na própria conta com posse obrigatória (R4)")
+    void deveRealizarDepositoComSucesso() {
+        String conta = "1291";
+        String cpf = "12912861012";
+        List<EventoConta> eventos = List.of(
+                criarEvento(conta, "Criado", "{\"cpfCliente\":\"" + cpf + "\",\"saldo\":\"1000.00\"}", 1)
+        );
+        when(repository.findByObjetoIdOrderByVersaoAsc(conta)).thenReturn(eventos);
+
+        MovimentacaoResponseDTO res = service.depositar(conta, new MovimentacaoRequestDTO("150.00"), cpf);
+
+        assertNotNull(res);
+        assertEquals("150.00", res.getValor());
+        assertEquals("DEPOSITO", res.getTipo());
+
+        ArgumentCaptor<EventoConta> captor = ArgumentCaptor.forClass(EventoConta.class);
+        verify(repository, times(1)).save(captor.capture());
+        assertEquals("Depósito", captor.getValue().getTipo());
+        assertEquals(2, captor.getValue().getVersao());
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"09506382000", "98574307084"}) // outro cliente e o gerente da conta
+    @DisplayName("Deve rejeitar depósito de quem não é o titular, inclusive sem o header X-User-CPF (R4)")
+    void deveRejeitarDepositoQuandoUsuarioNaoForTitular(String xUserCpf) {
+        String conta = "1291";
+        List<EventoConta> eventos = List.of(
+                criarEvento(conta, "Criado", "{\"cpfCliente\":\"12912861012\",\"gerenteCpf\":\"98574307084\",\"saldo\":\"1000.00\"}", 1)
+        );
+        when(repository.findByObjetoIdOrderByVersaoAsc(conta)).thenReturn(eventos);
+
+        assertThrows(AcessoNegadoException.class, () ->
+                service.depositar(conta, new MovimentacaoRequestDTO("10.00"), xUserCpf)
+        );
+
+        verify(repository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc", "-10.00", "0.00", "10.005", "10,00", "1E-99999999"})
+    @DisplayName("Deve rejeitar valor fora do formato antes de consultar a conta (R4, R5, R6)")
+    void deveRejeitarValorForaDoFormato(String valor) {
+        assertThrows(IllegalArgumentException.class, () ->
+                service.sacar("1291", new MovimentacaoRequestDTO(valor), "12912861012")
+        );
+        assertThrows(IllegalArgumentException.class, () ->
+                service.depositar("1291", new MovimentacaoRequestDTO(valor), "12912861012")
+        );
+        assertThrows(TransferenciaInvalidaException.class, () ->
+                service.transferir("1291", new TransferenciaRequestDTO("0950", valor), "12912861012")
+        );
+
+        verifyNoInteractions(repository);
     }
 
     @Test
