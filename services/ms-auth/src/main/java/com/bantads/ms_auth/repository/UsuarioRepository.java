@@ -9,4 +9,8 @@ import org.springframework.stereotype.Repository;
 public interface UsuarioRepository extends MongoRepository<Usuario, String> {
 
     Optional<Usuario> findByLogin(String login);
+
+    Optional<Usuario> findByCpf(String cpf);
+
+    boolean existsByLogin(String login);
 }
