@@ -1,0 +1,2 @@
+# Scripts shell precisam de LF: com CRLF (checkout no Windows) o bash quebra em "$'\r': command not found"
+*.sh text eol=lf

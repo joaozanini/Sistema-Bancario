@@ -2,10 +2,11 @@ services:
   postgres:
     image: postgres:16
     container_name: bantads-postgres
+    # Um único contêiner com o banco "bantads"; cada MS cria o próprio schema via Flyway (schema-per-service)
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-bantads}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?preencha POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-bantads}
     ports:
       - "5432:5432"
     volumes:
@@ -40,7 +41,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: bantads-redis
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?preencha REDIS_PASSWORD no .env}"]
     ports:
       - "6379:6379"
     volumes:
@@ -59,8 +60,8 @@ services:
     container_name: bantads-rabbitmq
     hostname: rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?preencha RABBITMQ_PASSWORD no .env}
     # Com load_definitions o RabbitMQ não cria o usuário padrão, cria aqui a partir do .env
     command:
       - sh
@@ -96,7 +97,7 @@ services:
     environment:
       - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
       - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_USER=${RABBITMQ_USER:-admin}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD}
@@ -121,7 +122,7 @@ services:
     environment:
       - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
       - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_USER=${RABBITMQ_USER:-admin}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
       - GMAIL_USERNAME=${GMAIL_USERNAME}
       - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
@@ -137,6 +138,158 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+
+  # Os MSs não publicam portas: só o API Gateway fala com eles, pela rede interna
+  ms-auth:
+    build: ./services/ms-auth
+    container_name: bantads-ms-auth
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
+      - MONGO_URI=mongodb://mongo:27017/bantads
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  ms-cliente:
+    build: ./services/ms-cliente
+    container_name: bantads-ms-cliente
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
+      - DB_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-bantads}
+      - POSTGRES_USER=${POSTGRES_USER:-bantads}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  ms-gerente:
+    build: ./services/ms-gerente
+    container_name: bantads-ms-gerente
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
+      - DB_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-bantads}
+      - POSTGRES_USER=${POSTGRES_USER:-bantads}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  ms-conta:
+    build: ./services/ms-conta
+    container_name: bantads-ms-conta
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
+      - DB_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-bantads}
+      - POSTGRES_USER=${POSTGRES_USER:-bantads}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=${RABBITMQ_USER:-admin}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: bantads-api-gateway
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=192
+      - PORT=3000
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:4200}
+      - JWT_SECRET=${JWT_SECRET:?preencha JWT_SECRET no .env}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-8h}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      # O Gateway publica os pedidos de SAGA em saga.cmd
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=${RABBITMQ_USER:-admin}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - MS_AUTH_URL=http://ms-auth:8081
+      - MS_CLIENTE_URL=http://ms-cliente:8082
+      - MS_GERENTE_URL=http://ms-gerente:8083
+      - MS_CONTA_URL=http://ms-conta:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ms-auth:
+        condition: service_healthy
+      ms-cliente:
+        condition: service_healthy
+      ms-gerente:
+        condition: service_healthy
+      ms-conta:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Build estático do Angular servido pelo nginx; o navegador chama o Gateway em localhost:3000
+  frontend:
+    build: ./frontend
+    container_name: bantads-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   bantads-net:

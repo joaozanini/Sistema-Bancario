@@ -75,12 +75,6 @@ jobs:
           path: services/${{ matrix.service }}/target/surefire-reports/
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: jar-${{ matrix.service }}
-          path: services/${{ matrix.service }}/target/*.jar
-          retention-days: 1
-
   gateway:
     name: API Gateway
     runs-on: ubuntu-latest
@@ -127,28 +121,23 @@ jobs:
       packages: write
     strategy:
       fail-fast: false
+      # Os Dockerfiles são multi-stage: cada imagem compila o próprio código, sem depender do job java
       matrix:
         include:
-          - { service: api-gateway,     dockerfile: Dockerfile, java: false }
-          - { service: ms-auth,         dockerfile: Dockerfile, java: true }
-          - { service: ms-cliente,      dockerfile: Dockerfile, java: true }
-          - { service: ms-conta,        dockerfile: DockerFile, java: true }
-          - { service: ms-email,        dockerfile: Dockerfile, java: true }
-          - { service: ms-gerente,      dockerfile: Dockerfile, java: true }
-          - { service: ms-orquestrador, dockerfile: Dockerfile, java: true }
+          - { service: api-gateway,     context: services/api-gateway }
+          - { service: ms-auth,         context: services/ms-auth }
+          - { service: ms-cliente,      context: services/ms-cliente }
+          - { service: ms-conta,        context: services/ms-conta }
+          - { service: ms-email,        context: services/ms-email }
+          - { service: ms-gerente,      context: services/ms-gerente }
+          - { service: ms-orquestrador, context: services/ms-orquestrador }
+          - { service: frontend,        context: frontend }
 
     env:
       PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Baixar o jar
-        if: matrix.java
-        uses: actions/download-artifact@v4
-        with:
-          name: jar-${{ matrix.service }}
-          path: services/${{ matrix.service }}/target
 
       - uses: docker/setup-buildx-action@v3
 
@@ -171,8 +160,7 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: services/${{ matrix.service }}
-          file: services/${{ matrix.service }}/${{ matrix.dockerfile }}
+          context: ${{ matrix.context }}
           push: ${{ env.PUBLISH == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
