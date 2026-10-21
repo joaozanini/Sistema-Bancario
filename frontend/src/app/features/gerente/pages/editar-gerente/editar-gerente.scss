@@ -1,0 +1,141 @@
+:host {
+  display: block;
+}
+
+.editar-gerente-page {
+  max-width: 912px;
+  padding: 32px;
+  color: #172033;
+}
+
+.page-header h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.page-header p {
+  margin: 0 0 24px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+}
+
+.formulario {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.formulario label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.formulario input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #dbe3ee;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #172033;
+  font: inherit;
+  font-size: 14px;
+}
+
+.formulario input:focus {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.formulario input[readonly] {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.formulario small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.acoes button,
+.botao {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2563eb;
+  color: white;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.acoes button:hover:not(:disabled),
+.botao:hover {
+  background: #1d4ed8;
+}
+
+.acoes button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.botao.secundario {
+  border: 1px solid #dbe3ee;
+  background: white;
+  color: #334155;
+}
+
+.botao.secundario:hover {
+  background: #f8fafc;
+}
+
+.formulario .erro,
+.erro {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.aviso {
+  padding: 12px 16px;
+  border-left: 3px solid #e2b66d;
+  background: #fffbf3;
+  color: #785320;
+  font-size: 13px;
+}
+
+.aviso p {
+  margin: 0 0 12px;
+}
+
+.status {
+  color: #64748b;
+  font-size: 13px;
+}
