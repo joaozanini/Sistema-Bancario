@@ -1,0 +1,114 @@
+<section class="transferencia-page" aria-labelledby="titulo">
+  <header class="page-header">
+    <h1 id="titulo">Transferência</h1>
+    <p>Envie um valor para outra conta BANTADS.</p>
+  </header>
+
+  @if (carregandoConta()) {
+    <p class="status" role="status">Carregando a conta de origem...</p>
+  }
+
+  @if (erroConta()) {
+    <p class="aviso" role="alert">{{ erroConta() }}</p>
+  }
+
+  @if (etapa() === 'dados') {
+    <form class="card formulario" (ngSubmit)="continuar()" novalidate>
+      <label>
+        <span>Conta de origem</span>
+        <input
+          type="text"
+          [value]="contaOrigem() ?? (carregandoConta() ? 'Carregando...' : '')"
+          readonly
+          aria-describedby="origem-ajuda"
+        >
+        <small id="origem-ajuda">Conta vinculada ao cliente autenticado.</small>
+      </label>
+
+      <label>
+        <span>Conta de destino</span>
+        <input
+          type="text"
+          name="contaDestino"
+          [(ngModel)]="contaDestino"
+          (ngModelChange)="limparErro()"
+          autocomplete="off"
+          required
+        >
+      </label>
+
+      <label>
+        <span>Valor</span>
+        <span class="campo-valor">
+          <span aria-hidden="true">R$</span>
+          <input
+            type="text"
+            name="valor"
+            [(ngModel)]="valor"
+            (ngModelChange)="limparErro()"
+            inputmode="decimal"
+            placeholder="0,00"
+            autocomplete="off"
+            required
+          >
+        </span>
+        <small>Informe um valor positivo com até duas casas decimais.</small>
+      </label>
+
+      @if (erro()) {
+        <p class="erro" role="alert">{{ erro() }}</p>
+      }
+
+      <div class="acoes">
+        <a class="botao secundario" routerLink="/cliente">Cancelar</a>
+        <button type="submit" [disabled]="carregandoConta() || !contaOrigem()">
+          Continuar
+        </button>
+      </div>
+    </form>
+  } @else if (etapa() === 'confirmacao') {
+    <section class="card confirmacao" aria-labelledby="confirmacao-titulo">
+      <h2 id="confirmacao-titulo">Confirme os dados da transferência</h2>
+
+      <dl class="resumo">
+        <div>
+          <dt>Conta de origem</dt>
+          <dd>{{ contaOrigem() }}</dd>
+        </div>
+        <div>
+          <dt>Conta de destino</dt>
+          <dd>{{ contaDestino }}</dd>
+        </div>
+        <div>
+          <dt>Valor</dt>
+          <dd>{{ valorNormalizado | brlCurrency }}</dd>
+        </div>
+      </dl>
+
+      @if (erro()) {
+        <p class="erro" role="alert">{{ erro() }}</p>
+      }
+
+      <div class="acoes">
+        <button
+          type="button"
+          class="secundario"
+          (click)="voltarParaEdicao()"
+          [disabled]="enviando()"
+        >
+          Voltar e corrigir
+        </button>
+        <button type="button" (click)="confirmar()" [disabled]="enviando()">
+          {{ enviando() ? 'Enviando...' : 'Confirmar transferência' }}
+        </button>
+      </div>
+    </section>
+  } @else {
+    <section class="card resultado" role="status" aria-labelledby="sucesso-titulo">
+      <span class="icone-sucesso" aria-hidden="true">✓</span>
+      <h2 id="sucesso-titulo">Transferência realizada</h2>
+      <p>A API confirmou a transferência de {{ valorNormalizado | brlCurrency }}.</p>
+      <a class="botao" routerLink="/cliente">Voltar ao início</a>
+    </section>
+  }
+</section>

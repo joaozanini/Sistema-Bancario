@@ -1,9 +1,7 @@
 package com.bantads.ms_conta.service;
 
 import com.bantads.ms_conta.config.RabbitMQConfig;
-import com.bantads.ms_conta.dto.ContaDTO;
-import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
-import com.bantads.ms_conta.dto.TransferenciaResponseDTO;
+import com.bantads.ms_conta.dto.*;
 import com.bantads.ms_conta.exception.AcessoNegadoException;
 import com.bantads.ms_conta.exception.ContaNaoEncontradaException;
 import com.bantads.ms_conta.exception.SaldoInsuficienteException;
@@ -15,10 +13,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -44,7 +46,7 @@ class ContaServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        service = new ContaService(repository, objectMapper, rabbitTemplate);
+        service = new ContaService(repository, objectMapper, rabbitTemplate, null);
     }
 
     private EventoConta criarEvento(String objetoId, String tipo, String payload, int versao) {
@@ -81,8 +83,8 @@ class ContaServiceTest {
     @Test
     @DisplayName("Deve identificar conta de menor saldo do gerente com mais contas (R13)")
     void deveIdentificarContaParaNovoGerente() {
-        String ger1 = "98574307084"; // tem 2 contas: saldo 800 e 200 (menor conta = 200)
-        String ger2 = "64065268052"; // tem 1 conta
+        String ger1 = "98574307084";
+        String ger2 = "64065268052";
 
         List<EventoConta> eventosGerentes = List.of(
                 criarEvento("1291", "Criado", "{\"gerenteCpf\":\"" + ger1 + "\"}", 1),
@@ -309,6 +311,27 @@ class ContaServiceTest {
     }
 
     @Test
+    @DisplayName("Deve rejeitar transferência quando header de posse (X-User-CPF) não for informado (R6)")
+    void deveRejeitarQuandoHeaderPosseNaoInformado() {
+        String contaOrigem = "1291";
+        List<EventoConta> eventosOrigem = List.of(
+                criarEvento(contaOrigem, "Criado", "{\"cpfCliente\":\"12912861012\",\"saldo\":\"1000.00\"}", 1)
+        );
+
+        when(repository.findByObjetoIdOrderByVersaoAsc(contaOrigem)).thenReturn(eventosOrigem);
+
+        TransferenciaRequestDTO request = new TransferenciaRequestDTO();
+        request.setContaDestino("0950");
+        request.setValor("100.00");
+
+        assertThrows(AcessoNegadoException.class, () ->
+                service.transferir(contaOrigem, request, null)
+        );
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Deve rejeitar transferência quando conta de destino não existir")
     void deveRejeitarQuandoContaDestinoNaoExistir() {
         String contaOrigem = "1291";
@@ -344,6 +367,161 @@ class ContaServiceTest {
         );
 
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve realizar novo replay e tentar novamente em conflito de versão (R6)")
+    void deveFazerNovoReplayEmConflitoDeVersao() {
+        String contaOrigem = "1291";
+        String contaDestino = "0950";
+        String cpfOrigem = "12912861012";
+
+        List<EventoConta> eventosOrigemTentativa1 = List.of(
+                criarEvento(contaOrigem, "Criado", "{\"cpfCliente\":\"" + cpfOrigem + "\",\"saldo\":\"1000.00\"}", 1)
+        );
+        List<EventoConta> eventosDestinoTentativa1 = List.of(
+                criarEvento(contaDestino, "Criado", "{\"cpfCliente\":\"09506382000\",\"saldo\":\"500.00\"}", 1)
+        );
+
+        List<EventoConta> eventosOrigemTentativa2 = List.of(
+                criarEvento(contaOrigem, "Criado", "{\"cpfCliente\":\"" + cpfOrigem + "\",\"saldo\":\"1000.00\"}", 1),
+                criarEvento(contaOrigem, "Depósito", "{\"valor\":\"100.00\"}", 2)
+        );
+        List<EventoConta> eventosDestinoTentativa2 = List.of(
+                criarEvento(contaDestino, "Criado", "{\"cpfCliente\":\"09506382000\",\"saldo\":\"500.00\"}", 1)
+        );
+
+        when(repository.findByObjetoIdOrderByVersaoAsc(contaOrigem))
+                .thenReturn(eventosOrigemTentativa1)
+                .thenReturn(eventosOrigemTentativa2);
+        when(repository.findByObjetoIdOrderByVersaoAsc(contaDestino))
+                .thenReturn(eventosDestinoTentativa1)
+                .thenReturn(eventosDestinoTentativa2);
+
+        doThrow(new DataIntegrityViolationException("Versão duplicada"))
+                .doNothing()
+                .when(repository).flush();
+
+        TransferenciaRequestDTO request = new TransferenciaRequestDTO();
+        request.setContaDestino(contaDestino);
+        request.setValor("200.00");
+
+        TransferenciaResponseDTO response = service.transferir(contaOrigem, request, cpfOrigem);
+
+        assertNotNull(response);
+        assertEquals(contaOrigem, response.getContaOrigem());
+        verify(repository, times(2)).findByObjetoIdOrderByVersaoAsc(contaOrigem);
+    }
+
+    @Test
+    @DisplayName("Deve realizar saque com sucesso validando saldo por replay e posse obrigatória (R5)")
+    void deveRealizarSaqueComSucesso() {
+        String conta = "1291";
+        String cpf = "12912861012";
+        List<EventoConta> eventos = List.of(
+                criarEvento(conta, "Criado", "{\"cpfCliente\":\"" + cpf + "\",\"saldo\":\"1000.00\"}", 1)
+        );
+        when(repository.findByObjetoIdOrderByVersaoAsc(conta)).thenReturn(eventos);
+
+        MovimentacaoRequestDTO req = new MovimentacaoRequestDTO("300.00");
+        MovimentacaoResponseDTO res = service.sacar(conta, req, cpf);
+
+        assertNotNull(res);
+        assertEquals("300.00", res.getValor());
+        assertEquals("SAQUE", res.getTipo());
+
+        ArgumentCaptor<EventoConta> captor = ArgumentCaptor.forClass(EventoConta.class);
+        verify(repository, times(1)).save(captor.capture());
+        assertEquals("Saque", captor.getValue().getTipo());
+        assertEquals(2, captor.getValue().getVersao());
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar saque quando saldo for insuficiente pelo replay (R5)")
+    void deveRejeitarSaqueSaldoInsuficiente() {
+        String conta = "1291";
+        String cpf = "12912861012";
+        List<EventoConta> eventos = List.of(
+                criarEvento(conta, "Criado", "{\"cpfCliente\":\"" + cpf + "\",\"saldo\":\"200.00\"}", 1)
+        );
+        when(repository.findByObjetoIdOrderByVersaoAsc(conta)).thenReturn(eventos);
+
+        MovimentacaoRequestDTO req = new MovimentacaoRequestDTO("500.00");
+        assertThrows(SaldoInsuficienteException.class, () ->
+                service.sacar(conta, req, cpf)
+        );
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar saque quando posse obrigatória não for informada (R5)")
+    void deveRejeitarSaqueQuandoPosseNaoInformada() {
+        String conta = "1291";
+        List<EventoConta> eventos = List.of(
+                criarEvento(conta, "Criado", "{\"cpfCliente\":\"12912861012\",\"saldo\":\"1000.00\"}", 1)
+        );
+        when(repository.findByObjetoIdOrderByVersaoAsc(conta)).thenReturn(eventos);
+
+        MovimentacaoRequestDTO req = new MovimentacaoRequestDTO("100.00");
+        assertThrows(AcessoNegadoException.class, () ->
+                service.sacar(conta, req, null)
+        );
+    }
+
+    @Test
+    @DisplayName("Deve realizar depósito na própria conta com posse obrigatória (R4)")
+    void deveRealizarDepositoComSucesso() {
+        String conta = "1291";
+        String cpf = "12912861012";
+        List<EventoConta> eventos = List.of(
+                criarEvento(conta, "Criado", "{\"cpfCliente\":\"" + cpf + "\",\"saldo\":\"1000.00\"}", 1)
+        );
+        when(repository.findByObjetoIdOrderByVersaoAsc(conta)).thenReturn(eventos);
+
+        MovimentacaoResponseDTO res = service.depositar(conta, new MovimentacaoRequestDTO("150.00"), cpf);
+
+        assertNotNull(res);
+        assertEquals("150.00", res.getValor());
+        assertEquals("DEPOSITO", res.getTipo());
+
+        ArgumentCaptor<EventoConta> captor = ArgumentCaptor.forClass(EventoConta.class);
+        verify(repository, times(1)).save(captor.capture());
+        assertEquals("Depósito", captor.getValue().getTipo());
+        assertEquals(2, captor.getValue().getVersao());
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"09506382000", "98574307084"}) // outro cliente e o gerente da conta
+    @DisplayName("Deve rejeitar depósito de quem não é o titular, inclusive sem o header X-User-CPF (R4)")
+    void deveRejeitarDepositoQuandoUsuarioNaoForTitular(String xUserCpf) {
+        String conta = "1291";
+        List<EventoConta> eventos = List.of(
+                criarEvento(conta, "Criado", "{\"cpfCliente\":\"12912861012\",\"gerenteCpf\":\"98574307084\",\"saldo\":\"1000.00\"}", 1)
+        );
+        when(repository.findByObjetoIdOrderByVersaoAsc(conta)).thenReturn(eventos);
+
+        assertThrows(AcessoNegadoException.class, () ->
+                service.depositar(conta, new MovimentacaoRequestDTO("10.00"), xUserCpf)
+        );
+
+        verify(repository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc", "-10.00", "0.00", "10.005", "10,00", "1E-99999999"})
+    @DisplayName("Deve rejeitar valor fora do formato antes de consultar a conta (R4, R5, R6)")
+    void deveRejeitarValorForaDoFormato(String valor) {
+        assertThrows(IllegalArgumentException.class, () ->
+                service.sacar("1291", new MovimentacaoRequestDTO(valor), "12912861012")
+        );
+        assertThrows(IllegalArgumentException.class, () ->
+                service.depositar("1291", new MovimentacaoRequestDTO(valor), "12912861012")
+        );
+        assertThrows(TransferenciaInvalidaException.class, () ->
+                service.transferir("1291", new TransferenciaRequestDTO("0950", valor), "12912861012")
+        );
+
+        verifyNoInteractions(repository);
     }
 
     @Test

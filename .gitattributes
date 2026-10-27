@@ -1,0 +1,7 @@
+# Shell script com CRLF nao executa em Linux ("bad interpreter: ^M"), e a frota
+# roda em container Linux. Forca LF independente do checkout de cada um.
+*.sh text eol=lf
+
+# Arquivos lidos dentro dos containers
+Dockerfile text eol=lf
+*.conf text eol=lf

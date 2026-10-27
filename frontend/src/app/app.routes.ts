@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth-guard';
+import { clienteGuard } from './core/guards/cliente-guard';
 
 export const routes: Routes = [
    {
@@ -31,6 +32,14 @@ export const routes: Routes = [
     import('./features/cliente/pages/extrato/extrato').then((m) => m.Extrato),
 },
   {
+    path: 'transferencia',
+    canActivate: [clienteGuard],
+    loadComponent: () =>
+      import('./features/cliente/pages/transferencia/transferencia').then(
+        (m) => m.Transferencia,
+      ),
+  },
+  {
     path: 'cliente',
     loadComponent: () =>
       import('./features/cliente/pages/home/home').then(
@@ -42,6 +51,20 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/gerente/pages/home/home').then(
         (m) => m.Home,
+      ),
+  },
+  {
+    path: 'gerente/gerentes',
+    loadComponent: () =>
+      import('./features/gerente/pages/gerentes/gerentes').then(
+        (m) => m.Gerentes,
+      ),
+  },
+  {
+    path: 'gerente/gerentes/:cpf/editar',
+    loadComponent: () =>
+      import('./features/gerente/pages/editar-gerente/editar-gerente').then(
+        (m) => m.EditarGerente,
       ),
   },
   {

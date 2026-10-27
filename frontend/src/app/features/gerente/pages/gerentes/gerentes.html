@@ -1,0 +1,49 @@
+<section class="gerentes-page">
+  <header class="page-header">
+    <h1>Gerentes</h1>
+    <p>Gerentes cadastrados no banco, em ordem alfabética.</p>
+  </header>
+
+  @if (erro()) {
+    <p class="aviso falha" role="alert">
+      {{ erro() }}
+      <button type="button" class="link" (click)="carregar()">Tentar novamente</button>
+    </p>
+  }
+
+  <div class="card">
+    @if (carregando() && gerentes().length === 0) {
+      <p class="vazio">Carregando gerentes...</p>
+    } @else if (gerentes().length === 0) {
+      <p class="vazio">Nenhum gerente encontrado.</p>
+    } @else {
+      <div class="tabela-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Nome</th>
+              <th scope="col">CPF</th>
+              <th scope="col">E-mail</th>
+              <th scope="col">Telefone</th>
+              <th scope="col" class="acoes">Ações</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (g of gerentes(); track g.cpf) {
+              <tr>
+                <td class="nome">{{ g.nome }}</td>
+                <td>{{ g.cpf | cpf }}</td>
+                <td>{{ g.email }}</td>
+                <td>{{ g.telefone || '—' }}</td>
+                <td class="acoes">
+                  <a class="btn" [routerLink]="['/gerente/gerentes', g.cpf, 'editar']">Editar</a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</section>
