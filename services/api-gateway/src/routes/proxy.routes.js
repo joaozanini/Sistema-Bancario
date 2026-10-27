@@ -3,6 +3,7 @@ const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware
 const { contaServiceUrl, gerenteServiceUrl } = require('../config/services');
 const { verifyJwtAndSession, injectUserHeaders, exigirTipo } = require('../middlewares/auth.middleware');
 const { enriquecerCpfDestino, enriquecerNomes } = require('../middlewares/transferencia.middleware');
+const { remover } = require('../controllers/gerentes.controller');
 
 const router = Router();
 
@@ -34,5 +35,8 @@ router.get('/contas', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHead
 router.all(['/contas', '/contas/*'], verifyJwtAndSession, injectUserHeaders, contaProxy);
 
 router.put('/gerentes/:cpf', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, gerenteProxy);
+
+// R15 é SAGA: não vai para o MS Gerente via REST, vira mensagem em saga.cmd
+router.delete('/gerentes/:cpf', verifyJwtAndSession, exigirTipo('GERENTE'), remover);
 
 module.exports = router;
