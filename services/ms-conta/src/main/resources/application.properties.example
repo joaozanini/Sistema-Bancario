@@ -2,8 +2,14 @@ server.port=${SERVER_PORT:8080}
 
 # Configurações do Banco de Dados
 spring.datasource.url=jdbc:postgresql://${DB_HOST:localhost}:5432/${POSTGRES_DB:bantads}
-spring.datasource.username=${POSTGRES_USER}
-spring.datasource.password=${POSTGRES_PASSWORD}
+spring.datasource.username=${POSTGRES_USER:bantads}
+spring.datasource.password=${POSTGRES_PASSWORD:bantads}
+
+# Configurações do RabbitMQ
+spring.rabbitmq.host=${RABBITMQ_HOST:localhost}
+spring.rabbitmq.port=${RABBITMQ_PORT:5672}
+spring.rabbitmq.username=${RABBITMQ_USER:admin}
+spring.rabbitmq.password=${RABBITMQ_PASSWORD:}
 
 # Schema próprio do serviço (schema-per-service): as tabelas e a flyway_schema_history ficam nele
 spring.flyway.schemas=${DB_SCHEMA:conta}
