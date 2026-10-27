@@ -2,6 +2,8 @@ package com.bantads.ms_conta.service;
 
 import com.bantads.ms_conta.config.RabbitMQConfig;
 import com.bantads.ms_conta.dto.ContaDTO;
+import com.bantads.ms_conta.dto.ExtratoResponseDTO;
+import com.bantads.ms_conta.dto.ItemExtratoDTO;
 import com.bantads.ms_conta.dto.MovimentacaoRequestDTO;
 import com.bantads.ms_conta.dto.MovimentacaoResponseDTO;
 import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
@@ -10,8 +12,12 @@ import com.bantads.ms_conta.exception.AcessoNegadoException;
 import com.bantads.ms_conta.exception.ContaNaoEncontradaException;
 import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.exception.TransferenciaInvalidaException;
+import com.bantads.ms_conta.model.ContaQuery;
 import com.bantads.ms_conta.model.EventoConta;
+import com.bantads.ms_conta.model.MovimentacaoQuery;
+import com.bantads.ms_conta.repository.ContaQueryRepository;
 import com.bantads.ms_conta.repository.EventoContaRepository;
+import com.bantads.ms_conta.repository.MovimentacaoQueryRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -27,7 +33,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -43,6 +51,8 @@ public class ContaService {
     private static final Pattern FORMATO_VALOR = Pattern.compile("\\d{1,15}(\\.\\d{1,2})?");
 
     private final EventoContaRepository repository;
+    private final ContaQueryRepository contaQueryRepository;
+    private final MovimentacaoQueryRepository movimentacaoQueryRepository;
     private final ObjectMapper objectMapper;
     private final RabbitTemplate rabbitTemplate;
     private final TransactionTemplate transactionTemplate;
@@ -51,10 +61,24 @@ public class ContaService {
     public ContaService(
             EventoContaRepository repository,
             ObjectMapper objectMapper,
+            RabbitTemplate rabbitTemplate,
+            PlatformTransactionManager transactionManager
+    ) {
+        this(repository, null, null, objectMapper, rabbitTemplate, transactionManager);
+    }
+
+    @Autowired
+    public ContaService(
+            EventoContaRepository repository,
+            @Autowired(required = false) ContaQueryRepository contaQueryRepository,
+            @Autowired(required = false) MovimentacaoQueryRepository movimentacaoQueryRepository,
+            ObjectMapper objectMapper,
             @Autowired(required = false) RabbitTemplate rabbitTemplate,
             @Autowired(required = false) PlatformTransactionManager transactionManager
     ) {
         this.repository = repository;
+        this.contaQueryRepository = contaQueryRepository;
+        this.movimentacaoQueryRepository = movimentacaoQueryRepository;
         this.objectMapper = objectMapper;
         this.rabbitTemplate = rabbitTemplate;
         this.transactionTemplate = transactionManager != null ? new TransactionTemplate(transactionManager) : null;
@@ -315,7 +339,9 @@ public class ContaService {
     @Transactional(rollbackFor = Exception.class)
     public void compensarCriacaoConta(String numeroConta, String cpfCliente) {
         if (numeroConta != null && !numeroConta.isBlank()) {
-            repository.deleteByObjetoId(numeroConta.trim());
+            String num = numeroConta.trim();
+            repository.deleteByObjetoId(num);
+            removerContaDoLadoQuery(num);
             log.warn("Compensação SAGA executada: Conta {} removida do Event Store.", numeroConta);
             return;
         }
@@ -327,9 +353,19 @@ public class ContaService {
                 String cpf = node.has("cpfCliente") ? node.get("cpfCliente").asText() : (node.has("cpf") ? node.get("cpf").asText() : null);
                 if (cpfCliente.trim().equals(cpf)) {
                     repository.deleteByObjetoId(evento.getObjetoId());
+                    removerContaDoLadoQuery(evento.getObjetoId());
                     log.warn("Compensação SAGA executada: Conta {} removida para o cliente {}.", evento.getObjetoId(), cpfCliente);
                 }
             }
+        }
+    }
+
+    private void removerContaDoLadoQuery(String numeroConta) {
+        if (movimentacaoQueryRepository != null) {
+            movimentacaoQueryRepository.deleteByNumeroConta(numeroConta);
+        }
+        if (contaQueryRepository != null && contaQueryRepository.existsById(numeroConta)) {
+            contaQueryRepository.deleteById(numeroConta);
         }
     }
 
@@ -657,6 +693,18 @@ public class ContaService {
 
     @Transactional(readOnly = true)
     public ContaDTO buscarContaPorNumero(String numeroConta) {
+        if (contaQueryRepository != null) {
+            Optional<ContaQuery> queryOpt = contaQueryRepository.findById(numeroConta);
+            if (queryOpt.isPresent()) {
+                ContaQuery cq = queryOpt.get();
+                ContaDTO dto = new ContaDTO(cq.getNumeroConta(), cq.getCpfCliente(), cq.getGerenteCpf());
+                dto.addLink("self", "http://localhost:8080/contas/" + numeroConta);
+                dto.addLink("deposito", "http://localhost:8080/contas/" + numeroConta + "/deposito");
+                dto.addLink("saque", "http://localhost:8080/contas/" + numeroConta + "/saque");
+                dto.addLink("extrato", "http://localhost:8080/contas/" + numeroConta + "/extrato");
+                return dto;
+            }
+        }
         List<EventoConta> eventos = repository.findByObjetoIdOrderByVersaoAsc(numeroConta);
         if (eventos.isEmpty()) {
             throw new ContaNaoEncontradaException("Conta não encontrada: " + numeroConta);
@@ -668,6 +716,373 @@ public class ContaService {
         dto.addLink("saque", "http://localhost:8080/contas/" + numeroConta + "/saque");
         dto.addLink("extrato", "http://localhost:8080/contas/" + numeroConta + "/extrato");
         return dto;
+    }
+
+    /**
+     * Requisito R7: Consulta de extrato no lado Query pelo CPF do cliente autenticado (X-User-CPF).
+     */
+    @Transactional
+    public ExtratoResponseDTO consultarExtratoPorCpf(String xUserCpf, String inicioStr, String fimStr) {
+        if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
+            throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");
+        }
+        String cpfLimpo = xUserCpf.trim();
+
+        if (contaQueryRepository != null) {
+            Optional<ContaQuery> contaQueryOpt = contaQueryRepository.findByCpfCliente(cpfLimpo);
+            if (contaQueryOpt.isPresent()) {
+                return consultarExtrato(contaQueryOpt.get().getNumeroConta(), inicioStr, fimStr, cpfLimpo);
+            }
+        }
+
+        // Fallback sincronizando a partir do Event Store caso a projeção assíncrona ainda não tenha processado
+        List<EventoConta> criados = repository.findByTipoIn(List.of("Criado", "CRIADO"));
+        for (EventoConta evento : criados) {
+            JsonNode node = parseJsonNode(evento.getPayload());
+            String cpf = node.has("cpfCliente") ? node.get("cpfCliente").asText()
+                    : (node.has("cpf") ? node.get("cpf").asText() : null);
+            if (cpfLimpo.equals(cpf)) {
+                return consultarExtrato(evento.getObjetoId(), inicioStr, fimStr, cpfLimpo);
+            }
+        }
+
+        throw new ContaNaoEncontradaException("Conta não encontrada para o cliente: " + cpfLimpo);
+    }
+
+    /**
+     * Requisito R7: Consulta de extrato no lado Query da arquitetura CQRS por período (início e fim),
+     * retornando saldo de abertura consolidado antes da data inicial, lista de movimentações (entradas e saídas)
+     * e links HATEOAS.
+     */
+    @Transactional
+    public ExtratoResponseDTO consultarExtrato(
+            String numeroConta,
+            String inicioStr,
+            String fimStr,
+            String xUserCpf
+    ) {
+        if (numeroConta == null || numeroConta.trim().isEmpty()) {
+            throw new IllegalArgumentException("Número da conta é obrigatório.");
+        }
+        String num = numeroConta.trim();
+
+        LocalDate fim = (fimStr != null && !fimStr.isBlank()) ? parseData(fimStr.trim(), "fim") : LocalDate.now();
+        LocalDate inicio = (inicioStr != null && !inicioStr.isBlank()) ? parseData(inicioStr.trim(), "inicio") : fim.minusDays(30);
+
+        if (inicio.isAfter(fim)) {
+            throw new IllegalArgumentException("A data de início deve ser anterior ou igual à data de fim.");
+        }
+
+        LocalDateTime dataHoraInicio = inicio.atStartOfDay();
+        LocalDateTime dataHoraFim = fim.atTime(23, 59, 59, 999_999_999);
+
+        sincronizarLadoQuerySeNecessario(num);
+
+        if (contaQueryRepository != null && movimentacaoQueryRepository != null) {
+            Optional<ContaQuery> contaQueryOpt = contaQueryRepository.findById(num);
+            if (contaQueryOpt.isPresent()) {
+                ContaQuery contaQuery = contaQueryOpt.get();
+                EstadoConta estadoQuery = new EstadoConta();
+                estadoQuery.setCpfCliente(contaQuery.getCpfCliente());
+                estadoQuery.setGerenteCpf(contaQuery.getGerenteCpf());
+                estadoQuery.adicionarSaldo(contaQuery.getSaldo());
+
+                validarPosse(estadoQuery, xUserCpf);
+
+                List<MovimentacaoQuery> todasMovs = movimentacaoQueryRepository
+                        .findByNumeroContaOrderByDataHoraAscVersaoAsc(num);
+                List<MovimentacaoQuery> movsAnteriores = movimentacaoQueryRepository
+                        .findByNumeroContaAndDataHoraLessThanOrderByDataHoraAscVersaoAsc(num, dataHoraInicio);
+                List<MovimentacaoQuery> movsPeriodo = movimentacaoQueryRepository
+                        .findByNumeroContaAndDataHoraBetweenOrderByDataHoraAscVersaoAsc(num, dataHoraInicio, dataHoraFim);
+
+                BigDecimal somaTodasMovs = somarMovimentacoesComSinal(todasMovs);
+                BigDecimal saldoInicialCriacao = contaQuery.getSaldo().subtract(somaTodasMovs);
+                BigDecimal saldoAbertura = saldoInicialCriacao.add(somarMovimentacoesComSinal(movsAnteriores));
+
+                List<ItemExtratoDTO> itens = new ArrayList<>();
+                for (MovimentacaoQuery mov : movsPeriodo) {
+                    itens.add(new ItemExtratoDTO(
+                            mov.getDataHora().toString(),
+                            mov.getTipo(),
+                            mov.getCpfOrigem(),
+                            mov.getNomeOrigem(),
+                            mov.getCpfDestino(),
+                            mov.getNomeDestino(),
+                            mov.getValor().setScale(2, RoundingMode.HALF_UP).toString()
+                    ));
+                }
+
+                return montarExtratoResponse(num, saldoAbertura, contaQuery.getSaldo(), itens);
+            }
+        }
+
+        // Fallback direto a partir dos eventos caso os repositórios query não estejam injetados
+        List<EventoConta> eventos = repository.findByObjetoIdOrderByVersaoAsc(num);
+        if (eventos.isEmpty()) {
+            throw new ContaNaoEncontradaException("Conta não encontrada: " + num);
+        }
+
+        EstadoConta estado = reconstruirEstadoPorReplay(eventos);
+        validarPosse(estado, xUserCpf);
+
+        BigDecimal saldoAbertura = BigDecimal.ZERO;
+        List<ItemExtratoDTO> itens = new ArrayList<>();
+
+        for (EventoConta evento : eventos) {
+            String tipoNorm = normalizarTipoEvento(evento.getTipo());
+            JsonNode payload = parseJsonNode(evento.getPayload());
+            LocalDateTime dataEvento = extrairDataHoraEvento(evento, payload);
+
+            if ("CRIADO".equals(tipoNorm)) {
+                if (payload.has("saldo")) {
+                    saldoAbertura = saldoAbertura.add(new BigDecimal(payload.get("saldo").asText()));
+                }
+                continue;
+            }
+
+            MovimentacaoQuery mov = construirMovimentacaoQuery(evento, estado.getCpfCliente());
+            if (mov == null) {
+                continue;
+            }
+
+            if (dataEvento.isBefore(dataHoraInicio)) {
+                if ("ENTRADA".equals(mov.getNatureza())) {
+                    saldoAbertura = saldoAbertura.add(mov.getValor());
+                } else {
+                    saldoAbertura = saldoAbertura.subtract(mov.getValor());
+                }
+            } else if (!dataEvento.isAfter(dataHoraFim)) {
+                itens.add(new ItemExtratoDTO(
+                        mov.getDataHora().toString(),
+                        mov.getTipo(),
+                        mov.getCpfOrigem(),
+                        mov.getNomeOrigem(),
+                        mov.getCpfDestino(),
+                        mov.getNomeDestino(),
+                        mov.getValor().setScale(2, RoundingMode.HALF_UP).toString()
+                ));
+            }
+        }
+
+        return montarExtratoResponse(num, saldoAbertura, estado.getSaldo(), itens);
+    }
+
+    /**
+     * Projeta de forma idempotente um EventoConta nas tabelas do lado Query (conta_query e movimentacao_query).
+     */
+    @Transactional
+    public void projetarEventoNoLadoQuery(EventoConta evento) {
+        if (evento == null || contaQueryRepository == null || movimentacaoQueryRepository == null) {
+            return;
+        }
+
+        String numeroConta = evento.getObjetoId();
+        String tipoNorm = normalizarTipoEvento(evento.getTipo());
+        JsonNode payload = parseJsonNode(evento.getPayload());
+        LocalDateTime dataHora = extrairDataHoraEvento(evento, payload);
+
+        if ("CRIADO".equals(tipoNorm)) {
+            ContaQuery conta = contaQueryRepository.findById(numeroConta).orElseGet(ContaQuery::new);
+            if (conta.getUltimaVersao() != null && conta.getUltimaVersao() >= evento.getVersao()) {
+                return;
+            }
+            conta.setNumeroConta(numeroConta);
+            String cpfCliente = payload.has("cpfCliente") ? payload.get("cpfCliente").asText()
+                    : (payload.has("cpf") ? payload.get("cpf").asText() : "");
+            String gerenteCpf = payload.has("gerenteCpf") ? payload.get("gerenteCpf").asText()
+                    : (payload.has("cpfGerente") ? payload.get("cpfGerente").asText() : "");
+            BigDecimal saldoInicial = payload.has("saldo") ? new BigDecimal(payload.get("saldo").asText()) : BigDecimal.ZERO;
+            BigDecimal limite = payload.has("limite") ? new BigDecimal(payload.get("limite").asText()) : BigDecimal.ZERO;
+            BigDecimal salario = payload.has("salario") ? new BigDecimal(payload.get("salario").asText()) : BigDecimal.ZERO;
+
+            conta.setCpfCliente(cpfCliente);
+            conta.setGerenteCpf(gerenteCpf);
+            conta.setSaldo(saldoInicial.setScale(2, RoundingMode.HALF_UP));
+            conta.setLimite(limite.setScale(2, RoundingMode.HALF_UP));
+            conta.setSalario(salario.setScale(2, RoundingMode.HALF_UP));
+            conta.setDataCriacao(dataHora);
+            conta.setUltimaVersao(evento.getVersao());
+            contaQueryRepository.save(conta);
+            return;
+        }
+
+        Optional<ContaQuery> contaOpt = contaQueryRepository.findById(numeroConta);
+        if (contaOpt.isEmpty()) {
+            return;
+        }
+        ContaQuery conta = contaOpt.get();
+
+        if ("GERENTEALTERADO".equals(tipoNorm)) {
+            if (conta.getUltimaVersao() < evento.getVersao()) {
+                if (payload.has("gerenteCpf")) {
+                    conta.setGerenteCpf(payload.get("gerenteCpf").asText());
+                } else if (payload.has("cpfGerente")) {
+                    conta.setGerenteCpf(payload.get("cpfGerente").asText());
+                }
+                conta.setUltimaVersao(evento.getVersao());
+                contaQueryRepository.save(conta);
+            }
+            return;
+        }
+
+        if (movimentacaoQueryRepository.existsById(evento.getId())) {
+            return;
+        }
+
+        MovimentacaoQuery mov = construirMovimentacaoQuery(evento, conta.getCpfCliente());
+        if (mov == null) {
+            return;
+        }
+
+        movimentacaoQueryRepository.save(mov);
+
+        if ("ENTRADA".equals(mov.getNatureza())) {
+            conta.setSaldo(conta.getSaldo().add(mov.getValor()).setScale(2, RoundingMode.HALF_UP));
+        } else {
+            conta.setSaldo(conta.getSaldo().subtract(mov.getValor()).setScale(2, RoundingMode.HALF_UP));
+        }
+        if (evento.getVersao() > conta.getUltimaVersao()) {
+            conta.setUltimaVersao(evento.getVersao());
+        }
+        contaQueryRepository.save(conta);
+    }
+
+    private void sincronizarLadoQuerySeNecessario(String numeroConta) {
+        if (contaQueryRepository == null || movimentacaoQueryRepository == null) {
+            return;
+        }
+        List<EventoConta> eventos = repository.findByObjetoIdOrderByVersaoAsc(numeroConta);
+        if (eventos.isEmpty()) {
+            return;
+        }
+        Optional<ContaQuery> contaOpt = contaQueryRepository.findById(numeroConta);
+        int ultimaVersaoProjetada = contaOpt.map(ContaQuery::getUltimaVersao).orElse(0);
+        int ultimaVersaoEventos = eventos.get(eventos.size() - 1).getVersao();
+
+        if (ultimaVersaoProjetada < ultimaVersaoEventos) {
+            for (EventoConta evento : eventos) {
+                if (evento.getVersao() > ultimaVersaoProjetada) {
+                    projetarEventoNoLadoQuery(evento);
+                }
+            }
+        }
+    }
+
+    private MovimentacaoQuery construirMovimentacaoQuery(EventoConta evento, String cpfTitularConta) {
+        String tipoNorm = normalizarTipoEvento(evento.getTipo());
+        JsonNode payload = parseJsonNode(evento.getPayload());
+        if (!payload.has("valor")) {
+            return null;
+        }
+
+        BigDecimal valor = new BigDecimal(payload.get("valor").asText()).abs().setScale(2, RoundingMode.HALF_UP);
+        LocalDateTime dataHora = extrairDataHoraEvento(evento, payload);
+
+        MovimentacaoQuery mov = new MovimentacaoQuery();
+        mov.setId(evento.getId() != null ? evento.getId() : UUID.randomUUID().toString());
+        mov.setNumeroConta(evento.getObjetoId());
+        mov.setDataHora(dataHora);
+        mov.setValor(valor);
+        mov.setVersao(evento.getVersao() != null ? evento.getVersao() : 1);
+
+        switch (tipoNorm) {
+            case "DEPOSITO" -> {
+                mov.setTipo("DEPOSITO");
+                mov.setNatureza("ENTRADA");
+            }
+            case "SAQUE" -> {
+                mov.setTipo("SAQUE");
+                mov.setNatureza("SAIDA");
+            }
+            case "TRANSFERENCIAORIGEM" -> {
+                mov.setTipo("TRANSFERENCIA");
+                mov.setNatureza("SAIDA");
+                mov.setCpfOrigem(extrairTexto(payload, "cpfOrigem", cpfTitularConta));
+                mov.setNomeOrigem(extrairTexto(payload, "nomeOrigem", null));
+                mov.setCpfDestino(extrairTexto(payload, "cpfDestino", null));
+                mov.setNomeDestino(extrairTexto(payload, "nomeDestino", null));
+            }
+            case "TRANSFERENCIADESTINO" -> {
+                mov.setTipo("TRANSFERENCIA");
+                mov.setNatureza("ENTRADA");
+                mov.setCpfOrigem(extrairTexto(payload, "cpfOrigem", null));
+                mov.setNomeOrigem(extrairTexto(payload, "nomeOrigem", null));
+                mov.setCpfDestino(extrairTexto(payload, "cpfDestino", cpfTitularConta));
+                mov.setNomeDestino(extrairTexto(payload, "nomeDestino", null));
+            }
+            default -> {
+                return null;
+            }
+        }
+
+        return mov;
+    }
+
+    private BigDecimal somarMovimentacoesComSinal(List<MovimentacaoQuery> movs) {
+        BigDecimal soma = BigDecimal.ZERO;
+        if (movs == null) {
+            return soma;
+        }
+        for (MovimentacaoQuery mov : movs) {
+            if ("ENTRADA".equals(mov.getNatureza())) {
+                soma = soma.add(mov.getValor());
+            } else {
+                soma = soma.subtract(mov.getValor());
+            }
+        }
+        return soma;
+    }
+
+    private ExtratoResponseDTO montarExtratoResponse(
+            String numeroConta,
+            BigDecimal saldoAbertura,
+            BigDecimal saldoAtual,
+            List<ItemExtratoDTO> itens
+    ) {
+        ExtratoResponseDTO response = new ExtratoResponseDTO(
+                numeroConta,
+                saldoAbertura.setScale(2, RoundingMode.HALF_UP).toString(),
+                saldoAtual.setScale(2, RoundingMode.HALF_UP).toString(),
+                itens
+        );
+        response.addLink("self", "http://localhost:8080/contas/" + numeroConta + "/extrato");
+        response.addLink("conta", "http://localhost:8080/contas/" + numeroConta);
+        response.addLink("deposito", "http://localhost:8080/contas/" + numeroConta + "/deposito");
+        response.addLink("saque", "http://localhost:8080/contas/" + numeroConta + "/saque");
+        response.addLink("transferencia", "http://localhost:8080/contas/" + numeroConta + "/transferencia");
+        return response;
+    }
+
+    private LocalDate parseData(String valor, String nomeCampo) {
+        try {
+            return LocalDate.parse(valor);
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Data de " + nomeCampo + " inválida: " + valor + ". Use o formato AAAA-MM-DD.");
+        }
+    }
+
+    private LocalDateTime extrairDataHoraEvento(EventoConta evento, JsonNode payload) {
+        if (evento.getTimestamp() != null) {
+            return evento.getTimestamp();
+        }
+        if (payload != null && payload.has("dataHora") && !payload.get("dataHora").isNull()) {
+            try {
+                return LocalDateTime.parse(payload.get("dataHora").asText());
+            } catch (Exception ignored) {
+            }
+        }
+        return LocalDateTime.now();
+    }
+
+    private String extrairTexto(JsonNode node, String campo, String padrao) {
+        if (node != null && node.has(campo) && !node.get(campo).isNull()) {
+            String val = node.get(campo).asText();
+            if (!val.isBlank()) {
+                return val;
+            }
+        }
+        return padrao;
     }
 
     private Map<String, String> mapearGerenteAtualPorConta() {
@@ -749,7 +1164,7 @@ public class ContaService {
         return valor != null && FORMATO_VALOR.matcher(valor).matches();
     }
 
-    // Posse obrigatória (R4, R5, R6): só o titular opera a conta
+    // Posse obrigatória (R4, R5, R6, R7): só o titular opera ou consulta o extrato da conta
     private void validarPosse(EstadoConta estado, String xUserCpf) {
         if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
             throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");

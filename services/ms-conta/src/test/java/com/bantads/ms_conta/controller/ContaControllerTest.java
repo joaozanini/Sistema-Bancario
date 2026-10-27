@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -185,6 +186,66 @@ class ContaControllerTest {
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.erro").value("Saldo insuficiente para realizar o saque."));
+    }
+
+    @Test
+    @DisplayName("Deve consultar extrato do cliente autenticado em GET /contas/extrato (R7)")
+    void deveConsultarExtratoDoClienteComSucesso() throws Exception {
+        ItemExtratoDTO item = new ItemExtratoDTO(
+                "2026-10-10T14:30:00",
+                "DEPOSITO",
+                null,
+                null,
+                null,
+                null,
+                "1000.00"
+        );
+        ExtratoResponseDTO response = new ExtratoResponseDTO(
+                "1291",
+                "800.00",
+                "1800.00",
+                List.of(item)
+        );
+        response.addLink("self", "http://localhost:8080/contas/1291/extrato");
+
+        when(service.consultarExtratoPorCpf("12912861012", "2026-10-01", "2026-10-31"))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/contas/extrato")
+                        .param("inicio", "2026-10-01")
+                        .param("fim", "2026-10-31")
+                        .header("X-User-CPF", "12912861012"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.numeroConta").value("1291"))
+                .andExpect(jsonPath("$.saldoAbertura").value("800.00"))
+                .andExpect(jsonPath("$.saldo").value("1800.00"))
+                .andExpect(jsonPath("$.movimentacoes[0].tipo").value("DEPOSITO"))
+                .andExpect(jsonPath("$.movimentacoes[0].valor").value("1000.00"))
+                .andExpect(jsonPath("$._links.self.href").exists());
+    }
+
+    @Test
+    @DisplayName("Deve consultar extrato por número da conta em GET /contas/{numero}/extrato (R7)")
+    void deveConsultarExtratoPorNumeroContaComSucesso() throws Exception {
+        ExtratoResponseDTO response = new ExtratoResponseDTO(
+                "1291",
+                "800.00",
+                "800.00",
+                List.of()
+        );
+        response.addLink("self", "http://localhost:8080/contas/1291/extrato");
+
+        when(service.consultarExtrato("1291", "2026-10-01", "2026-10-31", "12912861012"))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/contas/1291/extrato")
+                        .param("inicio", "2026-10-01")
+                        .param("fim", "2026-10-31")
+                        .header("X-User-CPF", "12912861012"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.numeroConta").value("1291"))
+                .andExpect(jsonPath("$.saldoAbertura").value("800.00"))
+                .andExpect(jsonPath("$._links.self.href").exists());
     }
 
     @Test
