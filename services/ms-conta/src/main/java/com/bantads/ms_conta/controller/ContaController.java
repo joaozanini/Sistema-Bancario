@@ -1,6 +1,7 @@
 package com.bantads.ms_conta.controller;
 
 import com.bantads.ms_conta.dto.ContaDTO;
+import com.bantads.ms_conta.dto.ExtratoResponseDTO;
 import com.bantads.ms_conta.dto.MovimentacaoRequestDTO;
 import com.bantads.ms_conta.dto.MovimentacaoResponseDTO;
 import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
@@ -48,6 +49,27 @@ public class ContaController {
     ) {
         MovimentacaoResponseDTO resposta = service.depositar(numeroConta, dto, xUserCpf);
         return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
+    }
+
+    @GetMapping("/extrato")
+    public ResponseEntity<ExtratoResponseDTO> consultarExtratoDoCliente(
+            @RequestParam(value = "inicio", required = false) String inicio,
+            @RequestParam(value = "fim", required = false) String fim,
+            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
+    ) {
+        ExtratoResponseDTO resposta = service.consultarExtratoPorCpf(xUserCpf, inicio, fim);
+        return ResponseEntity.ok(resposta);
+    }
+
+    @GetMapping("/{numero}/extrato")
+    public ResponseEntity<ExtratoResponseDTO> consultarExtratoPorConta(
+            @PathVariable("numero") String numeroConta,
+            @RequestParam(value = "inicio", required = false) String inicio,
+            @RequestParam(value = "fim", required = false) String fim,
+            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
+    ) {
+        ExtratoResponseDTO resposta = service.consultarExtrato(numeroConta, inicio, fim, xUserCpf);
+        return ResponseEntity.ok(resposta);
     }
 
     @GetMapping("/{numero}")
