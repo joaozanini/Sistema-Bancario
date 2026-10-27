@@ -2,13 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const rabbit = require('../config/rabbit');
-const redis = require('../config/redis');
 const jobService = require('./job.service');
 const sagaService = require('./saga.service');
 
-// job.service puxa o cliente Redis, que fica em loop de reconexão e segura o
-// processo. Sem fechar aqui, o arquivo de teste nunca termina.
-test.after(() => redis.destroy());
 
 function comDublos({ aoPublicar } = {}) {
   const eventos = [];

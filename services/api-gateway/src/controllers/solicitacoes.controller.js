@@ -1,4 +1,5 @@
 const sagaService = require('../services/saga.service');
+const clienteService = require('../services/cliente.service');
 
 const TIPO_APROVAR_CLIENTE = 'aprovar-cliente';
 const DOMINIO = 'clientes';
@@ -10,6 +11,8 @@ async function aprovar(req, res) {
 
   try {
     const jobId = await sagaService.iniciar(TIPO_APROVAR_CLIENTE, DOMINIO, { cpf });
+    // R9 cria o cliente: o que estiver em cache para esse CPF fica obsoleto
+    await clienteService.invalidar(cpf);
     return res.status(202).json({ jobId });
   } catch (err) {
     console.error('Falha ao iniciar a SAGA de aprovação:', err.message);
