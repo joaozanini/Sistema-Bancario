@@ -4,6 +4,7 @@ const { contaServiceUrl, gerenteServiceUrl } = require('../config/services');
 const { verifyJwtAndSession, injectUserHeaders, exigirTipo } = require('../middlewares/auth.middleware');
 const { enriquecerCpfDestino, enriquecerNomes } = require('../middlewares/transferencia.middleware');
 const { inserir, remover } = require('../controllers/gerentes.controller');
+const gerenteService = require('../services/gerente.service');
 
 const router = Router();
 
@@ -16,7 +17,16 @@ const contaProxy = createProxyMiddleware({
 const gerenteProxy = createProxyMiddleware({
   target: gerenteServiceUrl,
   changeOrigin: true,
-  on: { proxyReq: fixRequestBody },
+  on: {
+    proxyReq: fixRequestBody,
+    // R14: invalida só depois que o MS Gerente confirmou a gravação — invalidar
+    // antes abriria janela para uma leitura concorrente recachear o dado velho.
+    proxyRes: (proxyRes, req) => {
+      if (req.method === 'PUT' && proxyRes.statusCode < 400 && req.params?.cpf) {
+        gerenteService.invalidar(req.params.cpf);
+      }
+    },
+  },
 });
 
 router.post(

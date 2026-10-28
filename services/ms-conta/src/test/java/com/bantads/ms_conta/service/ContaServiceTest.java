@@ -6,8 +6,12 @@ import com.bantads.ms_conta.exception.AcessoNegadoException;
 import com.bantads.ms_conta.exception.ContaNaoEncontradaException;
 import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.exception.TransferenciaInvalidaException;
+import com.bantads.ms_conta.model.ContaQuery;
 import com.bantads.ms_conta.model.EventoConta;
+import com.bantads.ms_conta.model.MovimentacaoQuery;
+import com.bantads.ms_conta.repository.ContaQueryRepository;
 import com.bantads.ms_conta.repository.EventoContaRepository;
+import com.bantads.ms_conta.repository.MovimentacaoQueryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -38,6 +43,12 @@ class ContaServiceTest {
     private EventoContaRepository repository;
 
     @Mock
+    private ContaQueryRepository contaQueryRepository;
+
+    @Mock
+    private MovimentacaoQueryRepository movimentacaoQueryRepository;
+
+    @Mock
     private RabbitTemplate rabbitTemplate;
 
     private ObjectMapper objectMapper;
@@ -46,17 +57,28 @@ class ContaServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        service = new ContaService(repository, objectMapper, rabbitTemplate, null);
+        service = new ContaService(
+                repository,
+                contaQueryRepository,
+                movimentacaoQueryRepository,
+                objectMapper,
+                rabbitTemplate,
+                null
+        );
     }
 
     private EventoConta criarEvento(String objetoId, String tipo, String payload, int versao) {
+        return criarEventoComData(objetoId, tipo, payload, versao, LocalDateTime.now());
+    }
+
+    private EventoConta criarEventoComData(String objetoId, String tipo, String payload, int versao, LocalDateTime dataHora) {
         EventoConta evento = new EventoConta();
         evento.setId("evt-" + versao + "-" + objetoId);
         evento.setObjetoId(objetoId);
         evento.setTipo(tipo);
         evento.setPayload(payload);
         evento.setVersao(versao);
-        evento.setTimestamp(LocalDateTime.now());
+        evento.setTimestamp(dataHora);
         return evento;
     }
 
@@ -532,6 +554,7 @@ class ContaServiceTest {
                 criarEvento(numeroConta, "Criado", "{\"cpfCliente\":\"12912861012\",\"gerenteCpf\":\"98574307084\",\"saldo\":\"800.00\"}", 1)
         );
 
+        when(contaQueryRepository.findById(numeroConta)).thenReturn(Optional.empty());
         when(repository.findByObjetoIdOrderByVersaoAsc(numeroConta)).thenReturn(eventos);
 
         ContaDTO dto = service.buscarContaPorNumero(numeroConta);
@@ -542,5 +565,149 @@ class ContaServiceTest {
         assertEquals("98574307084", dto.getGerenteCpf());
         assertNotNull(dto.get_links());
         assertTrue(dto.get_links().containsKey("self"));
+    }
+
+    @Test
+    @DisplayName("Deve consultar extrato no lado query por período calculando saldoAbertura e filtrando movimentações (R7)")
+    void deveConsultarExtratoNoLadoQueryComSucesso() {
+        String numeroConta = "1291";
+        String cpf = "12912861012";
+
+        ContaQuery cq = new ContaQuery();
+        cq.setNumeroConta(numeroConta);
+        cq.setCpfCliente(cpf);
+        cq.setGerenteCpf("98574307084");
+        cq.setSaldo(new BigDecimal("1450.00"));
+        cq.setUltimaVersao(4);
+
+        MovimentacaoQuery movAnterior = new MovimentacaoQuery();
+        movAnterior.setId("m1");
+        movAnterior.setNumeroConta(numeroConta);
+        movAnterior.setDataHora(LocalDateTime.of(2026, 9, 25, 10, 0));
+        movAnterior.setTipo("DEPOSITO");
+        movAnterior.setNatureza("ENTRADA");
+        movAnterior.setValor(new BigDecimal("800.00"));
+        movAnterior.setVersao(2);
+
+        MovimentacaoQuery movPeriodo1 = new MovimentacaoQuery();
+        movPeriodo1.setId("m2");
+        movPeriodo1.setNumeroConta(numeroConta);
+        movPeriodo1.setDataHora(LocalDateTime.of(2026, 10, 5, 14, 30));
+        movPeriodo1.setTipo("DEPOSITO");
+        movPeriodo1.setNatureza("ENTRADA");
+        movPeriodo1.setValor(new BigDecimal("1000.00"));
+        movPeriodo1.setVersao(3);
+
+        MovimentacaoQuery movPeriodo2 = new MovimentacaoQuery();
+        movPeriodo2.setId("m3");
+        movPeriodo2.setNumeroConta(numeroConta);
+        movPeriodo2.setDataHora(LocalDateTime.of(2026, 10, 10, 16, 15));
+        movPeriodo2.setTipo("TRANSFERENCIA");
+        movPeriodo2.setNatureza("SAIDA");
+        movPeriodo2.setValor(new BigDecimal("350.00"));
+        movPeriodo2.setCpfOrigem(cpf);
+        movPeriodo2.setNomeOrigem("Catharyna");
+        movPeriodo2.setCpfDestino("09506382000");
+        movPeriodo2.setNomeDestino("Cleuddônio");
+        movPeriodo2.setVersao(4);
+
+        when(repository.findByObjetoIdOrderByVersaoAsc(numeroConta)).thenReturn(List.of());
+        when(contaQueryRepository.findById(numeroConta)).thenReturn(Optional.of(cq));
+        when(movimentacaoQueryRepository.findByNumeroContaOrderByDataHoraAscVersaoAsc(numeroConta))
+                .thenReturn(List.of(movAnterior, movPeriodo1, movPeriodo2));
+        when(movimentacaoQueryRepository.findByNumeroContaAndDataHoraLessThanOrderByDataHoraAscVersaoAsc(
+                eq(numeroConta), any(LocalDateTime.class)))
+                .thenReturn(List.of(movAnterior));
+        when(movimentacaoQueryRepository.findByNumeroContaAndDataHoraBetweenOrderByDataHoraAscVersaoAsc(
+                eq(numeroConta), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(movPeriodo1, movPeriodo2));
+
+        ExtratoResponseDTO extrato = service.consultarExtrato(numeroConta, "2026-10-01", "2026-10-31", cpf);
+
+        assertNotNull(extrato);
+        assertEquals(numeroConta, extrato.getNumeroConta());
+        assertEquals("800.00", extrato.getSaldoAbertura());
+        assertEquals("1450.00", extrato.getSaldo());
+        assertEquals(2, extrato.getMovimentacoes().size());
+
+        ItemExtratoDTO item1 = extrato.getMovimentacoes().get(0);
+        assertEquals("DEPOSITO", item1.getTipo());
+        assertEquals("1000.00", item1.getValor());
+
+        ItemExtratoDTO item2 = extrato.getMovimentacoes().get(1);
+        assertEquals("TRANSFERENCIA", item2.getTipo());
+        assertEquals("350.00", item2.getValor());
+        assertEquals("Catharyna", item2.getNomeOrigem());
+        assertEquals("Cleuddônio", item2.getNomeDestino());
+
+        assertNotNull(extrato.get_links());
+        assertTrue(extrato.get_links().containsKey("self"));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar consulta de extrato quando usuário não for o titular da conta (R7)")
+    void deveRejeitarConsultaExtratoQuandoUsuarioNaoTitular() {
+        String numeroConta = "1291";
+        ContaQuery cq = new ContaQuery();
+        cq.setNumeroConta(numeroConta);
+        cq.setCpfCliente("12912861012");
+        cq.setGerenteCpf("98574307084");
+        cq.setSaldo(new BigDecimal("800.00"));
+        cq.setUltimaVersao(1);
+
+        when(repository.findByObjetoIdOrderByVersaoAsc(numeroConta)).thenReturn(List.of());
+        when(contaQueryRepository.findById(numeroConta)).thenReturn(Optional.of(cq));
+
+        assertThrows(AcessoNegadoException.class, () ->
+                service.consultarExtrato(numeroConta, "2026-10-01", "2026-10-31", "99999999999")
+        );
+    }
+
+    @Test
+    @DisplayName("Deve projetar eventos CQRS no lado query de forma idempotente (R7)")
+    void deveProjetarEventosNoLadoQuery() {
+        String numeroConta = "1291";
+        String cpf = "12912861012";
+
+        EventoConta evtCriado = criarEventoComData(
+                numeroConta,
+                "Criado",
+                "{\"cpfCliente\":\"" + cpf + "\",\"gerenteCpf\":\"98574307084\",\"saldo\":\"0.00\",\"salario\":\"4000.00\",\"limite\":\"2000.00\"}",
+                1,
+                LocalDateTime.of(2026, 10, 1, 9, 0)
+        );
+
+        when(contaQueryRepository.findById(numeroConta)).thenReturn(Optional.empty());
+
+        service.projetarEventoNoLadoQuery(evtCriado);
+
+        ArgumentCaptor<ContaQuery> contaCaptor = ArgumentCaptor.forClass(ContaQuery.class);
+        verify(contaQueryRepository, times(1)).save(contaCaptor.capture());
+
+        ContaQuery contaSalva = contaCaptor.getValue();
+        assertEquals(numeroConta, contaSalva.getNumeroConta());
+        assertEquals(cpf, contaSalva.getCpfCliente());
+        assertEquals(new BigDecimal("0.00"), contaSalva.getSaldo());
+        assertEquals(1, contaSalva.getUltimaVersao());
+
+        when(contaQueryRepository.findById(numeroConta)).thenReturn(Optional.of(contaSalva));
+        when(movimentacaoQueryRepository.existsById("evt-2-1291")).thenReturn(false);
+
+        EventoConta evtDeposito = criarEventoComData(
+                numeroConta,
+                "Depósito",
+                "{\"valor\":\"500.00\",\"numeroConta\":\"1291\"}",
+                2,
+                LocalDateTime.of(2026, 10, 2, 11, 0)
+        );
+
+        service.projetarEventoNoLadoQuery(evtDeposito);
+
+        ArgumentCaptor<MovimentacaoQuery> movCaptor = ArgumentCaptor.forClass(MovimentacaoQuery.class);
+        verify(movimentacaoQueryRepository, times(1)).save(movCaptor.capture());
+        assertEquals("DEPOSITO", movCaptor.getValue().getTipo());
+        assertEquals("ENTRADA", movCaptor.getValue().getNatureza());
+        assertEquals(new BigDecimal("500.00"), movCaptor.getValue().getValor());
+        assertEquals(new BigDecimal("500.00"), contaSalva.getSaldo());
     }
 }

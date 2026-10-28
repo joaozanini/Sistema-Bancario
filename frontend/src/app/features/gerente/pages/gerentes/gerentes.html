@@ -1,9 +1,12 @@
 <section class="gerentes-page">
   <header class="page-header">
     <h1>Gerentes</h1>
-    <p>Gerentes cadastrados no banco, em ordem alfabética.</p>
+    <p>Gerentes ativos do banco, em ordem alfabética.</p>
   </header>
 
+  @if (mensagem()) {
+    <p class="aviso sucesso" role="status">{{ mensagem() }}</p>
+  }
   @if (erro()) {
     <p class="aviso falha" role="alert">
       {{ erro() }}
@@ -25,6 +28,7 @@
               <th scope="col">CPF</th>
               <th scope="col">E-mail</th>
               <th scope="col">Telefone</th>
+              <th scope="col" class="numero">Clientes</th>
               <th scope="col" class="acoes">Ações</th>
             </tr>
           </thead>
@@ -36,8 +40,16 @@
                 <td>{{ g.cpf | cpf }}</td>
                 <td>{{ g.email }}</td>
                 <td>{{ g.telefone || '—' }}</td>
+                <td class="numero">{{ g.quantidadeClientes ?? '—' }}</td>
                 <td class="acoes">
-                  <a class="btn" [routerLink]="['/gerente/gerentes', g.cpf, 'editar']">Editar</a>
+                  <div class="acoes-botoes">
+                    <a class="btn" [routerLink]="['/gerente/gerentes', g.cpf, 'editar']">Editar</a>
+                    @if (g.cpf !== cpfLogado) {
+                      <button type="button" class="btn remover" (click)="abrirRemocao(g)">
+                        Remover
+                      </button>
+                    }
+                  </div>
                 </td>
               </tr>
             }
@@ -46,4 +58,49 @@
       </div>
     }
   </div>
+
+  @if (emRemocao(); as alvo) {
+    <div class="overlay">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-remocao"
+        (keydown.escape)="fecharRemocao()"
+      >
+        <h2 id="titulo-remocao">Remover gerente</h2>
+        <p class="modal-info">{{ alvo.nome }} — CPF {{ alvo.cpf | cpf }}</p>
+        <p class="modal-texto">
+          O gerente ficará inativo e os clientes dele serão transferidos para o gerente com menos
+          clientes. Deseja continuar?
+        </p>
+
+        @if (removendo()) {
+          <p class="modal-status" role="status">Removendo... aguardando a conclusão da operação.</p>
+        }
+        @if (erroRemocao()) {
+          <p class="erro-remocao" role="alert">{{ erroRemocao() }}</p>
+        }
+
+        <div class="modal-acoes">
+          <button
+            type="button"
+            class="btn secundario"
+            (click)="fecharRemocao()"
+            [disabled]="removendo()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn perigo"
+            (click)="confirmarRemocao()"
+            [disabled]="removendo()"
+          >
+            {{ removendo() ? 'Removendo...' : 'Remover' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </section>

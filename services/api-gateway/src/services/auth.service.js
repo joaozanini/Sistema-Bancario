@@ -1,4 +1,6 @@
-const { authServiceUrl, clienteServiceUrl, gerenteServiceUrl } = require('../config/services');
+const { authServiceUrl } = require('../config/services');
+const clienteService = require('./cliente.service');
+const gerenteService = require('./gerente.service');
 const tokenService = require('./token.service');
 const sessionService = require('./session.service');
 
@@ -31,16 +33,10 @@ async function autenticar(email, senha) {
   return { token, tipo, usuario };
 }
 
+// passa pelo cache-aside: dado cadastral muda pouco e o login e a rota mais chamada
 async function comporUsuario(cpf, tipo) {
   const isGerente = String(tipo).toUpperCase() === 'GERENTE';
-  const baseUrl = isGerente ? gerenteServiceUrl : clienteServiceUrl;
-  const dominio = isGerente ? 'gerentes' : 'clientes';
-
-  const resposta = await fetch(`${baseUrl}/${dominio}/${cpf}`);
-  if (!resposta.ok) {
-    throw new Error(`Falha ao compor usuario (${dominio}/${cpf}): ${resposta.status}`);
-  }
-  const dados = await resposta.json();
+  const dados = isGerente ? await gerenteService.buscar(cpf) : await clienteService.buscar(cpf);
   return { cpf, nome: dados.nome, email: dados.email };
 }
 

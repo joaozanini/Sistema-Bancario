@@ -5,7 +5,6 @@ const http = require('node:http');
 const PORTA_MS_CONTA = 18080;
 process.env.MS_CONTA_URL = `http://localhost:${PORTA_MS_CONTA}`;
 
-const redis = require('../config/redis');
 const sessionService = require('../services/session.service');
 const tokenService = require('../services/token.service');
 const app = require('../app');
@@ -32,7 +31,6 @@ test.after(() => {
   gateway.close();
   msConta.closeAllConnections();
   msConta.close();
-  redis.destroy();
 });
 
 function chamar(caminho, tipo) {
