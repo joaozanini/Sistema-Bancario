@@ -4,6 +4,7 @@ import { DateTime } from 'luxon';
 import { delay, Observable, of } from 'rxjs';
 
 import { ExtratoDto } from '../models/extrato.model';
+import { environment } from '../../../../environments/environment';
 
 const USAR_MOCK = false;
 
@@ -13,7 +14,7 @@ const USAR_MOCK = false;
 export class ExtratoService {
   private http = inject(HttpClient);
 
-  private readonly extratoUrl = 'http://localhost:3000/contas/extrato';
+  private readonly extratoUrl = `${environment.apiUrl}/contas/extrato`;
 
   obterExtrato(inicio: DateTime, fim: DateTime): Observable<ExtratoDto> {
     if (USAR_MOCK) {

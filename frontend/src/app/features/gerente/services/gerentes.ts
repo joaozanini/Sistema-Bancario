@@ -4,6 +4,7 @@ import { map, Observable, of, switchMap, throwError } from 'rxjs';
 
 import { JobAceito, JobsService } from '../../../core/services/jobs';
 import { AtualizacaoGerente, GerenteDto } from '../models/gerente.model';
+import { environment } from '../../../../environments/environment';
 
 const MENSAGEM_REMOCAO = 'Gerente removido com sucesso.';
 
@@ -14,7 +15,7 @@ export class GerentesService {
   private http = inject(HttpClient);
   private jobsService = inject(JobsService);
 
-  private readonly gerentesUrl = 'http://localhost:3000/gerentes';
+  private readonly gerentesUrl = `${environment.apiUrl}/gerentes`;
 
   // R12: só os ativos, ordenados por nome
   listar(): Observable<GerenteDto[]> {

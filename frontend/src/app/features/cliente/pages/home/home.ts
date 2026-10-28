@@ -1,7 +1,10 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { HttpErrorResponse } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
+
 import { BrlCurrencyPipe } from '../../../../shared/pipes/brl-currency.pipe';
+import { ContaService, ResumoConta } from '../../services/conta';
 
 @Component({
   selector: 'app-home',
@@ -9,22 +12,41 @@ import { BrlCurrencyPipe } from '../../../../shared/pipes/brl-currency.pipe';
   templateUrl: './home.html',
   styleUrl: './home.scss',
 })
-export class Home {
-  private readonly route = inject(ActivatedRoute);
-  private readonly parametros = toSignal(this.route.queryParamMap, {
-    initialValue: this.route.snapshot.queryParamMap,
-  });
+export class Home implements OnInit {
+  private readonly contaService = inject(ContaService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  readonly secao = computed(() => this.parametros().get('secao') ?? 'resumo');
+  readonly conta = signal<ResumoConta | null>(null);
+  readonly carregando = signal(false);
+  readonly erro = signal('');
   readonly mostrarSaldo = signal(true);
 
-  // Dados de demonstração enquanto o serviço de conta não oferece consulta.
-  readonly conta = {
-    agencia: '0001',
-    numero: '000123-4',
-    tipo: 'Conta corrente',
-    saldo: '1250.00',
-  };
+  ngOnInit(): void {
+    this.carregar();
+  }
+
+  carregar(): void {
+    this.carregando.set(true);
+    this.erro.set('');
+
+    this.contaService
+      .obterResumo()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (conta) => {
+          this.conta.set(conta);
+          this.carregando.set(false);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.erro.set(
+            err.status === 0
+              ? 'Não foi possível conectar ao servidor. Tente novamente.'
+              : 'Não foi possível carregar sua conta.',
+          );
+          this.carregando.set(false);
+        },
+      });
+  }
 
   alternarSaldo(): void {
     this.mostrarSaldo.update((visivel) => !visivel);

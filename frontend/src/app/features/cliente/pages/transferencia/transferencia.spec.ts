@@ -3,6 +3,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Subject, of, throwError } from 'rxjs';
 
+import { MoneyDecimal } from '../../../../shared/utils/money.util';
+import { ContaService } from '../../services/conta';
 import { ExtratoService } from '../../services/extrato';
 import { TransferenciaService } from '../../services/transferencia';
 import { Transferencia } from './transferencia';
@@ -12,6 +14,7 @@ describe('Transferencia', () => {
   let component: Transferencia;
   let extratoService: { obterExtrato: ReturnType<typeof vi.fn> };
   let transferenciaService: { transferir: ReturnType<typeof vi.fn> };
+  let contaService: { obterResumo: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     extratoService = {
@@ -22,6 +25,11 @@ describe('Transferencia', () => {
     transferenciaService = {
       transferir: vi.fn().mockReturnValue(of({})),
     };
+    contaService = {
+      obterResumo: vi.fn().mockReturnValue(
+        of({ numeroConta: '12345', saldo: new MoneyDecimal('850.00') }),
+      ),
+    };
 
     await TestBed.configureTestingModule({
       imports: [Transferencia],
@@ -29,6 +37,7 @@ describe('Transferencia', () => {
         provideRouter([]),
         { provide: ExtratoService, useValue: extratoService },
         { provide: TransferenciaService, useValue: transferenciaService },
+        { provide: ContaService, useValue: contaService },
       ],
     }).compileComponents();
 
@@ -190,5 +199,19 @@ describe('Transferencia', () => {
     respostaPendente.complete();
 
     expect(component.etapa()).toBe('sucesso');
+  });
+
+  it('reconsulta o saldo depois da transferência (5.10)', () => {
+    component.contaDestino = '98765';
+    component.valor = '150';
+    component.continuar();
+
+    component.confirmar();
+    fixture.detectChanges();
+
+    expect(component.etapa()).toBe('sucesso');
+    expect(contaService.obterResumo).toHaveBeenCalledOnce();
+    expect(component.saldoAtual()?.toFixed(2)).toBe('850.00');
+    expect(fixture.nativeElement.textContent).toContain('Saldo atual');
   });
 });
