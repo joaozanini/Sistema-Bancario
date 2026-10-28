@@ -132,3 +132,114 @@ tbody td.nome {
 .btn:hover {
   background: #eff6ff;
 }
+
+.aviso.sucesso {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.numero {
+  text-align: right;
+}
+
+.acoes-botoes {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+button.btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn.remover {
+  color: #b91c1c;
+}
+
+.btn.remover:hover {
+  background: #fef2f2;
+}
+
+.btn.secundario {
+  color: #334155;
+}
+
+.btn.perigo {
+  border-color: #b91c1c;
+  background: #b91c1c;
+  color: white;
+}
+
+.btn.perigo:hover:not(:disabled) {
+  background: #991b1b;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
+}
+
+.modal h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.modal-info {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.modal-texto,
+.modal-status {
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.modal-status {
+  color: #64748b;
+}
+
+.erro-remocao {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.modal-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.modal-acoes .btn {
+  min-height: 36px;
+}
