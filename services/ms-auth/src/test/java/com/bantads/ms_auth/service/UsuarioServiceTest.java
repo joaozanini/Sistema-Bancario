@@ -111,6 +111,29 @@ class UsuarioServiceTest {
     }
 
     @Test
+    void criarGerenteGravaOHashDaSenhaInformada() {
+        service.criarGerente(SAGA_ID, CPF, EMAIL, "senhaDoForm");
+
+        ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
+        verify(repository).insert(captor.capture());
+        Usuario criado = captor.getValue();
+        assertThat(criado.getTipo()).isEqualTo(TipoUsuario.GERENTE);
+        assertThat(criado.getSenhaHash()).isEqualTo("hash:senhaDoForm");
+        assertThat(criado.getLogin()).isEqualTo(EMAIL);
+        assertThat(criado.getSagaCriacao()).isEqualTo(SAGA_ID);
+        verify(geradorSenha, never()).gerar();
+    }
+
+    @Test
+    void gerenteComLoginExistenteRecusaSemGravar() {
+        when(repository.existsByLogin(EMAIL)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.criarGerente(SAGA_ID, CPF, EMAIL, "senhaDoForm"))
+                .isInstanceOf(LoginJaCadastradoException.class);
+        verify(repository, never()).insert(any(Usuario.class));
+    }
+
+    @Test
     void compensacaoRemoveOQueAMesmaSagaCriou() {
         Usuario criado = new Usuario(CPF, TipoUsuario.CLIENTE, EMAIL, "hash");
         criado.setSagaCriacao(SAGA_ID);

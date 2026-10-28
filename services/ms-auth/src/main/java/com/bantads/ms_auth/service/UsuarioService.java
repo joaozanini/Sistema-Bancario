@@ -46,24 +46,35 @@ public class UsuarioService {
      * existe no retorno: no banco fica apenas o hash.
      */
     public String criarCliente(String sagaId, String cpf, String login) {
+        String senha = geradorSenha.gerar();
+        criar(sagaId, cpf, TipoUsuario.CLIENTE, login, senha);
+        return senha;
+    }
+
+    /**
+     * Cria o registro do gerente inserido (R13) com a senha informada no formulario.
+     */
+    public void criarGerente(String sagaId, String cpf, String login, String senha) {
+        criar(sagaId, cpf, TipoUsuario.GERENTE, login, senha);
+    }
+
+    private void criar(String sagaId, String cpf, TipoUsuario tipo, String login, String senha) {
         Optional<Usuario> mesmoCpf = repository.findByCpf(cpf);
         if (mesmoCpf.isPresent()) {
             Usuario existente = mesmoCpf.get();
             if (!sagaId.equals(existente.getSagaCriacao())) {
                 throw new CpfJaCadastradoException();
             }
-            // entrega anterior desta SAGA caiu antes de responder, entao a senha dela nunca saiu daqui
-            String senha = geradorSenha.gerar();
+            // entrega anterior desta SAGA caiu antes de responder: regrava o hash com a senha atual
             existente.setSenhaHash(passwordEncoder.encode(senha));
             repository.save(existente);
-            return senha;
+            return;
         }
         if (repository.existsByLogin(login)) {
             throw new LoginJaCadastradoException(login);
         }
 
-        String senha = geradorSenha.gerar();
-        Usuario usuario = new Usuario(cpf, TipoUsuario.CLIENTE, login, passwordEncoder.encode(senha));
+        Usuario usuario = new Usuario(cpf, tipo, login, passwordEncoder.encode(senha));
         usuario.setSagaCriacao(sagaId);
         try {
             repository.insert(usuario);
@@ -74,7 +85,6 @@ public class UsuarioService {
             }
             throw new CpfJaCadastradoException();
         }
-        return senha;
     }
 
     public void removerCriadoPelaSaga(String sagaId, String cpf) {

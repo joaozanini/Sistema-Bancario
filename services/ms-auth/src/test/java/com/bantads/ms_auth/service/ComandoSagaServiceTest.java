@@ -3,6 +3,7 @@ package com.bantads.ms_auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -152,6 +153,52 @@ class ComandoSagaServiceTest {
                 Map.of("cpf", CPF, "email", EMAIL), null, null);
 
         assertThat(service.processar(comando)).isEmpty();
+    }
+
+    @Test
+    void criarGerenteUsaASenhaInformadaENaoADevolve() {
+        MensagemSaga resposta = service.processar(criarGerente(Map.of(
+                "cpf", CPF, "email", EMAIL, "tipo", "GERENTE", "senha", SENHA))).orElseThrow();
+
+        verify(usuarioService).criarGerente(SAGA_ID, CPF, EMAIL, SENHA);
+        verify(usuarioService, never()).criarCliente(anyString(), anyString(), anyString());
+        assertThat(resposta.status()).isEqualTo(StatusResposta.SUCESSO);
+        assertThat(resposta.payload()).isEmpty();
+    }
+
+    @Test
+    void gerenteSemSenhaRespondeFalha() {
+        MensagemSaga resposta = service.processar(criarGerente(Map.of(
+                "cpf", CPF, "email", EMAIL, "tipo", "GERENTE"))).orElseThrow();
+
+        assertThat(resposta.status()).isEqualTo(StatusResposta.FALHA);
+        verify(usuarioService, never()).criarGerente(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void gerenteComLoginDuplicadoRespondeOErroCombinado() {
+        doThrow(new LoginJaCadastradoException(EMAIL))
+                .when(usuarioService).criarGerente(SAGA_ID, CPF, EMAIL, SENHA);
+
+        MensagemSaga resposta = service.processar(criarGerente(Map.of(
+                "cpf", CPF, "email", EMAIL, "tipo", "GERENTE", "senha", SENHA))).orElseThrow();
+
+        assertThat(resposta.status()).isEqualTo(StatusResposta.FALHA);
+        assertThat(resposta.erro()).isEqualTo("LOGIN_DUPLICADO");
+    }
+
+    @Test
+    void tipoDeUsuarioDesconhecidoRespondeFalha() {
+        MensagemSaga resposta = service.processar(criarGerente(Map.of(
+                "cpf", CPF, "email", EMAIL, "tipo", "ADMIN", "senha", SENHA))).orElseThrow();
+
+        assertThat(resposta.status()).isEqualTo(StatusResposta.FALHA);
+        verify(usuarioService, never()).criarGerente(anyString(), anyString(), anyString(), anyString());
+    }
+
+    private static MensagemSaga criarGerente(Map<String, Object> payload) {
+        return new MensagemSaga(SAGA_ID, ComandoSagaService.CRIAR_USUARIO, "2026-04-30T09:59:59",
+                payload, null, null);
     }
 
     private static MensagemSaga criarUsuario() {
