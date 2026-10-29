@@ -72,8 +72,8 @@ class SagaServiceTest {
                 .when(publisher).publicar(anyString(), any());
 
         Clock clock = Clock.fixed(AGORA, ZoneOffset.UTC);
-        service = new SagaService(List.of(new AprovarClienteSaga()), repository, publisher, clock,
-                Duration.ofSeconds(30));
+        service = new SagaService(List.of(new AprovarClienteSaga()), repository, publisher, new SegredosSaga(),
+                clock, Duration.ofSeconds(30));
     }
 
     @Test
@@ -108,7 +108,7 @@ class SagaServiceTest {
 
     @Test
     void sagaDeTipoDesconhecidoEhIgnorada() {
-        service.iniciar(MensagemSaga.comando(SAGA_ID, "inserir-gerente", null, Map.of()));
+        service.iniciar(MensagemSaga.comando(SAGA_ID, "saga-inexistente", null, Map.of()));
 
         assertThat(publicadas).isEmpty();
         verify(repository, never()).salvar(any());

@@ -71,20 +71,31 @@ public class ComandoSagaService {
         if (cpf == null || email == null) {
             return Optional.of(registrarFalha(comando, "cpf e email sao obrigatorios"));
         }
-        if (tipoUsuario != null && !"CLIENTE".equals(tipoUsuario)) {
+        boolean gerente = "GERENTE".equals(tipoUsuario);
+        if (tipoUsuario != null && !gerente && !"CLIENTE".equals(tipoUsuario)) {
             return Optional.of(registrarFalha(comando, "Tipo de usuario nao suportado: " + tipoUsuario));
         }
+        // R13: a senha vem do formulario e nao volta na resposta
+        String senhaInformada = texto(payload, "senha");
+        if (gerente && senhaInformada == null) {
+            return Optional.of(registrarFalha(comando, "senha e obrigatoria para gerente"));
+        }
 
-        String senha;
+        Map<String, Object> resposta;
         try {
-            senha = usuarioService.criarCliente(comando.sagaId(), cpf, email);
+            if (gerente) {
+                usuarioService.criarGerente(comando.sagaId(), cpf, email, senhaInformada);
+                resposta = Map.of();
+            } else {
+                resposta = Map.of("senha", usuarioService.criarCliente(comando.sagaId(), cpf, email));
+            }
         } catch (LoginJaCadastradoException e) {
             return Optional.of(registrarFalha(comando, ERRO_LOGIN_DUPLICADO));
         } catch (CpfJaCadastradoException e) {
             return Optional.of(registrarFalha(comando, e.getMessage()));
         }
         registrar(comando, StatusResposta.SUCESSO, null);
-        return Optional.of(MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of("senha", senha)));
+        return Optional.of(MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), resposta));
     }
 
     /**

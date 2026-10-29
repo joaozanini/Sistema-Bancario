@@ -2,7 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const sagaService = require('../services/saga.service');
-const { remover, TIPO_REMOVER_GERENTE, DOMINIO } = require('./gerentes.controller');
+const redis = require('../config/redis');
+const { inserir, remover, TIPO_INSERIR_GERENTE, TIPO_REMOVER_GERENTE, DOMINIO } = require('./gerentes.controller');
 
 const CPF_LOGADO = '98574307084';
 const CPF_ALVO = '64065268052';
@@ -97,4 +98,80 @@ test('falha ao publicar vira 502 e nao 202', async () => {
   } finally {
     restaurar();
   }
+});
+
+const NOVO_GERENTE = {
+  cpf: '11144477735',
+  nome: 'Gerente Novo',
+  email: 'novo.gerente@bantads.com.br',
+  telefone: '41999990000',
+  senha: 'senhaDoFormulario',
+};
+
+test('inserir devolve 202 com o jobId', async () => {
+  const restaurar = comSagaDublada(async () => 'job-13');
+  try {
+    const res = resposta();
+    await inserir({ body: NOVO_GERENTE, user: { cpf: CPF_LOGADO } }, res);
+
+    assert.equal(res.codigo, 202);
+    assert.deepEqual(res.corpo, { jobId: 'job-13' });
+  } finally {
+    restaurar();
+  }
+});
+
+test('inserir publica a saga com os dados do formulario', async () => {
+  const recebido = [];
+  const restaurar = comSagaDublada(async (tipo, dominio, payload) => {
+    recebido.push({ tipo, dominio, payload });
+    return 'job-1';
+  });
+  try {
+    await inserir({ body: { ...NOVO_GERENTE, extra: 'ignorado' }, user: { cpf: CPF_LOGADO } }, resposta());
+
+    // precisa bater com InserirGerenteSaga.TIPO e dominioJob() no ms-orquestrador
+    assert.equal(recebido[0].tipo, 'inserir-gerente');
+    assert.equal(recebido[0].dominio, 'gerentes');
+    assert.deepEqual(recebido[0].payload, NOVO_GERENTE);
+  } finally {
+    restaurar();
+  }
+});
+
+test('inserir sem senha devolve 400 sem publicar', async () => {
+  let publicou = false;
+  const restaurar = comSagaDublada(async () => {
+    publicou = true;
+    return 'job-1';
+  });
+  try {
+    const res = resposta();
+    const { senha, ...semSenha } = NOVO_GERENTE;
+    await inserir({ body: semSenha, user: { cpf: CPF_LOGADO } }, res);
+
+    assert.equal(res.codigo, 400);
+    assert.match(res.corpo.message, /senha/);
+    assert.equal(publicou, false);
+  } finally {
+    restaurar();
+  }
+});
+
+test('inserir com falha ao publicar vira 502', async () => {
+  const restaurar = comSagaDublada(async () => {
+    throw new Error('broker fora do ar');
+  });
+  try {
+    const res = resposta();
+    await inserir({ body: NOVO_GERENTE, user: { cpf: CPF_LOGADO } }, res);
+
+    assert.equal(res.codigo, 502);
+  } finally {
+    restaurar();
+  }
+});
+
+test('a constante de insercao bate com o tipo da saga', () => {
+  assert.equal(TIPO_INSERIR_GERENTE, 'inserir-gerente');
 });

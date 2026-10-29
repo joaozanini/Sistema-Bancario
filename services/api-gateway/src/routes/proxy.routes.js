@@ -3,7 +3,7 @@ const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware
 const { contaServiceUrl, gerenteServiceUrl } = require('../config/services');
 const { verifyJwtAndSession, injectUserHeaders, exigirTipo } = require('../middlewares/auth.middleware');
 const { enriquecerCpfDestino, enriquecerNomes } = require('../middlewares/transferencia.middleware');
-const { remover } = require('../controllers/gerentes.controller');
+const { inserir, remover } = require('../controllers/gerentes.controller');
 const gerenteService = require('../services/gerente.service');
 
 const router = Router();
@@ -43,6 +43,9 @@ router.get('/contas', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHead
 
 // router.all (e não router.use) para o Express não tirar o prefixo /contas do req.url repassado ao MS.
 router.all(['/contas', '/contas/*'], verifyJwtAndSession, injectUserHeaders, contaProxy);
+
+// R13 é SAGA: publica em saga.cmd e responde 202
+router.post('/gerentes', verifyJwtAndSession, exigirTipo('GERENTE'), inserir);
 
 router.put('/gerentes/:cpf', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, gerenteProxy);
 
