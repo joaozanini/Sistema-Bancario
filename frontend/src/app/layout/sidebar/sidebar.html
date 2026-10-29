@@ -11,6 +11,6 @@
         >{{ item.rotulo }}</a
       >
     }
-    <a class="logout" routerLink="/login" (click)="sair()">Sair</a>
+    <a class="logout" href="/login" (click)="sair($event)">{{ saindo ? 'Saindo...' : 'Sair' }}</a>
   </nav>
 </aside>

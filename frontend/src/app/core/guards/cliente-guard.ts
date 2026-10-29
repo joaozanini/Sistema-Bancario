@@ -12,6 +12,6 @@ export const clienteGuard: CanActivateFn = () => {
     return true;
   }
 
-  const destino = tipo === 'GERENTE' ? '/gerente' : tipo === 'ADMIN' ? '/admin' : '/login';
+  const destino = tipo === 'GERENTE' ? '/gerente' : '/login';
   return router.createUrlTree([destino]);
 };

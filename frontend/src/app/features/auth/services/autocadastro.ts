@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from '../../../../environments/environment';
 
 export interface SolicitacaoCadastroRequest {
   nome: string;
@@ -27,7 +28,7 @@ export interface SolicitacaoCadastroResponse {
 export class AutocadastroService {
   private http = inject(HttpClient);
 
-  private readonly solicitacoesUrl = 'http://localhost:3000/solicitacoes';
+  private readonly solicitacoesUrl = `${environment.apiUrl}/solicitacoes`;
 
   solicitar(dados: SolicitacaoCadastroRequest): Observable<SolicitacaoCadastroResponse> {
     return this.http.post<SolicitacaoCadastroResponse>(this.solicitacoesUrl, dados);

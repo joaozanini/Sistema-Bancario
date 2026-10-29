@@ -67,13 +67,6 @@ export const routes: Routes = [
         (m) => m.EditarGerente,
       ),
   },
-  {
-    path: 'admin',
-    loadComponent: () =>
-      import('./features/admin/pages/home/home').then(
-        (m) => m.Home,
-      ),
-      },
     ],
   },
   {
