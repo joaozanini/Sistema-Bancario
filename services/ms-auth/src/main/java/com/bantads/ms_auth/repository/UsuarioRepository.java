@@ -12,5 +12,9 @@ public interface UsuarioRepository extends MongoRepository<Usuario, String> {
 
     Optional<Usuario> findByCpf(String cpf);
 
+    boolean existsByCpf(String cpf);
+
     boolean existsByLogin(String login);
+
+    boolean existsByLoginIgnoreCase(String login);
 }

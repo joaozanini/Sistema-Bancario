@@ -59,7 +59,10 @@ public class UsuarioService {
     }
 
     private void criar(String sagaId, String cpf, TipoUsuario tipo, String login, String senha) {
-        Optional<Usuario> mesmoCpf = repository.findByCpf(cpf);
+        String cpfLimpo = normalizarCpf(cpf);
+        String loginLimpo = login != null ? login.trim() : "";
+
+        Optional<Usuario> mesmoCpf = repository.findByCpf(cpfLimpo);
         if (mesmoCpf.isPresent()) {
             Usuario existente = mesmoCpf.get();
             if (!sagaId.equals(existente.getSagaCriacao())) {
@@ -70,26 +73,38 @@ public class UsuarioService {
             repository.save(existente);
             return;
         }
-        if (repository.existsByLogin(login)) {
-            throw new LoginJaCadastradoException(login);
+        if (repository.existsByCpf(cpfLimpo)) {
+            throw new CpfJaCadastradoException();
+        }
+        if (repository.existsByLogin(loginLimpo) || repository.existsByLoginIgnoreCase(loginLimpo)) {
+            throw new LoginJaCadastradoException(loginLimpo);
         }
 
-        Usuario usuario = new Usuario(cpf, tipo, login, passwordEncoder.encode(senha));
+        Usuario usuario = new Usuario(cpfLimpo, tipo, loginLimpo, passwordEncoder.encode(senha));
         usuario.setSagaCriacao(sagaId);
         try {
             repository.insert(usuario);
         } catch (DuplicateKeyException e) {
             // corrida com outra criacao: o indice unico e quem decide
-            if (repository.existsByLogin(login)) {
-                throw new LoginJaCadastradoException(login);
+            if (repository.existsByLogin(loginLimpo) || repository.existsByLoginIgnoreCase(loginLimpo)) {
+                throw new LoginJaCadastradoException(loginLimpo);
             }
             throw new CpfJaCadastradoException();
         }
     }
 
     public void removerCriadoPelaSaga(String sagaId, String cpf) {
-        repository.findByCpf(cpf)
+        String cpfLimpo = normalizarCpf(cpf);
+        repository.findByCpf(cpfLimpo)
                 .filter(usuario -> sagaId.equals(usuario.getSagaCriacao()))
                 .ifPresent(repository::delete);
+    }
+
+    private String normalizarCpf(String cpf) {
+        if (cpf == null) {
+            return "";
+        }
+        String digitos = cpf.replaceAll("\\D", "");
+        return digitos.isEmpty() ? cpf.trim() : digitos;
     }
 }

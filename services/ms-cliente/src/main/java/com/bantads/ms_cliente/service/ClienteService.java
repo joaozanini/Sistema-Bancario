@@ -160,10 +160,16 @@ public class ClienteService {
                 .or(() -> solicitacaoRepository.findByCpf(cpfBruto.trim()))
                 .orElseThrow(() -> new IllegalArgumentException("Solicitação não encontrada para criação do cliente: " + cpfBruto));
 
+        String emailSolicitacao = solicitacao.getEmail() != null ? solicitacao.getEmail().trim() : "";
+        if (!emailSolicitacao.isEmpty()
+                && (clienteRepository.existsByEmail(emailSolicitacao) || clienteRepository.existsByEmailIgnoreCase(emailSolicitacao))) {
+            throw new IllegalArgumentException("E-mail já cadastrado como cliente no sistema.");
+        }
+
         Cliente cliente = new Cliente();
         cliente.setCpf(solicitacao.getCpf());
         cliente.setNome(solicitacao.getNome());
-        cliente.setEmail(solicitacao.getEmail());
+        cliente.setEmail(emailSolicitacao);
         cliente.setTelefone(solicitacao.getTelefone());
         cliente.setSalario(solicitacao.getSalario());
         cliente.setLogradouro(solicitacao.getLogradouro());

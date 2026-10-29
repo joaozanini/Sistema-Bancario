@@ -1,6 +1,7 @@
 package com.bantads.ms_cliente.service;
 
 import com.bantads.ms_cliente.model.Cliente;
+import com.bantads.ms_cliente.model.SolicitacaoCadastro;
 import com.bantads.ms_cliente.repository.ClienteRepository;
 import com.bantads.ms_cliente.repository.SolicitacaoCadastroRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -77,5 +78,26 @@ class ClienteServiceTest {
 
         assertTrue(resultado.isEmpty());
         verifyNoInteractions(clienteRepository);
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar criação de cliente quando o e-mail já está cadastrado em outro cliente")
+    void deveRejeitarCriacaoDeClienteQuandoEmailJaCadastrado() {
+        SolicitacaoCadastro solicitacao = new SolicitacaoCadastro();
+        solicitacao.setCpf("11122233344");
+        solicitacao.setNome("Novo Cliente");
+        solicitacao.setEmail("cli1@bantads.com.br");
+        solicitacao.setSalario(new BigDecimal("5000.00"));
+
+        when(clienteRepository.findById("11122233344")).thenReturn(Optional.empty());
+        when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
+        when(clienteRepository.existsByEmail("cli1@bantads.com.br")).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                service.criarClienteDaSolicitacao("11122233344")
+        );
+
+        assertTrue(ex.getMessage().contains("E-mail já cadastrado como cliente"));
+        verify(clienteRepository, never()).save(any());
     }
 }
