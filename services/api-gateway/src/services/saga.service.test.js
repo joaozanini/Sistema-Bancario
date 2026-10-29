@@ -39,8 +39,25 @@ test('publica em saga.cmd no formato do enunciado', async () => {
     assert.equal(mensagem.sagaId, sagaId);
     assert.equal(mensagem.tipo, 'cliente.aprovar');
     assert.deepEqual(mensagem.payload, { cpf: '12912861012' });
-    assert.ok(!Number.isNaN(Date.parse(mensagem.timestamp)), 'timestamp deve ser ISO válido');
+    assert.match(mensagem.timestamp, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/, 'sem milissegundos e sem fuso');
+    assert.ok(!Number.isNaN(Date.parse(mensagem.timestamp)), 'timestamp deve ser uma data válida');
   } finally {
+    d.restaurar();
+  }
+});
+
+test('timestamp é o horário local, como o do Orquestrador', async () => {
+  const d = comDublos();
+  const relogio = Date.now;
+  // 30/04/2026 10:00:00 no horário local da máquina, qualquer que seja o fuso
+  const instante = new Date(2026, 3, 30, 10, 0, 0).getTime();
+  Date.now = () => instante;
+  try {
+    await sagaService.iniciar('cliente.aprovar', 'clientes', {});
+    const { mensagem } = d.eventos.find((e) => e.tipo === 'publicacao');
+    assert.equal(mensagem.timestamp, '2026-04-30T10:00:00');
+  } finally {
+    Date.now = relogio;
     d.restaurar();
   }
 });
