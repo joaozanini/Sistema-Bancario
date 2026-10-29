@@ -3,6 +3,7 @@ package com.bantads.ms_cliente.controller;
 import com.bantads.ms_cliente.dto.SolicitacaoCadastroDTO;
 import com.bantads.ms_cliente.model.SolicitacaoCadastro;
 import com.bantads.ms_cliente.service.AutoCadastroService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -64,6 +65,8 @@ public class AutoCadastroController {
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("erro", e.getMessage()));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("erro", "CPF ou e-mail já cadastrado no sistema."));
         }
     }
 

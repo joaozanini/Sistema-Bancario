@@ -32,15 +32,15 @@ public class AutoCadastroService {
         if (solicitacaoRepository.existsByCpf(cpf)) {
             throw new IllegalArgumentException("CPF já possui uma solicitação de cadastro.");
         }
-        if (clienteRepository.existsById(cpf)) {
+        if (clienteRepository.existsById(cpf) || clienteRepository.existsByCpf(cpf)) {
             throw new IllegalArgumentException("CPF já cadastrado como cliente no sistema.");
         }
 
         // Unicidade de E-mail contra solicitações e contra clientes já cadastrados (R1)
-        if (solicitacaoRepository.existsByEmail(email)) {
+        if (solicitacaoRepository.existsByEmail(email) || solicitacaoRepository.existsByEmailIgnoreCase(email)) {
             throw new IllegalArgumentException("E-mail já utilizado em outra solicitação.");
         }
-        if (clienteRepository.existsByEmail(email)) {
+        if (clienteRepository.existsByEmail(email) || clienteRepository.existsByEmailIgnoreCase(email)) {
             throw new IllegalArgumentException("E-mail já cadastrado como cliente no sistema.");
         }
 
@@ -67,9 +67,11 @@ public class AutoCadastroService {
         if (solicitacao.getEmail() == null || solicitacao.getEmail().trim().isBlank()) {
             throw new IllegalArgumentException("E-mail é obrigatório.");
         }
-        if (!solicitacao.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+        String emailLimpo = solicitacao.getEmail().trim();
+        if (!emailLimpo.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
             throw new IllegalArgumentException("E-mail inválido.");
         }
+        solicitacao.setEmail(emailLimpo);
 
         if (solicitacao.getTelefone() == null || solicitacao.getTelefone().trim().isBlank()) {
             throw new IllegalArgumentException("Telefone é obrigatório.");

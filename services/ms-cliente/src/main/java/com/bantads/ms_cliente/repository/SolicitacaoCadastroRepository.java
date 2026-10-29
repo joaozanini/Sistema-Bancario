@@ -10,6 +10,7 @@ import java.util.UUID;
 public interface SolicitacaoCadastroRepository extends JpaRepository<SolicitacaoCadastro, UUID> {
     boolean existsByCpf(String cpf);
     boolean existsByEmail(String email);
+    boolean existsByEmailIgnoreCase(String email);
     Optional<SolicitacaoCadastro> findByCpf(String cpf);
     List<SolicitacaoCadastro> findByStatusIgnoreCase(String status);
 }

@@ -51,8 +51,11 @@ class AutoCadastroServiceTest {
     void deveRegistrarSolicitacaoComSucesso() {
         when(solicitacaoRepository.existsByCpf("12912861012")).thenReturn(false);
         when(clienteRepository.existsById("12912861012")).thenReturn(false);
+        when(clienteRepository.existsByCpf("12912861012")).thenReturn(false);
         when(solicitacaoRepository.existsByEmail("maria@bantads.com.br")).thenReturn(false);
+        when(solicitacaoRepository.existsByEmailIgnoreCase("maria@bantads.com.br")).thenReturn(false);
         when(clienteRepository.existsByEmail("maria@bantads.com.br")).thenReturn(false);
+        when(clienteRepository.existsByEmailIgnoreCase("maria@bantads.com.br")).thenReturn(false);
         when(solicitacaoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         SolicitacaoCadastro salva = service.registrarSolicitacao(solicitacaoValida);
@@ -94,7 +97,9 @@ class AutoCadastroServiceTest {
     void deveRejeitarQuandoEmailJaPertenceAClienteCadastrado() {
         when(solicitacaoRepository.existsByCpf("12912861012")).thenReturn(false);
         when(clienteRepository.existsById("12912861012")).thenReturn(false);
+        when(clienteRepository.existsByCpf("12912861012")).thenReturn(false);
         when(solicitacaoRepository.existsByEmail("maria@bantads.com.br")).thenReturn(false);
+        when(solicitacaoRepository.existsByEmailIgnoreCase("maria@bantads.com.br")).thenReturn(false);
         when(clienteRepository.existsByEmail("maria@bantads.com.br")).thenReturn(true);
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
@@ -102,6 +107,24 @@ class AutoCadastroServiceTest {
         );
 
         assertTrue(ex.getMessage().contains("E-mail já cadastrado como cliente"));
+        verify(solicitacaoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar solicitação quando e-mail difere apenas em maiúsculas/minúsculas (case-insensitive)")
+    void deveRejeitarQuandoEmailDuplicadoCaseInsensitive() {
+        solicitacaoValida.setEmail("MARIA@Bantads.com.br");
+        when(solicitacaoRepository.existsByCpf("12912861012")).thenReturn(false);
+        when(clienteRepository.existsById("12912861012")).thenReturn(false);
+        when(clienteRepository.existsByCpf("12912861012")).thenReturn(false);
+        when(solicitacaoRepository.existsByEmail("MARIA@Bantads.com.br")).thenReturn(false);
+        when(solicitacaoRepository.existsByEmailIgnoreCase("MARIA@Bantads.com.br")).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                service.registrarSolicitacao(solicitacaoValida)
+        );
+
+        assertTrue(ex.getMessage().contains("E-mail já utilizado em outra solicitação"));
         verify(solicitacaoRepository, never()).save(any());
     }
 

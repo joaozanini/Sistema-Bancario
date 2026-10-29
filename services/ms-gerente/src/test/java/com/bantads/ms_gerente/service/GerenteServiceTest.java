@@ -2,6 +2,8 @@ package com.bantads.ms_gerente.service;
 
 import com.bantads.ms_gerente.dto.AtualizacaoGerenteDTO;
 import com.bantads.ms_gerente.dto.GerenteDTO;
+import com.bantads.ms_gerente.exception.CpfJaCadastradoException;
+import com.bantads.ms_gerente.exception.EmailJaCadastradoException;
 import com.bantads.ms_gerente.exception.GerenteNaoEncontradoException;
 import com.bantads.ms_gerente.model.Gerente;
 import com.bantads.ms_gerente.repository.GerenteRepository;
@@ -33,7 +35,7 @@ class GerenteServiceTest {
     private GerenteService service;
 
     @Test
-    @DisplayName("Deve atualizar nome e telefone mantendo CPF, e-mail e situação")
+    @DisplayName("Deve atualizar nome e telefone mantendo CPF, e-mail, situação e _links HATEOAS")
     void deveAtualizarDadosDoGerente() {
         Gerente gerente = gerenteExistente();
         when(repository.findById(CPF)).thenReturn(Optional.of(gerente));
@@ -44,6 +46,11 @@ class GerenteServiceTest {
 
         assertThat(atualizado).isEqualTo(
                 new GerenteDTO(CPF, "Geniéve Silva", "ger1@bantads.com.br", "41988887777", true));
+        assertThat(atualizado._links()).isNotNull();
+        assertThat(atualizado._links().get("self")).containsEntry("href", "http://localhost:8083/gerentes/" + CPF);
+        assertThat(atualizado._links().get("gerentes")).containsEntry("href", "http://localhost:8083/gerentes");
+        assertThat(atualizado._links().get("atualizar")).containsEntry("href", "http://localhost:8083/gerentes/" + CPF);
+        assertThat(atualizado._links().get("remover")).containsEntry("href", "http://localhost:8083/gerentes/" + CPF);
     }
 
     @Test
@@ -54,6 +61,63 @@ class GerenteServiceTest {
         assertThatThrownBy(() -> service.atualizar(CPF,
                 new AtualizacaoGerenteDTO("Geniéve", null)))
                 .isInstanceOf(GerenteNaoEncontradoException.class);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve inserir gerente quando CPF e e-mail são únicos")
+    void deveInserirGerenteQuandoCpfEEmailUnicos() {
+        Gerente novo = new Gerente();
+        novo.setCpf("11144477735");
+        novo.setNome("Gerente Novo");
+        novo.setEmail("novo@bantads.com.br");
+        novo.setTelefone("41999990000");
+
+        when(repository.existsById("11144477735")).thenReturn(false);
+        when(repository.existsByCpf("11144477735")).thenReturn(false);
+        when(repository.existsByEmail("novo@bantads.com.br")).thenReturn(false);
+        when(repository.existsByEmailIgnoreCase("novo@bantads.com.br")).thenReturn(false);
+        when(repository.save(any(Gerente.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        GerenteDTO criado = service.inserir(novo);
+
+        assertThat(criado.cpf()).isEqualTo("11144477735");
+        assertThat(criado.email()).isEqualTo("novo@bantads.com.br");
+        assertThat(criado._links()).containsKeys("self", "gerentes", "atualizar", "remover");
+    }
+
+    @Test
+    @DisplayName("Deve recusar inserção quando CPF já está cadastrado no MS Gerente")
+    void deveRecusarInsercaoQuandoCpfDuplicado() {
+        Gerente novo = new Gerente();
+        novo.setCpf(CPF);
+        novo.setNome("Outro Gerente");
+        novo.setEmail("outro@bantads.com.br");
+
+        when(repository.existsById(CPF)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.inserir(novo))
+                .isInstanceOf(CpfJaCadastradoException.class);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve recusar inserção quando e-mail já está cadastrado no MS Gerente (inclusive case-insensitive)")
+    void deveRecusarInsercaoQuandoEmailDuplicado() {
+        Gerente novo = new Gerente();
+        novo.setCpf("11144477735");
+        novo.setNome("Outro Gerente");
+        novo.setEmail("GER1@bantads.com.br");
+
+        when(repository.existsById("11144477735")).thenReturn(false);
+        when(repository.existsByCpf("11144477735")).thenReturn(false);
+        when(repository.existsByEmail("GER1@bantads.com.br")).thenReturn(false);
+        when(repository.existsByEmailIgnoreCase("GER1@bantads.com.br")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.inserir(novo))
+                .isInstanceOf(EmailJaCadastradoException.class);
 
         verify(repository, never()).save(any());
     }

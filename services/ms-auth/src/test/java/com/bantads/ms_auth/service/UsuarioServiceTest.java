@@ -68,6 +68,16 @@ class UsuarioServiceTest {
     }
 
     @Test
+    void loginExistenteCaseInsensitiveRecusaSemGravar() {
+        when(repository.existsByLogin("NOVO@Bantads.com.br")).thenReturn(false);
+        when(repository.existsByLoginIgnoreCase("NOVO@Bantads.com.br")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.criarCliente(SAGA_ID, CPF, "NOVO@Bantads.com.br"))
+                .isInstanceOf(LoginJaCadastradoException.class);
+        verify(repository, never()).insert(any(Usuario.class));
+    }
+
+    @Test
     void cpfDeOutroRegistroRecusa() {
         Usuario existente = new Usuario(CPF, TipoUsuario.GERENTE, "ger@bantads.com.br", "hash");
         when(repository.findByCpf(CPF)).thenReturn(Optional.of(existente));
