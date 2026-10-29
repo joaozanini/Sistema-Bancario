@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const sagaService = require('../services/saga.service');
 const redis = require('../config/redis');
-const { inserir, remover, TIPO_INSERIR_GERENTE, TIPO_REMOVER_GERENTE, DOMINIO } = require('./gerentes.controller');
+const { listar, inserir, remover, TIPO_INSERIR_GERENTE, TIPO_REMOVER_GERENTE, DOMINIO } = require('./gerentes.controller');
 
 const CPF_LOGADO = '98574307084';
 const CPF_ALVO = '64065268052';
@@ -174,4 +174,36 @@ test('inserir com falha ao publicar vira 502', async () => {
 
 test('a constante de insercao bate com o tipo da saga', () => {
   assert.equal(TIPO_INSERIR_GERENTE, 'inserir-gerente');
+});
+
+test('listar responde 200 com a composição de gerentes', async () => {
+  const gerentesService = require('../services/gerentes.service');
+  const original = gerentesService.listarTodos;
+  const lista = [{ cpf: CPF_ALVO, nome: 'Godophredo', quantidadeClientes: 2 }];
+  gerentesService.listarTodos = async () => lista;
+
+  try {
+    const res = resposta();
+    await listar({}, res);
+    assert.equal(res.codigo, null);
+    assert.deepEqual(res.corpo, lista);
+  } finally {
+    gerentesService.listarTodos = original;
+  }
+});
+
+test('listar responde 502 quando um microsserviço falha', async () => {
+  const gerentesService = require('../services/gerentes.service');
+  const original = gerentesService.listarTodos;
+  gerentesService.listarTodos = async () => {
+    throw new Error('MS Gerente respondeu 500');
+  };
+
+  try {
+    const res = resposta();
+    await listar({}, res);
+    assert.equal(res.codigo, 502);
+  } finally {
+    gerentesService.listarTodos = original;
+  }
 });

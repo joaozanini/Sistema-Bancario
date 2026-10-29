@@ -1,5 +1,15 @@
 const sagaService = require('../services/saga.service');
 const gerenteService = require('../services/gerente.service');
+const gerentesService = require('../services/gerentes.service');
+
+async function listar(req, res) {
+  try {
+    return res.json(await gerentesService.listarTodos());
+  } catch (err) {
+    console.error('Falha ao listar gerentes (API Composition):', err.message);
+    return res.status(502).json({ message: 'Serviço de gerentes indisponível.' });
+  }
+}
 
 const TIPO_INSERIR_GERENTE = 'inserir-gerente';
 const TIPO_REMOVER_GERENTE = 'remover-gerente';
@@ -45,4 +55,4 @@ async function remover(req, res) {
   }
 }
 
-module.exports = { inserir, remover, TIPO_INSERIR_GERENTE, TIPO_REMOVER_GERENTE, DOMINIO };
+module.exports = { listar, inserir, remover, TIPO_INSERIR_GERENTE, TIPO_REMOVER_GERENTE, DOMINIO };
