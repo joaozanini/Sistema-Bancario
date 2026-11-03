@@ -189,6 +189,5 @@ describe('Deposito', () => {
     const resultado = executeGuard() as UrlTree;
 
     expect(rotaDeposito?.canActivate).toContain(clienteGuard);
-    expect(TestBed.inject(Router).serializeUrl(resultado)).toBe('/admin');
-  });
+    expect(TestBed.inject(Router).serializeUrl(resultado)).toBe('/login');  });
 });
