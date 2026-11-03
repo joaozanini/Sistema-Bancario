@@ -40,6 +40,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'deposito',
+    canActivate: [clienteGuard],
+    loadComponent: () =>
+      import('./features/cliente/pages/deposito/deposito').then(
+        (m) => m.Deposito,
+      ),
+  },
+  {
     path: 'cliente',
     loadComponent: () =>
       import('./features/cliente/pages/home/home').then(
