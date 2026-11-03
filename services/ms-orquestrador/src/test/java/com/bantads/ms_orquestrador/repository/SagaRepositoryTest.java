@@ -86,6 +86,18 @@ class SagaRepositoryTest {
     }
 
     @Test
+    void jobInlineGravaOResultadoInline() {
+        repository.salvarJob(Job.concluidoInline("abc-123", "gerentes", java.util.Map.of("mensagem", "ok")));
+
+        ArgumentCaptor<String> valor = ArgumentCaptor.forClass(String.class);
+        verify(valores).set(eq("job:abc-123"), valor.capture(), eq(Duration.ofMinutes(5)));
+        JsonNode json = jsonMapper.readTree(valor.getValue());
+        assertThat(json.get("resultType").asString()).isEqualTo("inline");
+        assertThat(json.get("resourceId").isNull()).isTrue();
+        assertThat(json.get("resultado").get("mensagem").asString()).isEqualTo("ok");
+    }
+
+    @Test
     void reivindicaEtapaComSetNx() {
         when(valores.setIfAbsent("saga:abc-123:etapa:4", "1", Duration.ofHours(1))).thenReturn(true, false);
 

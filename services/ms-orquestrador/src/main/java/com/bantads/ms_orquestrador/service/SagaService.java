@@ -211,8 +211,7 @@ public class SagaService {
             segredos.descartar(estado.sagaId());
             repository.salvar(new EstadoSaga(estado.sagaId(), estado.tipo(), passos.size(),
                     StatusSaga.CONCLUIDA, estado.payload(), agora()));
-            repository.salvarJob(Job.concluidoComRecurso(estado.sagaId(), definicao.dominioJob(),
-                    definicao.resourceId(estado.payload())));
+            repository.salvarJob(definicao.jobConcluido(estado.sagaId(), estado.payload()));
             log.info("SAGA concluida: sagaId={} tipo={}", estado.sagaId(), estado.tipo());
             enviarSemResposta(estado.sagaId(), passos, semResposta, dadosComando);
             return;
@@ -230,6 +229,11 @@ public class SagaService {
             Map<String, Object> dados) {
         for (int indice : indices) {
             PassoSaga passo = passos.get(indice);
+            if (passo.ehLocal()) {
+                passo.acaoLocal().accept(dados);
+                log.info("Passo local executado: sagaId={} passo={}", sagaId, passo.tipoComando());
+                continue;
+            }
             enviar(sagaId, indice + 1, passo.fila(), passo.tipoComando(), passo.payloadComando().apply(dados));
         }
     }
