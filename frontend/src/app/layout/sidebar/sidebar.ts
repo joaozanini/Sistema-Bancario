@@ -18,7 +18,7 @@ const MENUS: Record<TipoUsuario, ItemMenu[]> = {
   ],
   GERENTE: [
     { rotulo: 'Início', link: '/gerente' },
-    { rotulo: 'Clientes', link: '/gerente/clientes' },c
+    { rotulo: 'Clientes', link: '/gerente/clientes' },
     { rotulo: 'Gerentes', link: '/gerente/gerentes' },
     { rotulo: 'Relatório', link: '/gerente/relatorio' },
   ],
