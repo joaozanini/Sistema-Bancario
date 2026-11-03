@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.bantads.ms_auth.exception.CpfJaCadastradoException;
 import com.bantads.ms_auth.exception.CredenciaisInvalidasException;
 import com.bantads.ms_auth.exception.LoginJaCadastradoException;
+import com.bantads.ms_auth.exception.UsuarioNaoEncontradoException;
 import com.bantads.ms_auth.model.TipoUsuario;
 import com.bantads.ms_auth.model.Usuario;
 import com.bantads.ms_auth.repository.UsuarioRepository;
@@ -98,6 +99,30 @@ public class UsuarioService {
         repository.findByCpf(cpfLimpo)
                 .filter(usuario -> sagaId.equals(usuario.getSagaCriacao()))
                 .ifPresent(repository::delete);
+    }
+
+    /**
+     * R15: o gerente removido nao consegue mais logar. Repetir o comando para um
+     * registro ja inativo nao muda nada.
+     */
+    public void desativar(String sagaId, String cpf) {
+        Usuario usuario = repository.findByCpf(normalizarCpf(cpf)).orElseThrow(UsuarioNaoEncontradoException::new);
+        if (!usuario.isAtivo()) {
+            return;
+        }
+        usuario.setAtivo(false);
+        usuario.setSagaDesativacao(sagaId);
+        repository.save(usuario);
+    }
+
+    public void reativarDesativadoPelaSaga(String sagaId, String cpf) {
+        repository.findByCpf(normalizarCpf(cpf))
+                .filter(usuario -> !usuario.isAtivo() && sagaId.equals(usuario.getSagaDesativacao()))
+                .ifPresent(usuario -> {
+                    usuario.setAtivo(true);
+                    usuario.setSagaDesativacao(null);
+                    repository.save(usuario);
+                });
     }
 
     private String normalizarCpf(String cpf) {

@@ -13,6 +13,7 @@ import com.bantads.ms_auth.dto.MensagemSaga;
 import com.bantads.ms_auth.dto.StatusResposta;
 import com.bantads.ms_auth.exception.CpfJaCadastradoException;
 import com.bantads.ms_auth.exception.LoginJaCadastradoException;
+import com.bantads.ms_auth.exception.UsuarioNaoEncontradoException;
 import com.bantads.ms_auth.model.ComandoProcessado;
 import com.bantads.ms_auth.repository.ComandoProcessadoRepository;
 import java.time.Clock;
@@ -194,6 +195,51 @@ class ComandoSagaServiceTest {
 
         assertThat(resposta.status()).isEqualTo(StatusResposta.FALHA);
         verify(usuarioService, never()).criarGerente(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void desativarUsuarioDesativaERespondeSucessoSemPayload() {
+        MensagemSaga resposta = service.processar(comandoDe(ComandoSagaService.DESATIVAR_USUARIO, Map.of("cpf", CPF)))
+                .orElseThrow();
+
+        verify(usuarioService).desativar(SAGA_ID, CPF);
+        assertThat(resposta.status()).isEqualTo(StatusResposta.SUCESSO);
+        assertThat(resposta.tipo()).isEqualTo(ComandoSagaService.DESATIVAR_USUARIO);
+        assertThat(resposta.payload()).isEmpty();
+    }
+
+    @Test
+    void desativarUsuarioInexistenteRespondeFalha() {
+        doThrow(new UsuarioNaoEncontradoException()).when(usuarioService).desativar(SAGA_ID, CPF);
+
+        MensagemSaga resposta = service.processar(comandoDe(ComandoSagaService.DESATIVAR_USUARIO, Map.of("cpf", CPF)))
+                .orElseThrow();
+
+        assertThat(resposta.status()).isEqualTo(StatusResposta.FALHA);
+        assertThat(resposta.erro()).isEqualTo("Usuario nao encontrado");
+    }
+
+    @Test
+    void desativarSemCpfRespondeFalhaSemTocarNoUsuario() {
+        MensagemSaga resposta = service.processar(comandoDe(ComandoSagaService.DESATIVAR_USUARIO, Map.of()))
+                .orElseThrow();
+
+        assertThat(resposta.status()).isEqualTo(StatusResposta.FALHA);
+        verify(usuarioService, never()).desativar(anyString(), anyString());
+    }
+
+    @Test
+    void compensacaoReativaSoOQueASagaDesativouERespondeSucesso() {
+        MensagemSaga resposta = service.processar(
+                comandoDe(ComandoSagaService.COMPENSAR_DESATIVAR_USUARIO, Map.of("cpf", CPF))).orElseThrow();
+
+        verify(usuarioService).reativarDesativadoPelaSaga(SAGA_ID, CPF);
+        assertThat(resposta.status()).isEqualTo(StatusResposta.SUCESSO);
+        verify(processados, never()).save(any());
+    }
+
+    private static MensagemSaga comandoDe(String tipo, Map<String, Object> payload) {
+        return new MensagemSaga(SAGA_ID, tipo, "2026-04-30T09:59:59", payload, null, null);
     }
 
     private static MensagemSaga criarGerente(Map<String, Object> payload) {

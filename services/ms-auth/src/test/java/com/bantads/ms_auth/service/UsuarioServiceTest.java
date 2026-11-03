@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.bantads.ms_auth.exception.CpfJaCadastradoException;
 import com.bantads.ms_auth.exception.LoginJaCadastradoException;
+import com.bantads.ms_auth.exception.UsuarioNaoEncontradoException;
 import com.bantads.ms_auth.model.TipoUsuario;
 import com.bantads.ms_auth.model.Usuario;
 import com.bantads.ms_auth.repository.UsuarioRepository;
@@ -162,5 +163,69 @@ class UsuarioServiceTest {
         service.removerCriadoPelaSaga(SAGA_ID, CPF);
 
         verify(repository, never()).delete(any(Usuario.class));
+    }
+
+    @Test
+    void desativarMarcaOUsuarioInativoERegistraASaga() {
+        Usuario gerente = new Usuario(CPF, TipoUsuario.GERENTE, EMAIL, "hash");
+        when(repository.findByCpf(CPF)).thenReturn(Optional.of(gerente));
+
+        service.desativar(SAGA_ID, CPF);
+
+        verify(repository).save(gerente);
+        assertThat(gerente.isAtivo()).isFalse();
+        assertThat(gerente.getSagaDesativacao()).isEqualTo(SAGA_ID);
+    }
+
+    @Test
+    void desativarUsuarioJaInativoNaoMudaNada() {
+        Usuario gerente = new Usuario(CPF, TipoUsuario.GERENTE, EMAIL, "hash");
+        gerente.setAtivo(false);
+        gerente.setSagaDesativacao("outra-saga");
+        when(repository.findByCpf(CPF)).thenReturn(Optional.of(gerente));
+
+        service.desativar(SAGA_ID, CPF);
+
+        verify(repository, never()).save(any());
+        assertThat(gerente.getSagaDesativacao()).isEqualTo("outra-saga");
+    }
+
+    @Test
+    void desativarUsuarioInexistenteLancaExcecao() {
+        assertThatThrownBy(() -> service.desativar(SAGA_ID, CPF)).isInstanceOf(UsuarioNaoEncontradoException.class);
+    }
+
+    @Test
+    void reativarDevolveSoOQueASagaDesativou() {
+        Usuario gerente = new Usuario(CPF, TipoUsuario.GERENTE, EMAIL, "hash");
+        gerente.setAtivo(false);
+        gerente.setSagaDesativacao(SAGA_ID);
+        when(repository.findByCpf(CPF)).thenReturn(Optional.of(gerente));
+
+        service.reativarDesativadoPelaSaga(SAGA_ID, CPF);
+
+        verify(repository).save(gerente);
+        assertThat(gerente.isAtivo()).isTrue();
+        assertThat(gerente.getSagaDesativacao()).isNull();
+    }
+
+    @Test
+    void reativarIgnoraUsuarioDesativadoPorOutraSaga() {
+        Usuario gerente = new Usuario(CPF, TipoUsuario.GERENTE, EMAIL, "hash");
+        gerente.setAtivo(false);
+        gerente.setSagaDesativacao("outra-saga");
+        when(repository.findByCpf(CPF)).thenReturn(Optional.of(gerente));
+
+        service.reativarDesativadoPelaSaga(SAGA_ID, CPF);
+
+        verify(repository, never()).save(any());
+        assertThat(gerente.isAtivo()).isFalse();
+    }
+
+    @Test
+    void reativarSemRegistroOuDuasVezesNaoFalha() {
+        service.reativarDesativadoPelaSaga(SAGA_ID, CPF);
+
+        verify(repository, never()).save(any());
     }
 }

@@ -14,6 +14,7 @@ import com.bantads.ms_auth.dto.MensagemSaga;
 import com.bantads.ms_auth.dto.StatusResposta;
 import com.bantads.ms_auth.exception.CpfJaCadastradoException;
 import com.bantads.ms_auth.exception.LoginJaCadastradoException;
+import com.bantads.ms_auth.exception.UsuarioNaoEncontradoException;
 import com.bantads.ms_auth.model.ComandoProcessado;
 import com.bantads.ms_auth.repository.ComandoProcessadoRepository;
 
@@ -28,6 +29,9 @@ public class ComandoSagaService {
 
     public static final String CRIAR_USUARIO = "auth.criar-usuario";
     public static final String COMPENSAR_CRIAR_USUARIO = "auth.criar-usuario.compensar";
+
+    public static final String DESATIVAR_USUARIO = "auth.desativar-usuario";
+    public static final String COMPENSAR_DESATIVAR_USUARIO = "auth.desativar-usuario.compensar";
 
     // contrato com o orquestrador: este erro faz a solicitacao virar Nao aprovada
     public static final String ERRO_LOGIN_DUPLICADO = "LOGIN_DUPLICADO";
@@ -54,6 +58,8 @@ public class ComandoSagaService {
         return switch (comando.tipo()) {
             case CRIAR_USUARIO -> criarUsuario(comando, payload);
             case COMPENSAR_CRIAR_USUARIO -> Optional.of(compensarCriacao(comando, payload));
+            case DESATIVAR_USUARIO -> Optional.of(desativarUsuario(comando, payload));
+            case COMPENSAR_DESATIVAR_USUARIO -> Optional.of(compensarDesativacao(comando, payload));
             default -> Optional.of(MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(),
                     "Tipo de comando nao reconhecido pelo MS Auth: " + comando.tipo()));
         };
@@ -118,6 +124,29 @@ public class ComandoSagaService {
             return MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(), "cpf e obrigatorio");
         }
         usuarioService.removerCriadoPelaSaga(comando.sagaId(), cpf);
+        return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of());
+    }
+
+    // desativar e idempotente e a resposta nao carrega segredo, entao dispensa o registro de deduplicacao
+    private MensagemSaga desativarUsuario(MensagemSaga comando, Map<String, Object> payload) {
+        String cpf = texto(payload, "cpf");
+        if (cpf == null) {
+            return MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(), "cpf e obrigatorio");
+        }
+        try {
+            usuarioService.desativar(comando.sagaId(), cpf);
+        } catch (UsuarioNaoEncontradoException e) {
+            return MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(), e.getMessage());
+        }
+        return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of());
+    }
+
+    private MensagemSaga compensarDesativacao(MensagemSaga comando, Map<String, Object> payload) {
+        String cpf = texto(payload, "cpf");
+        if (cpf == null) {
+            return MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(), "cpf e obrigatorio");
+        }
+        usuarioService.reativarDesativadoPelaSaga(comando.sagaId(), cpf);
         return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of());
     }
 

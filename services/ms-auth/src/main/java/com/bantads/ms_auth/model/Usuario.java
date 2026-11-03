@@ -29,6 +29,10 @@ public class Usuario {
     @Field("saga_criacao")
     private String sagaCriacao;
 
+    // SAGA que desativou o registro; a compensacao so reativa o que a propria SAGA desativou
+    @Field("saga_desativacao")
+    private String sagaDesativacao;
+
     public Usuario() {
     }
 
@@ -93,5 +97,13 @@ public class Usuario {
 
     public void setSagaCriacao(String sagaCriacao) {
         this.sagaCriacao = sagaCriacao;
+    }
+
+    public String getSagaDesativacao() {
+        return sagaDesativacao;
+    }
+
+    public void setSagaDesativacao(String sagaDesativacao) {
+        this.sagaDesativacao = sagaDesativacao;
     }
 }
