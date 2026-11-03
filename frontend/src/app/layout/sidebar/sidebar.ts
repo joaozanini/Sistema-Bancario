@@ -13,6 +13,7 @@ const MENUS: Record<TipoUsuario, ItemMenu[]> = {
     { rotulo: 'Início', link: '/cliente' },
     { rotulo: 'Minha conta', link: '/cliente', queryParams: { secao: 'conta' } },
     { rotulo: 'Extrato', link: '/cliente', queryParams: { secao: 'extrato' } },
+    { rotulo: 'Depósito', link: '/deposito' },
     { rotulo: 'Transferência', link: '/transferencia' },
   ],
   GERENTE: [
