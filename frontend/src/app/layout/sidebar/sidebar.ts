@@ -1,3 +1,4 @@
+
 import { Component, inject } from '@angular/core';
 import { Params, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService, TipoUsuario } from '../../core/services/auth';
@@ -12,7 +13,7 @@ const MENUS: Record<TipoUsuario, ItemMenu[]> = {
   CLIENTE: [
     { rotulo: 'Início', link: '/cliente' },
     { rotulo: 'Minha conta', link: '/cliente', queryParams: { secao: 'conta' } },
-    { rotulo: 'Extrato', link: '/cliente', queryParams: { secao: 'extrato' } },
+    { rotulo: 'Extrato', link: '/extrato' },
     { rotulo: 'Depósito', link: '/deposito' },
     { rotulo: 'Transferência', link: '/transferencia' },
   ],
