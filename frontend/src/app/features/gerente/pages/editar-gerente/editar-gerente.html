@@ -1,0 +1,69 @@
+<section class="editar-gerente-page" aria-labelledby="titulo">
+  <header class="page-header">
+    <h1 id="titulo">Editar gerente</h1>
+    <p>Altere o nome e o telefone. CPF e e-mail não podem ser alterados.</p>
+  </header>
+
+  @if (carregando()) {
+    <p class="status" role="status">Carregando gerente...</p>
+  } @else if (erroCarregamento()) {
+    <div class="aviso" role="alert">
+      <p>{{ erroCarregamento() }}</p>
+      <div class="acoes">
+        <a class="botao secundario" [routerLink]="rotaListagem">Voltar para a lista</a>
+        <button type="button" class="botao" (click)="carregar()">Tentar novamente</button>
+      </div>
+    </div>
+  } @else if (gerente(); as g) {
+    <form #gerenteForm="ngForm" class="card formulario" (ngSubmit)="salvar(gerenteForm)" novalidate>
+      <label>
+        <span>CPF</span>
+        <input type="text" [value]="g.cpf | cpf" readonly>
+      </label>
+
+      <label>
+        <span>E-mail</span>
+        <input type="email" [value]="g.email" readonly aria-describedby="email-ajuda">
+        <small id="email-ajuda">O e-mail é o login do gerente e não pode ser alterado.</small>
+      </label>
+
+      <label>
+        <span>Nome</span>
+        <input
+          type="text"
+          name="nome"
+          [(ngModel)]="nome"
+          #nomeInput="ngModel"
+          autocomplete="name"
+          required
+        >
+        @if (nomeInput.invalid && nomeInput.touched) {
+          <small class="erro">Informe o nome.</small>
+        }
+      </label>
+
+      <label>
+        <span>Telefone</span>
+        <input
+          type="tel"
+          name="telefone"
+          [(ngModel)]="telefone"
+          placeholder="(41) 98765-4321"
+          autocomplete="tel"
+          maxlength="15"
+        >
+      </label>
+
+      @if (erro()) {
+        <p class="erro" role="alert">{{ erro() }}</p>
+      }
+
+      <div class="acoes">
+        <a class="botao secundario" [routerLink]="rotaListagem">Cancelar</a>
+        <button type="submit" [disabled]="salvando()">
+          {{ salvando() ? 'Salvando...' : 'Salvar alterações' }}
+        </button>
+      </div>
+    </form>
+  }
+</section>

@@ -24,6 +24,14 @@ public interface DefinicaoSaga {
         return Set.of();
     }
 
+    /**
+     * Chaves do payload inicial que ficam so na memoria do Orquestrador ate a
+     * SAGA terminar e nunca entram no estado salvo no Redis.
+     */
+    default Set<String> chavesSecretasIniciais() {
+        return Set.of();
+    }
+
     default Optional<ComandoSaga> emailFalha(Map<String, Object> dados) {
         return Optional.empty();
     }

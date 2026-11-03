@@ -46,15 +46,17 @@ public class SagaService {
     private final Map<String, DefinicaoSaga> definicoes;
     private final SagaRepository repository;
     private final SagaPublisher publisher;
+    private final SegredosSaga segredos;
     private final Clock clock;
     private final Duration timeoutPasso;
 
     public SagaService(List<DefinicaoSaga> definicoes, SagaRepository repository, SagaPublisher publisher,
-            Clock clock, @Value("${saga.timeout-passo}") Duration timeoutPasso) {
+            SegredosSaga segredos, Clock clock, @Value("${saga.timeout-passo}") Duration timeoutPasso) {
         this.definicoes = definicoes.stream()
                 .collect(Collectors.toMap(DefinicaoSaga::tipo, Function.identity()));
         this.repository = repository;
         this.publisher = publisher;
+        this.segredos = segredos;
         this.clock = clock;
         this.timeoutPasso = timeoutPasso;
     }
@@ -73,6 +75,15 @@ public class SagaService {
         Map<String, Object> dados = mensagem.payload() == null
                 ? new LinkedHashMap<>()
                 : new LinkedHashMap<>(mensagem.payload());
+        Map<String, Object> secretos = new HashMap<>();
+        for (String chave : definicao.chavesSecretasIniciais()) {
+            Object valor = dados.remove(chave);
+            if (valor != null) {
+                secretos.put(chave, valor);
+            }
+        }
+        segredos.guardar(mensagem.sagaId(), secretos);
+
         EstadoSaga estado = new EstadoSaga(mensagem.sagaId(), definicao.tipo(), ETAPA_INICIO,
                 StatusSaga.EM_ANDAMENTO, dados, agora());
         log.info("SAGA iniciada: sagaId={} tipo={}", estado.sagaId(), estado.tipo());
@@ -181,15 +192,23 @@ public class SagaService {
             Map<String, Object> transitorios) {
         List<PassoSaga> passos = definicao.passos();
         Map<String, Object> dadosComando = new LinkedHashMap<>(estado.payload());
+        dadosComando.putAll(segredos.buscar(estado.sagaId()));
         dadosComando.putAll(transitorios);
 
         List<Integer> semResposta = new ArrayList<>();
         int proximo = indice;
-        while (proximo < passos.size() && passos.get(proximo).fireAndForget()) {
-            semResposta.add(proximo++);
+        while (proximo < passos.size()
+                && (passos.get(proximo).fireAndForget() || !passos.get(proximo).executa(estado.payload()))) {
+            if (passos.get(proximo).executa(estado.payload())) {
+                semResposta.add(proximo);
+            } else {
+                log.info("Passo pulado: sagaId={} tipo={}", estado.sagaId(), passos.get(proximo).tipoComando());
+            }
+            proximo++;
         }
 
         if (proximo == passos.size()) {
+            segredos.descartar(estado.sagaId());
             repository.salvar(new EstadoSaga(estado.sagaId(), estado.tipo(), passos.size(),
                     StatusSaga.CONCLUIDA, estado.payload(), agora()));
             repository.salvarJob(Job.concluidoComRecurso(estado.sagaId(), definicao.dominioJob(),
@@ -226,7 +245,7 @@ public class SagaService {
         int ultima = incluirPassoFalho ? estado.etapaAtual() : estado.etapaAtual() - 1;
         for (int etapa = ultima; etapa >= 1; etapa--) {
             PassoSaga passo = passos.get(etapa - 1);
-            if (passo.temCompensacao()) {
+            if (passo.temCompensacao() && passo.executa(estado.payload())) {
                 enviar(estado.sagaId(), etapa, passo.fila(), passo.tipoCompensacao(),
                         passo.payloadCompensacao().apply(estado.payload(), erro));
             }
@@ -237,6 +256,7 @@ public class SagaService {
                 () -> log.warn("E-mail de falha nao enviado: sagaId={} etapa={}",
                         estado.sagaId(), estado.etapaAtual()));
 
+        segredos.descartar(estado.sagaId());
         repository.salvar(compensando.comStatus(StatusSaga.FALHA, agora()));
         repository.salvarJob(Job.falha(estado.sagaId(), definicao.dominioJob(), definicao.mensagemErroJob(erro)));
         log.info("SAGA compensada: sagaId={} tipo={} etapa={}", estado.sagaId(), estado.tipo(), estado.etapaAtual());

@@ -3,6 +3,7 @@ package com.bantads.ms_cliente.controller;
 import com.bantads.ms_cliente.dto.SolicitacaoCadastroDTO;
 import com.bantads.ms_cliente.model.SolicitacaoCadastro;
 import com.bantads.ms_cliente.service.AutoCadastroService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,13 +26,26 @@ public class AutoCadastroController {
     @PostMapping
     public ResponseEntity<?> criarSolicitacao(@RequestBody SolicitacaoCadastroDTO dto) {
         try {
+            if (dto == null) {
+                return ResponseEntity.badRequest().body(Map.of("erro", "Dados da solicitação não informados."));
+            }
+
+            BigDecimal salario = null;
+            if (dto.getSalario() != null && !dto.getSalario().trim().isBlank()) {
+                try {
+                    salario = new BigDecimal(dto.getSalario().trim());
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().body(Map.of("erro", "Salário inválido."));
+                }
+            }
+
             // Mapeando DTO de entrada para a Entidade
             SolicitacaoCadastro entidade = new SolicitacaoCadastro();
             entidade.setNome(dto.getNome());
             entidade.setCpf(dto.getCpf());
             entidade.setEmail(dto.getEmail());
             entidade.setTelefone(dto.getTelefone());
-            entidade.setSalario(new BigDecimal(dto.getSalario())); 
+            entidade.setSalario(salario); 
             entidade.setLogradouro(dto.getLogradouro());
             entidade.setNumero(dto.getNumero());
             entidade.setComplemento(dto.getComplemento());
@@ -39,7 +53,7 @@ public class AutoCadastroController {
             entidade.setCidade(dto.getCidade());
             entidade.setUf(dto.getUf());
 
-            // Regra de unicidade
+            // Regra de validação e unicidade
             SolicitacaoCadastro salva = service.registrarSolicitacao(entidade);
 
             // Mapeando Entidade salva para DTO de saída
@@ -51,6 +65,8 @@ public class AutoCadastroController {
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("erro", e.getMessage()));
+        } catch (DataIntegrityViolationException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("erro", "CPF ou e-mail já cadastrado no sistema."));
         }
     }
 

@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from '../../../../environments/environment';
 
 export interface TransferenciaRequest {
   contaDestino: string;
@@ -12,7 +13,7 @@ export interface TransferenciaRequest {
 })
 export class TransferenciaService {
   private readonly http = inject(HttpClient);
-  private readonly contasUrl = 'http://localhost:3000/contas';
+  private readonly contasUrl = `${environment.apiUrl}/contas`;
 
   transferir(
     numeroContaOrigem: string,

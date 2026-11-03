@@ -4,6 +4,7 @@ import { map, Observable } from 'rxjs';
 
 import { Solicitacao, SolicitacaoDto } from '../models/solicitacao.model';
 import { ordenarSolicitacoes, paraSolicitacao } from '../utils/solicitacoes';
+import { environment } from '../../../../environments/environment';
 
 @Injectable({
   providedIn: 'root',
@@ -11,7 +12,7 @@ import { ordenarSolicitacoes, paraSolicitacao } from '../utils/solicitacoes';
 export class SolicitacoesService {
   private http = inject(HttpClient);
 
-  private readonly solicitacoesUrl = 'http://localhost:3000/solicitacoes';
+  private readonly solicitacoesUrl = `${environment.apiUrl}/solicitacoes`;
 
   listar(): Observable<Solicitacao[]> {
     return this.http

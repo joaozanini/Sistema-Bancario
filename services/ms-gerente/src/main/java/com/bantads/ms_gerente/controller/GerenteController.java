@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/gerentes")
 public class GerenteController {
@@ -23,6 +25,14 @@ public class GerenteController {
     public GerenteController(GerenteRepository repository, GerenteService service) {
         this.repository = repository;
         this.service = service;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<GerenteDTO>> listar() {
+        List<GerenteDTO> gerentes = repository.findAll().stream()
+                .map(GerenteDTO::de)
+                .toList();
+        return ResponseEntity.ok(gerentes);
     }
 
     @GetMapping("/{cpf}")

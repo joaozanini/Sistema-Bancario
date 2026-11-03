@@ -1,32 +1,36 @@
 package com.bantads.ms_gerente.controller;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.RequestBuilder;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
 import com.bantads.ms_gerente.dto.AtualizacaoGerenteDTO;
 import com.bantads.ms_gerente.dto.GerenteDTO;
 import com.bantads.ms_gerente.exception.GerenteNaoEncontradoException;
 import com.bantads.ms_gerente.exception.GlobalExceptionHandler;
+import com.bantads.ms_gerente.model.Gerente;
 import com.bantads.ms_gerente.repository.GerenteRepository;
 import com.bantads.ms_gerente.service.GerenteService;
-
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.json.JsonMapper;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class GerenteControllerTest {
@@ -56,7 +60,50 @@ class GerenteControllerTest {
     }
 
     @Test
-    @DisplayName("Deve retornar 200 com o gerente atualizado")
+    @DisplayName("Deve retornar 200 ao buscar gerente por CPF com _links HATEOAS")
+    void deveBuscarGerentePorCpfComLinksHateoas() throws Exception {
+        Gerente gerente = new Gerente();
+        gerente.setCpf(CPF);
+        gerente.setNome("Geniéve");
+        gerente.setEmail(EMAIL);
+        gerente.setTelefone("41999990001");
+        gerente.setAtivo(true);
+
+        when(repository.findById(CPF)).thenReturn(Optional.of(gerente));
+
+        mockMvc.perform(get("/gerentes/" + CPF))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cpf").value(CPF))
+                .andExpect(jsonPath("$.nome").value("Geniéve"))
+                .andExpect(jsonPath("$.email").value(EMAIL))
+                .andExpect(jsonPath("$._links.self.href").value("http://localhost:8083/gerentes/" + CPF))
+                .andExpect(jsonPath("$._links.gerentes.href").value("http://localhost:8083/gerentes"))
+                .andExpect(jsonPath("$._links.atualizar.href").value("http://localhost:8083/gerentes/" + CPF))
+                .andExpect(jsonPath("$._links.remover.href").value("http://localhost:8083/gerentes/" + CPF));
+    }
+
+    @Test
+    @DisplayName("Deve listar gerentes com _links HATEOAS")
+    void deveListarGerentesComLinksHateoas() throws Exception {
+        Gerente gerente = new Gerente();
+        gerente.setCpf(CPF);
+        gerente.setNome("Geniéve");
+        gerente.setEmail(EMAIL);
+        gerente.setTelefone("41999990001");
+        gerente.setAtivo(true);
+
+        when(repository.findAll()).thenReturn(List.of(gerente));
+
+        mockMvc.perform(get("/gerentes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].cpf").value(CPF))
+                .andExpect(jsonPath("$[0]._links.self.href").value("http://localhost:8083/gerentes/" + CPF))
+                .andExpect(jsonPath("$[0]._links.gerentes.href").value("http://localhost:8083/gerentes"));
+    }
+
+    @Test
+    @DisplayName("Deve retornar 200 com o gerente atualizado e _links HATEOAS")
     void deveAtualizarGerente() throws Exception {
         AtualizacaoGerenteDTO dados = new AtualizacaoGerenteDTO("Geniéve Silva", "41988887777");
         when(service.atualizar(CPF, dados))
@@ -67,7 +114,11 @@ class GerenteControllerTest {
                 .andExpect(jsonPath("$.cpf").value(CPF))
                 .andExpect(jsonPath("$.nome").value("Geniéve Silva"))
                 .andExpect(jsonPath("$.email").value(EMAIL))
-                .andExpect(jsonPath("$.telefone").value("41988887777"));
+                .andExpect(jsonPath("$.telefone").value("41988887777"))
+                .andExpect(jsonPath("$._links.self.href").value("http://localhost:8083/gerentes/" + CPF))
+                .andExpect(jsonPath("$._links.gerentes.href").value("http://localhost:8083/gerentes"))
+                .andExpect(jsonPath("$._links.atualizar.href").value("http://localhost:8083/gerentes/" + CPF))
+                .andExpect(jsonPath("$._links.remover.href").value("http://localhost:8083/gerentes/" + CPF));
     }
 
     @Test
@@ -104,7 +155,8 @@ class GerenteControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cpf").value(CPF))
-                .andExpect(jsonPath("$.email").value(EMAIL));
+                .andExpect(jsonPath("$.email").value(EMAIL))
+                .andExpect(jsonPath("$._links.self.href").exists());
     }
 
     private RequestBuilder atualizacao(AtualizacaoGerenteDTO dados) {

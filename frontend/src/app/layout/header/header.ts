@@ -4,7 +4,6 @@ import { AuthService, TipoUsuario } from '../../core/services/auth';
 const ROTULO_TIPO: Record<TipoUsuario, string> = {
   CLIENTE: 'Cliente',
   GERENTE: 'Gerente',
-  ADMIN: 'Administrador',
 };
 
 @Component({

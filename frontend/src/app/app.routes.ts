@@ -62,12 +62,19 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'admin',
+    path: 'gerente/gerentes',
     loadComponent: () =>
-      import('./features/admin/pages/home/home').then(
-        (m) => m.Home,
+      import('./features/gerente/pages/gerentes/gerentes').then(
+        (m) => m.Gerentes,
       ),
-      },
+  },
+  {
+    path: 'gerente/gerentes/:cpf/editar',
+    loadComponent: () =>
+      import('./features/gerente/pages/editar-gerente/editar-gerente').then(
+        (m) => m.EditarGerente,
+      ),
+  },
     ],
   },
   {

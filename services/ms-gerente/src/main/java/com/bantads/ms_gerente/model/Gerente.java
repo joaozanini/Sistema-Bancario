@@ -10,15 +10,19 @@ import jakarta.persistence.Table;
 public class Gerente {
 
     @Id
+    @Column(nullable = false, unique = true, length = 11)
     private String cpf;
 
+    @Column(nullable = false, length = 100)
     private String nome;
 
-    @Column(unique = true)
+    @Column(nullable = false, unique = true, length = 100)
     private String email;
 
+    @Column(length = 20)
     private String telefone;
 
+    @Column(nullable = false)
     private boolean ativo = true;
 
     public String getCpf() {

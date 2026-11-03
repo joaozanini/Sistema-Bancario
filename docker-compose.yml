@@ -90,6 +90,103 @@ services:
       timeout: 10s
       retries: 5
 
+  ms-auth:
+    build: ./services/ms-auth
+    container_name: bantads-ms-auth
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
+      - SERVER_PORT=8081
+      - MONGO_URI=mongodb://mongo:27017/${POSTGRES_DB:-bantads}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  ms-cliente:
+    build: ./services/ms-cliente
+    container_name: bantads-ms-cliente
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
+      - SERVER_PORT=8082
+      - DB_HOST=postgres
+      - DB_SCHEMA=cliente
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  ms-conta:
+    build: ./services/ms-conta
+    container_name: bantads-ms-conta
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
+      - SERVER_PORT=8080
+      - DB_HOST=postgres
+      - DB_SCHEMA=conta
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  ms-gerente:
+    build: ./services/ms-gerente
+    container_name: bantads-ms-gerente
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=60 -XX:+UseSerialGC
+      - SERVER_PORT=8083
+      - DB_HOST=postgres
+      - DB_SCHEMA=gerente
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
   ms-orquestrador:
     build: ./services/ms-orquestrador
     container_name: bantads-ms-orquestrador
@@ -137,6 +234,67 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: bantads-api-gateway
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=192
+      - PORT=3000
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:4200}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-8h}
+      - MS_CONTA_URL=http://ms-conta:8080
+      - MS_AUTH_URL=http://ms-auth:8081
+      - MS_CLIENTE_URL=http://ms-cliente:8082
+      - MS_GERENTE_URL=http://ms-gerente:8083
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ms-auth:
+        condition: service_healthy
+      ms-cliente:
+        condition: service_healthy
+      ms-conta:
+        condition: service_healthy
+      ms-gerente:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build: ./frontend
+    container_name: bantads-frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - bantads-net
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
 
 networks:
   bantads-net:

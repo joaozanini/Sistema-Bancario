@@ -2,10 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const sagaService = require('../services/saga.service');
-const redis = require('../config/redis');
 const { aprovar, TIPO_APROVAR_CLIENTE, DOMINIO } = require('./solicitacoes.controller');
-
-test.after(() => redis.destroy());
 
 function resposta() {
   return {

@@ -2,9 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { exigirTipo } = require('./auth.middleware');
-const redis = require('../config/redis');
-
-test.after(() => redis.destroy());
 
 function respostaFalsa() {
   return {

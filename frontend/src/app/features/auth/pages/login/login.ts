@@ -44,7 +44,7 @@ export class Login {
    private redirecionar(tipo: string | undefined) {
     const destino = (tipo ?? '').toLowerCase();
 
-    if (['cliente', 'gerente', 'admin'].includes(destino)) {
+    if (['cliente', 'gerente'].includes(destino)) {
       this.router.navigate([`/${destino}`]);
       return;
     }

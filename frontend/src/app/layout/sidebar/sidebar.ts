@@ -18,11 +18,10 @@ const MENUS: Record<TipoUsuario, ItemMenu[]> = {
   ],
   GERENTE: [
     { rotulo: 'Início', link: '/gerente' },
-    { rotulo: 'Clientes', link: '/gerente/clientes' },
+    { rotulo: 'Clientes', link: '/gerente/clientes' },c
     { rotulo: 'Gerentes', link: '/gerente/gerentes' },
     { rotulo: 'Relatório', link: '/gerente/relatorio' },
   ],
-  ADMIN: [{ rotulo: 'Início', link: '/admin' }],
 };
 
 @Component({
@@ -32,20 +31,29 @@ const MENUS: Record<TipoUsuario, ItemMenu[]> = {
   styleUrl: './sidebar.scss',
 })
 export class SidebarComponent {
-private readonly auth = inject(AuthService);
-private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
 
-private readonly tipo: TipoUsuario = this.auth.obterTipo() ?? tipoPelaUrl(this.router.url);
+  private readonly tipo: TipoUsuario = this.auth.obterTipo() ?? tipoPelaUrl(this.router.url);
 
-readonly itens = MENUS[this.tipo];
+  readonly itens = MENUS[this.tipo];
 
-sair(): void {
-  this.auth.logout();
+  saindo = false;
+
+  sair(evento: Event): void {
+    evento.preventDefault();
+    if (this.saindo) {
+      return;
+    }
+
+    this.saindo = true;
+    this.auth.sair().subscribe({
+      complete: () => this.router.navigateByUrl('/login'),
+    });
+  }
 }
-}
-
 
 function tipoPelaUrl(url: string): TipoUsuario {
   const segmento = url.split(/[/?#]/)[1]?.toUpperCase();
-  return segmento === 'GERENTE' || segmento === 'ADMIN' ? segmento : 'CLIENTE';
+  return segmento === 'GERENTE' ? 'GERENTE' : 'CLIENTE';
 }

@@ -3,3 +3,18 @@ server.port=${SERVER_PORT:8081}
 
 # Cria o indice unico de login declarado em Usuario ao subir a aplicação
 spring.data.mongodb.auto-index-creation=true
+
+# RabbitMQ: consumidor de ms.auth.cmd (passos de SAGA)
+spring.rabbitmq.host=${RABBITMQ_HOST:localhost}
+spring.rabbitmq.port=${RABBITMQ_PORT:5672}
+spring.rabbitmq.username=${RABBITMQ_USER:admin}
+spring.rabbitmq.password=${RABBITMQ_PASSWORD:}
+
+# Retentativa a cada 5s antes de cair na DLQ (enunciado 5.7): 1 + 3 entregas.
+# Sem requeue no rejeite final, para a mensagem ir para ms.auth.cmd.dlq em vez de entrar em loop.
+spring.rabbitmq.listener.simple.retry.enabled=true
+spring.rabbitmq.listener.simple.retry.max-retries=3
+spring.rabbitmq.listener.simple.retry.initial-interval=5s
+spring.rabbitmq.listener.simple.retry.multiplier=1
+spring.rabbitmq.listener.simple.retry.max-interval=5s
+spring.rabbitmq.listener.simple.default-requeue-rejected=false

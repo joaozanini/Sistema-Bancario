@@ -25,6 +25,10 @@ public class Usuario {
 
     private boolean ativo = true;
 
+    // SAGA que criou o registro; a compensacao so remove o que a propria SAGA criou
+    @Field("saga_criacao")
+    private String sagaCriacao;
+
     public Usuario() {
     }
 
@@ -81,5 +85,13 @@ public class Usuario {
 
     public void setAtivo(boolean ativo) {
         this.ativo = ativo;
+    }
+
+    public String getSagaCriacao() {
+        return sagaCriacao;
+    }
+
+    public void setSagaCriacao(String sagaCriacao) {
+        this.sagaCriacao = sagaCriacao;
     }
 }

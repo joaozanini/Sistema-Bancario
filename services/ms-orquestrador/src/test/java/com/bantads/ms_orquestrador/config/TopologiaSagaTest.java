@@ -11,9 +11,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.amqp.autoconfigure.RabbitProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 
-// Le o application.properties real de producao; so os listeners e o agendador de timeouts ficam desligados,
-// senao tentariam conectar num broker e num Redis que nao existem durante o build.
+// O application.properties nao e versionado, entao as asserções apontam para o
+// .example — que e o arquivo que o repositorio entrega e que todo dev copia.
+// Declarar os valores aqui na anotacao nao serviria: o teste validaria o proprio input.
+// Listeners e agendador desligados: no build nao ha broker nem Redis para conectar.
 @SpringBootTest(properties = {
+        "spring.config.import=classpath:/application.properties.example[.properties]",
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "spring.rabbitmq.listener.direct.auto-startup=false",
         "saga.timeout.verificar=false"

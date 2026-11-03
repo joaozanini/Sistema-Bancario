@@ -1,8 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { catchError, finalize, map, Observable, of } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
-export type TipoUsuario = 'CLIENTE' | 'GERENTE' | 'ADMIN';
+export type TipoUsuario = 'CLIENTE' | 'GERENTE';
 
 export interface UsuarioLogado {
   cpf: string;
@@ -23,7 +24,8 @@ export interface LoginResponse {
 export class AuthService {
   private http = inject(HttpClient);
 
-  private readonly loginUrl = 'http://localhost:3000/auth/login';
+  private readonly loginUrl = `${environment.apiUrl}/auth/login`;
+  private readonly logoutUrl = `${environment.apiUrl}/auth/logout`;
 
   login(email: string, senha: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(this.loginUrl, { email, senha });
@@ -52,11 +54,19 @@ export class AuthService {
 
   obterTipo(): TipoUsuario | null {
     const tipo = (localStorage.getItem('tipo') ?? '').toUpperCase();
-    return tipo === 'CLIENTE' || tipo === 'GERENTE' || tipo === 'ADMIN' ? tipo : null;
+    return tipo === 'CLIENTE' || tipo === 'GERENTE' ? tipo : null;
   }
 
   estaAutenticado() {
     return !!this.obterToken();
+  }
+
+  sair(): Observable<void> {
+    return this.http.post<unknown>(this.logoutUrl, {}).pipe(
+      map(() => undefined),
+      catchError(() => of(undefined)),
+      finalize(() => this.logout()),
+    );
   }
 
   logout() {

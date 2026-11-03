@@ -3,6 +3,8 @@ const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware
 const { contaServiceUrl, gerenteServiceUrl } = require('../config/services');
 const { verifyJwtAndSession, injectUserHeaders, exigirTipo } = require('../middlewares/auth.middleware');
 const { enriquecerCpfDestino, enriquecerNomes } = require('../middlewares/transferencia.middleware');
+const { listar, inserir, remover } = require('../controllers/gerentes.controller');
+const gerenteService = require('../services/gerente.service');
 
 const router = Router();
 
@@ -15,7 +17,16 @@ const contaProxy = createProxyMiddleware({
 const gerenteProxy = createProxyMiddleware({
   target: gerenteServiceUrl,
   changeOrigin: true,
-  on: { proxyReq: fixRequestBody },
+  on: {
+    proxyReq: fixRequestBody,
+    // R14: invalida só depois que o MS Gerente confirmou a gravação — invalidar
+    // antes abriria janela para uma leitura concorrente recachear o dado velho.
+    proxyRes: (proxyRes, req) => {
+      if (req.method === 'PUT' && proxyRes.statusCode < 400 && req.params?.cpf) {
+        gerenteService.invalidar(req.params.cpf);
+      }
+    },
+  },
 });
 
 router.post(
@@ -33,6 +44,15 @@ router.get('/contas', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHead
 // router.all (e não router.use) para o Express não tirar o prefixo /contas do req.url repassado ao MS.
 router.all(['/contas', '/contas/*'], verifyJwtAndSession, injectUserHeaders, contaProxy);
 
+// R12: API Composition (gerentes ativos + quantidade de clientes de cada um)
+router.get('/gerentes', verifyJwtAndSession, exigirTipo('GERENTE'), listar);
+
+// R13 é SAGA: publica em saga.cmd e responde 202
+router.post('/gerentes', verifyJwtAndSession, exigirTipo('GERENTE'), inserir);
+
 router.put('/gerentes/:cpf', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, gerenteProxy);
+
+// R15 é SAGA: não vai para o MS Gerente via REST, vira mensagem em saga.cmd
+router.delete('/gerentes/:cpf', verifyJwtAndSession, exigirTipo('GERENTE'), remover);
 
 module.exports = router;
