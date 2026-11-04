@@ -55,6 +55,12 @@ for servico in "${SERVICOS_SPRING[@]}"; do
   if [ ! -f "$destino" ]; then
     cp "$destino.example" "$destino"
     echo "  criado  $servico"
+  elif [ "$destino.example" -nt "$destino" ]; then
+    # O Maven empacota este arquivo DENTRO do jar. Manter a copia velha faz o
+    # servico subir sem a config que o time acrescentou ao .example e falhar so
+    # em runtime (ex.: sem spring.rabbitmq.host, cai no localhost e nao conecta).
+    cp "$destino.example" "$destino"
+    echo "  atualizado  $servico (o .example mudou; valores reais vao no .env)"
   else
     echo "  ja existe  $servico"
   fi
