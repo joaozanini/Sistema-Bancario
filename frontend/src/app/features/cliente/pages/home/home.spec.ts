@@ -33,6 +33,18 @@ describe('Home do cliente', () => {
     expect(texto).not.toContain('Demonstração');
   });
 
+  it('o menu de operações leva para depósito, saque, transferência e extrato', async () => {
+    contaService = {
+      obterResumo: vi.fn().mockReturnValue(of({ numeroConta: '1291', saldo: new MoneyDecimal('950') })),
+    };
+    await criar();
+
+    const links = Array.from(
+      fixture.nativeElement.querySelectorAll('.shortcuts a') as NodeListOf<HTMLAnchorElement>,
+    ).map((a) => a.getAttribute('href'));
+    expect(links).toEqual(['/deposito', '/saque', '/transferencia', '/extrato']);
+  });
+
   it('mostra erro e permite tentar de novo', async () => {
     contaService = {
       obterResumo: vi.fn().mockReturnValue(throwError(() => new HttpErrorResponse({ status: 502 }))),

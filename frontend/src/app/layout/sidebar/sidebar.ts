@@ -12,9 +12,9 @@ export interface ItemMenu {
 const MENUS: Record<TipoUsuario, ItemMenu[]> = {
   CLIENTE: [
     { rotulo: 'Início', link: '/cliente' },
-    { rotulo: 'Minha conta', link: '/cliente', queryParams: { secao: 'conta' } },
     { rotulo: 'Extrato', link: '/extrato' },
     { rotulo: 'Depósito', link: '/deposito' },
+    { rotulo: 'Saque', link: '/saque' },
     { rotulo: 'Transferência', link: '/transferencia' },
   ],
   GERENTE: [

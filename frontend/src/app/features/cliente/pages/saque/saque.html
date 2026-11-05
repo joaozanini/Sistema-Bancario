@@ -1,0 +1,112 @@
+<section class="saque-page" aria-labelledby="titulo">
+  <header class="page-header">
+    <h1 id="titulo">Saque</h1>
+    <p>Retire um valor da sua conta BANTADS.</p>
+  </header>
+
+  @if (carregandoConta()) {
+    <p class="status" role="status">Carregando a conta do cliente...</p>
+  }
+
+  @if (erroConta()) {
+    <p class="aviso" role="alert">{{ erroConta() }}</p>
+  }
+
+  @if (etapa() === 'dados') {
+    <form class="card formulario" (ngSubmit)="continuar()" novalidate>
+      <label>
+        <span>Conta do cliente</span>
+        <input
+          type="text"
+          name="conta"
+          [value]="conta() ?? (carregandoConta() ? 'Carregando...' : '')"
+          readonly
+          aria-describedby="conta-ajuda"
+        >
+        <small id="conta-ajuda">
+          Conta vinculada ao cliente autenticado.
+          @if (saldo(); as s) {
+            Saldo disponível: {{ s | brlCurrency }}.
+          }
+        </small>
+      </label>
+
+      <label>
+        <span>Valor</span>
+        <span class="campo-valor">
+          <span aria-hidden="true">R$</span>
+          <input
+            type="text"
+            name="valor"
+            [(ngModel)]="valor"
+            (ngModelChange)="limparErro()"
+            inputmode="decimal"
+            placeholder="0,00"
+            autocomplete="off"
+            required
+          >
+        </span>
+        <small>Informe um valor positivo com até duas casas decimais.</small>
+      </label>
+
+      @if (erro()) {
+        <p class="erro" role="alert">{{ erro() }}</p>
+      }
+
+      <div class="acoes">
+        <a class="botao secundario" routerLink="/cliente">Cancelar</a>
+        <button type="submit" [disabled]="carregandoConta() || !conta()">
+          Continuar
+        </button>
+      </div>
+    </form>
+  } @else if (etapa() === 'confirmacao') {
+    <section class="card confirmacao" aria-labelledby="confirmacao-titulo">
+      <h2 id="confirmacao-titulo">Confirme os dados do saque</h2>
+
+      <dl class="resumo">
+        <div>
+          <dt>Conta do cliente</dt>
+          <dd>{{ conta() }}</dd>
+        </div>
+        <div>
+          <dt>Valor do saque</dt>
+          <dd>{{ valorNormalizado | brlCurrency }}</dd>
+        </div>
+      </dl>
+
+      @if (erro()) {
+        <p class="erro" role="alert">{{ erro() }}</p>
+      }
+
+      <div class="acoes">
+        <button
+          type="button"
+          class="secundario"
+          (click)="voltarParaEdicao()"
+          [disabled]="enviando()"
+        >
+          Voltar e corrigir
+        </button>
+        <button type="button" (click)="confirmar()" [disabled]="enviando()">
+          {{ enviando() ? 'Enviando...' : 'Confirmar saque' }}
+        </button>
+      </div>
+    </section>
+  } @else {
+    <section class="card resultado" role="status" aria-labelledby="sucesso-titulo">
+      <span class="icone-sucesso" aria-hidden="true">✓</span>
+      <h2 id="sucesso-titulo">Saque realizado</h2>
+      <p>A API confirmou o saque de {{ valorNormalizado | brlCurrency }}.</p>
+      @if (saldoAtual(); as s) {
+        <p>Saldo atual: <strong>{{ s | brlCurrency }}</strong></p>
+        <p class="status">O saldo pode levar alguns instantes para refletir a operação.</p>
+      } @else if (erroSaldo()) {
+        <p class="status">Não foi possível consultar o saldo atualizado.</p>
+      } @else {
+        <p class="status">Consultando saldo atualizado...</p>
+      }
+      <a class="botao" routerLink="/cliente">Voltar ao início</a>
+    </section>
+  }
+</section>

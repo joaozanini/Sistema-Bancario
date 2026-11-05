@@ -48,6 +48,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'saque',
+    canActivate: [clienteGuard],
+    loadComponent: () =>
+      import('./features/cliente/pages/saque/saque').then(
+        (m) => m.Saque,
+      ),
+  },
+  {
     path: 'cliente',
     loadComponent: () =>
       import('./features/cliente/pages/home/home').then(
