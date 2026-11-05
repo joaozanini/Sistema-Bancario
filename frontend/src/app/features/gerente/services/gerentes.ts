@@ -1,12 +1,13 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { map, Observable, of, switchMap, throwError } from 'rxjs';
+import { catchError, map, Observable, of, switchMap, throwError } from 'rxjs';
 
 import { JobAceito, JobsService } from '../../../core/services/jobs';
-import { AtualizacaoGerente, GerenteDto } from '../models/gerente.model';
+import { AtualizacaoGerente, GerenteDto, NovoGerente } from '../models/gerente.model';
 import { environment } from '../../../../environments/environment';
 
 const MENSAGEM_REMOCAO = 'Gerente removido com sucesso.';
+const MENSAGEM_INSERCAO = 'Gerente inserido com sucesso.';
 
 @Injectable({
   providedIn: 'root',
@@ -36,6 +37,36 @@ export class GerentesService {
 
   atualizar(cpf: string, dados: AtualizacaoGerente): Observable<GerenteDto> {
     return this.http.put<GerenteDto>(`${this.gerentesUrl}/${cpf}`, dados);
+  }
+
+  inserir(dados: NovoGerente): Observable<string> {
+    return this.http
+      .post<JobAceito>(this.gerentesUrl, dados, { observe: 'response' })
+      .pipe(
+        switchMap((resposta) => {
+          const jobId = resposta.body?.jobId;
+          if (resposta.status !== 202 || !jobId) {
+            return of(MENSAGEM_INSERCAO);
+          }
+
+          return this.jobsService.aguardar(jobId).pipe(
+            switchMap((job) => {
+              if (job.status === 'FALHA') {
+                return throwError(() => new Error(job.erro || 'Não foi possível inserir o gerente.'));
+              }
+              if (job.resultType === 'resource' && job.resourceId) {
+                return this.http
+                  .get<GerenteDto>(`${environment.apiUrl}/${job.dominio}/${job.resourceId}`)
+                  .pipe(
+                    map((gerente) => `Gerente ${gerente.nome} inserido com sucesso.`),
+                    catchError(() => of(MENSAGEM_INSERCAO)),
+                  );
+              }
+              return of(MENSAGEM_INSERCAO);
+            }),
+          );
+        }),
+      );
   }
 
   // R15 é SAGA: o Gateway responde 202 com o jobId e o resultado (inline) sai do polling do job

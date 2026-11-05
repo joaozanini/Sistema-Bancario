@@ -90,4 +90,63 @@ describe('GerentesService', () => {
     expect(jobsService.aguardar).not.toHaveBeenCalled();
     expect(saida.valor).toBe('Gerente removido com sucesso.');
   });
+
+  describe('inserir', () => {
+    const NOVO = {
+      cpf: '11122233344',
+      nome: 'Gertrudes',
+      email: 'ger5@bantads.com.br',
+      telefone: '(41) 99999-0005',
+      senha: 'tads',
+    };
+
+    function inserir(): { valor?: string; erro?: Error } {
+      const saida: { valor?: string; erro?: Error } = {};
+      service.inserir(NOVO).subscribe({
+        next: (v) => (saida.valor = v),
+        error: (e) => (saida.erro = e),
+      });
+      return saida;
+    }
+
+    it('no 202 faz polling do job e busca o gerente criado', () => {
+      jobsService.aguardar.mockReturnValue(
+        of(job({ resultType: 'resource', resourceId: NOVO.cpf })),
+      );
+      const saida = inserir();
+
+      const req = http.expectOne(URL);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(NOVO);
+      req.flush({ jobId: 'j1' }, { status: 202, statusText: 'Accepted' });
+
+      http.expectOne(`${URL}/${NOVO.cpf}`).flush({ ...NOVO, ativo: true });
+
+      expect(jobsService.aguardar).toHaveBeenCalledWith('j1');
+      expect(saida.valor).toBe('Gerente Gertrudes inserido com sucesso.');
+    });
+
+    it('job em FALHA vira erro com a mensagem do job', () => {
+      jobsService.aguardar.mockReturnValue(
+        of(job({ status: 'FALHA', resultType: null, erro: 'E-mail já cadastrado' })),
+      );
+      const saida = inserir();
+
+      http.expectOne(URL).flush({ jobId: 'j1' }, { status: 202, statusText: 'Accepted' });
+
+      expect(saida.erro?.message).toBe('E-mail já cadastrado');
+    });
+
+    it('se não conseguir buscar o gerente criado, conclui com a mensagem padrão', () => {
+      jobsService.aguardar.mockReturnValue(
+        of(job({ resultType: 'resource', resourceId: NOVO.cpf })),
+      );
+      const saida = inserir();
+
+      http.expectOne(URL).flush({ jobId: 'j1' }, { status: 202, statusText: 'Accepted' });
+      http.expectOne(`${URL}/${NOVO.cpf}`).flush(null, { status: 404, statusText: 'Not Found' });
+
+      expect(saida.valor).toBe('Gerente inserido com sucesso.');
+    });
+  });
 });

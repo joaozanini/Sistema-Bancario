@@ -1,0 +1,108 @@
+<section class="novo-gerente-page" aria-labelledby="titulo">
+  <header class="page-header">
+    <h1 id="titulo">Novo gerente</h1>
+    <p>Cadastre um gerente. Ele recebe automaticamente uma conta do gerente com mais contas.</p>
+  </header>
+
+  @if (sucesso()) {
+    <section class="card resultado" role="status">
+      <span class="icone-sucesso" aria-hidden="true">✓</span>
+      <h2>{{ sucesso() }}</h2>
+      <a class="botao" [routerLink]="rotaListagem">Voltar para a lista</a>
+    </section>
+  } @else {
+    <form #gerenteForm="ngForm" class="card formulario" (ngSubmit)="salvar(gerenteForm)" novalidate>
+      <label>
+        <span>Nome</span>
+        <input
+          type="text"
+          name="nome"
+          [(ngModel)]="nome"
+          #nomeInput="ngModel"
+          autocomplete="name"
+          required
+        >
+        @if (nomeInput.invalid && nomeInput.touched) {
+          <small class="erro">Informe o nome.</small>
+        }
+      </label>
+
+      <label>
+        <span>CPF</span>
+        <input
+          type="text"
+          name="cpf"
+          [(ngModel)]="cpf"
+          #cpfInput="ngModel"
+          placeholder="000.000.000-00"
+          inputmode="numeric"
+          maxlength="14"
+          pattern="[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}"
+          autocomplete="off"
+          required
+        >
+        @if (cpfInput.invalid && cpfInput.touched) {
+          <small class="erro">Use o formato 000.000.000-00.</small>
+        }
+      </label>
+
+      <label>
+        <span>E-mail</span>
+        <input
+          type="email"
+          name="email"
+          [(ngModel)]="email"
+          #emailInput="ngModel"
+          placeholder="gerente@bantads.com.br"
+          autocomplete="off"
+          required
+          email
+        >
+        @if (emailInput.invalid && emailInput.touched) {
+          <small class="erro">Informe um e-mail válido.</small>
+        }
+      </label>
+
+      <label>
+        <span>Telefone</span>
+        <input
+          type="tel"
+          name="telefone"
+          [(ngModel)]="telefone"
+          placeholder="(41) 98765-4321"
+          autocomplete="off"
+          maxlength="15"
+        >
+      </label>
+
+      <label>
+        <span>Senha</span>
+        <input
+          type="password"
+          name="senha"
+          [(ngModel)]="senha"
+          #senhaInput="ngModel"
+          autocomplete="new-password"
+          required
+        >
+        @if (senhaInput.invalid && senhaInput.touched) {
+          <small class="erro">Informe a senha do gerente.</small>
+        }
+      </label>
+
+      @if (salvando()) {
+        <p class="status" role="status">Inserindo... aguardando a conclusão da operação.</p>
+      }
+      @if (erro()) {
+        <p class="erro" role="alert">{{ erro() }}</p>
+      }
+
+      <div class="acoes">
+        <a class="botao secundario" [routerLink]="rotaListagem">Cancelar</a>
+        <button type="submit" [disabled]="salvando()">
+          {{ salvando() ? 'Inserindo...' : 'Inserir gerente' }}
+        </button>
+      </div>
+    </form>
+  }
+</section>
