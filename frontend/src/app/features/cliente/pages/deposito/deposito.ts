@@ -3,8 +3,10 @@ import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import Decimal from 'decimal.js';
 
 import { BrlCurrencyPipe } from '../../../../shared/pipes/brl-currency.pipe';
+import { ContaService } from '../../services/conta';
 import { ExtratoService } from '../../services/extrato';
 import { DepositoService } from '../../services/deposito';
 import { periodoPadrao } from '../../utils/linha-do-tempo';
@@ -20,7 +22,11 @@ type EtapaDeposito = 'dados' | 'confirmacao' | 'sucesso';
 export class Deposito implements OnInit {
   private readonly extratoService = inject(ExtratoService);
   private readonly depositoService = inject(DepositoService);
+  private readonly contaService = inject(ContaService);
   private readonly destroyRef = inject(DestroyRef);
+
+  readonly saldoAtual = signal<Decimal | null>(null);
+  readonly erroSaldo = signal(false);
 
   readonly conta = signal<string | null>(null);
   readonly carregandoConta = signal(true);
@@ -123,11 +129,25 @@ export class Deposito implements OnInit {
         next: () => {
           this.enviando.set(false);
           this.etapa.set('sucesso');
+          this.reconsultarSaldo();
         },
         error: (erro: unknown) => {
           this.enviando.set(false);
           this.erro.set(this.mensagemErroApi(erro));
         },
+      });
+  }
+
+  private reconsultarSaldo(): void {
+    this.saldoAtual.set(null);
+    this.erroSaldo.set(false);
+
+    this.contaService
+      .obterResumo()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (resumo) => this.saldoAtual.set(resumo.saldo),
+        error: () => this.erroSaldo.set(true),
       });
   }
 
