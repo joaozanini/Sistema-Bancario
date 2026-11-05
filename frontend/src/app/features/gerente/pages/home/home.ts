@@ -81,17 +81,21 @@ export class Home implements OnInit {
     this.processandoId.set(solicitacao.id);
 
     this.solicitacoesService
-      .aprovar(solicitacao.id)
+      .aprovar(solicitacao.cpf)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: (mensagem) => {
           this.processandoId.set(null);
-          this.mensagem.set(`Aprovação de ${solicitacao.nome} enviada.`);
+          this.mensagem.set(mensagem);
           this.carregar();
         },
-        error: (err: HttpErrorResponse) => {
+        error: (err: HttpErrorResponse | Error) => {
           this.processandoId.set(null);
-          this.erro.set(this.mensagemDeErro(err, 'Não foi possível aprovar a solicitação.'));
+          this.erro.set(
+            err instanceof HttpErrorResponse
+              ? this.mensagemDeErro(err, 'Não foi possível aprovar a solicitação.')
+              : err.message,
+          );
         },
       });
   }
