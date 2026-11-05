@@ -1,0 +1,61 @@
+<section class="clientes-page">
+  <header class="page-header">
+    <h1>Clientes</h1>
+    <p>Todos os clientes do banco, em ordem alfabética.</p>
+  </header>
+
+  <label class="busca">
+    <span>Buscar por CPF ou nome</span>
+    <input
+      type="search"
+      name="busca"
+      [ngModel]="busca()"
+      (ngModelChange)="busca.set($event)"
+      placeholder="Digite o CPF ou o nome (ou parte deles)"
+      autocomplete="off"
+    >
+  </label>
+
+  @if (erro()) {
+    <p class="aviso falha" role="alert">
+      {{ erro() }}
+      <button type="button" class="link" (click)="carregar()">Tentar novamente</button>
+    </p>
+  }
+
+  <div class="card">
+    @if (carregando() && clientes().length === 0) {
+      <p class="vazio">Carregando clientes...</p>
+    } @else if (visiveis().length === 0) {
+      <p class="vazio">
+        {{ busca() ? 'Nenhum cliente encontrado para essa busca.' : 'Nenhum cliente encontrado.' }}
+      </p>
+    } @else {
+      <div class="tabela-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">CPF</th>
+              <th scope="col">Nome</th>
+              <th scope="col">Cidade</th>
+              <th scope="col">Estado</th>
+              <th scope="col" class="numero">Saldo</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (c of visiveis(); track c.cpf) {
+              <tr>
+                <td>{{ c.cpf | cpf }}</td>
+                <td class="nome">{{ c.nome }}</td>
+                <td>{{ c.cidade || '—' }}</td>
+                <td>{{ c.uf || '—' }}</td>
+                <td class="numero" [class.negativo]="c.saldo.isNegative()">{{ c.saldo | brlCurrency }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</section>

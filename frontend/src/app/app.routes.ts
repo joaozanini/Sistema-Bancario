@@ -62,6 +62,20 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'gerente/clientes',
+    loadComponent: () =>
+      import('./features/gerente/pages/clientes/clientes').then(
+        (m) => m.Clientes,
+      ),
+  },
+  {
+    path: 'gerente/relatorio',
+    loadComponent: () =>
+      import('./features/gerente/pages/relatorio/relatorio').then(
+        (m) => m.Relatorio,
+      ),
+  },
+  {
     path: 'gerente/gerentes',
     loadComponent: () =>
       import('./features/gerente/pages/gerentes/gerentes').then(

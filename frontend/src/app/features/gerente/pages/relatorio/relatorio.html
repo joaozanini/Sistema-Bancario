@@ -1,0 +1,58 @@
+<section class="relatorio-page">
+  <header class="page-header">
+    <div>
+      <h1>Relatório de clientes</h1>
+      <p>Todos os clientes do banco com conta e gerente, em ordem alfabética.</p>
+    </div>
+    <button type="button" class="botao-novo" (click)="gerar()" [disabled]="gerando()">
+      {{ gerando() ? 'Gerando...' : 'Gerar novamente' }}
+    </button>
+  </header>
+
+  @if (erro()) {
+    <p class="aviso falha" role="alert">
+      {{ erro() }}
+      <button type="button" class="link" (click)="gerar()">Tentar novamente</button>
+    </p>
+  }
+
+  <div class="card">
+    @if (gerando() && linhas().length === 0) {
+      <p class="vazio" role="status">Gerando relatório... aguardando a conclusão da operação.</p>
+    } @else if (gerado() && linhas().length === 0) {
+      <p class="vazio">Nenhum cliente encontrado.</p>
+    } @else if (linhas().length > 0) {
+      <div class="tabela-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">CPF</th>
+              <th scope="col">Nome</th>
+              <th scope="col">E-mail</th>
+              <th scope="col" class="numero">Salário</th>
+              <th scope="col">Conta</th>
+              <th scope="col" class="numero">Saldo</th>
+              <th scope="col">CPF do gerente</th>
+              <th scope="col">Gerente</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (l of linhas(); track l.cpf) {
+              <tr>
+                <td>{{ l.cpf | cpf }}</td>
+                <td class="nome">{{ l.nome }}</td>
+                <td>{{ l.email }}</td>
+                <td class="numero">{{ l.salario | brlCurrency }}</td>
+                <td>{{ l.numeroConta }}</td>
+                <td class="numero" [class.negativo]="l.saldo.isNegative()">{{ l.saldo | brlCurrency }}</td>
+                <td>{{ l.cpfGerente ? (l.cpfGerente | cpf) : '—' }}</td>
+                <td>{{ l.nomeGerente || '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</section>
