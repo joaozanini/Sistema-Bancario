@@ -30,6 +30,16 @@ describe('Sidebar', () => {
     expect(component.itens.find((i) => i.rotulo === 'Extrato')?.link).toBe('/extrato');
   });
 
+  it('mostra as operações do cliente sem o item Minha conta', () => {
+    expect(component.itens.map((i) => i.link)).toEqual([
+      '/cliente',
+      '/extrato',
+      '/deposito',
+      '/saque',
+      '/transferencia',
+    ]);
+  });
+
   it('Sair encerra a sessão no Gateway e volta para o login', () => {
     const navegar = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     const evento = new Event('click', { cancelable: true });
