@@ -91,6 +91,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'gerente/gerentes/novo',
+    loadComponent: () =>
+      import('./features/gerente/pages/novo-gerente/novo-gerente').then(
+        (m) => m.NovoGerente,
+      ),
+  },
+  {
     path: 'gerente/gerentes/:cpf/editar',
     loadComponent: () =>
       import('./features/gerente/pages/editar-gerente/editar-gerente').then(

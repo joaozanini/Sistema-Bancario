@@ -8,6 +8,31 @@
   color: #172033;
 }
 
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.botao-novo {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.botao-novo:hover {
+  background: #1d4ed8;
+}
+
 .page-header h1 {
   margin: 0 0 8px;
   font-size: 24px;
