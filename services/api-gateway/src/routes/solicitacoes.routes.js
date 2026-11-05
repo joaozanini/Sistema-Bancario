@@ -3,13 +3,15 @@ const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware
 const { clienteServiceUrl } = require('../config/services');
 const { verifyJwtAndSession, injectUserHeaders, exigirTipo } = require('../middlewares/auth.middleware');
 const { aprovar } = require('../controllers/solicitacoes.controller');
+const { interceptarRespostaDoProxy } = require('../middlewares/links.middleware');
 
 const router = Router();
 
 const clienteProxy = createProxyMiddleware({
   target: clienteServiceUrl,
   changeOrigin: true,
-  on: { proxyReq: fixRequestBody },
+  selfHandleResponse: true,
+  on: { proxyReq: fixRequestBody, proxyRes: interceptarRespostaDoProxy },
 });
 
 // R1: autocadastro é público — quem se cadastra ainda não tem login

@@ -7,11 +7,13 @@ const jobsRoutes = require('./routes/jobs.routes');
 const clientesRoutes = require('./routes/clientes.routes');
 const solicitacoesRoutes = require('./routes/solicitacoes.routes');
 const proxyRoutes = require('./routes/proxy.routes');
+const { reescreverLinksDeRespostaJson } = require('./middlewares/links.middleware');
 
 const app = express();
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json());
+app.use(reescreverLinksDeRespostaJson);
 
 app.use(healthRoutes);
 app.use(rebootRoutes);
