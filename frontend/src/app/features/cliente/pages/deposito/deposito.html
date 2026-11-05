@@ -93,6 +93,14 @@
       <span class="icone-sucesso" aria-hidden="true">✓</span>
       <h2 id="sucesso-titulo">Depósito realizado</h2>
       <p>A API confirmou o depósito de {{ valorNormalizado | brlCurrency }}.</p>
+      @if (saldoAtual(); as s) {
+        <p>Saldo atual: <strong>{{ s | brlCurrency }}</strong></p>
+        <p class="status">O saldo pode levar alguns instantes para refletir a operação.</p>
+      } @else if (erroSaldo()) {
+        <p class="status">Não foi possível consultar o saldo atualizado.</p>
+      } @else {
+        <p class="status">Consultando saldo atualizado...</p>
+      }
       <a class="botao" routerLink="/cliente">Voltar ao início</a>
     </section>
   }

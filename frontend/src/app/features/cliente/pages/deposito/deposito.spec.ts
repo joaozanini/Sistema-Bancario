@@ -5,6 +5,8 @@ import { Subject, of, throwError } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth';
 import { clienteGuard } from '../../../../core/guards/cliente-guard';
+import { MoneyDecimal } from '../../../../shared/utils/money.util';
+import { ContaService } from '../../services/conta';
 import { DepositoService } from '../../services/deposito';
 import { ExtratoService } from '../../services/extrato';
 import { routes } from '../../../../app.routes';
@@ -16,6 +18,7 @@ describe('Deposito', () => {
   let authService: { obterTipo: ReturnType<typeof vi.fn> };
   let extratoService: { obterExtrato: ReturnType<typeof vi.fn> };
   let depositoService: { depositar: ReturnType<typeof vi.fn> };
+  let contaService: { obterResumo: ReturnType<typeof vi.fn> };
 
   const executeGuard = () =>
     TestBed.runInInjectionContext(() => clienteGuard({} as never, {} as never));
@@ -30,6 +33,9 @@ describe('Deposito', () => {
     depositoService = {
       depositar: vi.fn().mockReturnValue(of({ mensagem: 'Depósito confirmado' })),
     };
+    contaService = {
+      obterResumo: vi.fn().mockReturnValue(of({ numeroConta: '12345', saldo: new MoneyDecimal('950') })),
+    };
 
     await TestBed.configureTestingModule({
       imports: [Deposito],
@@ -38,6 +44,7 @@ describe('Deposito', () => {
         { provide: AuthService, useValue: authService },
         { provide: ExtratoService, useValue: extratoService },
         { provide: DepositoService, useValue: depositoService },
+        { provide: ContaService, useValue: contaService },
       ],
     }).compileComponents();
 
@@ -136,6 +143,16 @@ describe('Deposito', () => {
 
     expect(component.etapa()).toBe('sucesso');
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Depósito realizado');
+  });
+
+  it('reconsulta o saldo depois do depósito', () => {
+    component.valor = '150';
+    component.continuar();
+    component.confirmar();
+    fixture.detectChanges();
+
+    expect(contaService.obterResumo).toHaveBeenCalledOnce();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Saldo atual: R$ 950,00');
   });
 
   it('mostra erro HTTP sem indicar sucesso', () => {

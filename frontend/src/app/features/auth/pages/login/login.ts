@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -34,8 +35,8 @@ export class Login {
         this.auth.salvarTipo(resposta.tipo);
         this.redirecionar(resposta.tipo);
       },
-      error: () => {
-        this.erro = 'Não foi possível realizar o login.';
+      error: (err: HttpErrorResponse) => {
+        this.erro = this.mensagemDeErro(err);
         this.carregando = false;
       },
     });
@@ -51,5 +52,15 @@ export class Login {
 
     this.erro = 'Perfil de usuário inválido.';
     this.carregando = false;
+  }
+
+  private mensagemDeErro(err: HttpErrorResponse): string {
+    if (err.status === 0) {
+      return 'Não foi possível conectar ao servidor. Tente novamente.';
+    }
+    if (err.status === 401) {
+      return err.error?.message || 'Login inválido!';
+    }
+    return 'Não foi possível realizar o login.';
   }
 }
