@@ -1,0 +1,13 @@
+<span class="icone">
+  <app-icone nome="carteira" [tamanho]="22" />
+</span>
+<div class="dados">
+  <span class="rotulo">Saldo disponível</span>
+  <strong class="valor" aria-live="polite">
+    @if (saldo(); as s) {
+      {{ s | brlCurrency }}
+    } @else {
+      {{ carregando() ? '...' : '—' }}
+    }
+  </strong>
+</div>

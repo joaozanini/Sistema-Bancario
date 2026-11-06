@@ -14,6 +14,8 @@
 
   @if (etapa() === 'dados') {
     <form class="card formulario" (ngSubmit)="continuar()" novalidate>
+      <app-saldo-disponivel [saldo]="saldo()" [carregando]="carregandoConta()" />
+
       <label>
         <span>Conta do cliente</span>
         <input
@@ -23,12 +25,7 @@
           readonly
           aria-describedby="conta-ajuda"
         >
-        <small id="conta-ajuda">
-          Conta vinculada ao cliente autenticado.
-          @if (saldo(); as s) {
-            Saldo disponível: {{ s | brlCurrency }}.
-          }
-        </small>
+        <small id="conta-ajuda">Conta vinculada ao cliente autenticado.</small>
       </label>
 
       <label>

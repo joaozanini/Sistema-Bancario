@@ -8,7 +8,6 @@ import { clienteGuard } from '../../../../core/guards/cliente-guard';
 import { MoneyDecimal } from '../../../../shared/utils/money.util';
 import { ContaService } from '../../services/conta';
 import { DepositoService } from '../../services/deposito';
-import { ExtratoService } from '../../services/extrato';
 import { routes } from '../../../../app.routes';
 import { Deposito } from './deposito';
 
@@ -16,7 +15,6 @@ describe('Deposito', () => {
   let fixture: ComponentFixture<Deposito>;
   let component: Deposito;
   let authService: { obterTipo: ReturnType<typeof vi.fn> };
-  let extratoService: { obterExtrato: ReturnType<typeof vi.fn> };
   let depositoService: { depositar: ReturnType<typeof vi.fn> };
   let contaService: { obterResumo: ReturnType<typeof vi.fn> };
 
@@ -25,11 +23,6 @@ describe('Deposito', () => {
 
   beforeEach(async () => {
     authService = { obterTipo: vi.fn().mockReturnValue('CLIENTE') };
-    extratoService = {
-      obterExtrato: vi.fn().mockReturnValue(
-        of({ numeroConta: '12345', saldoAbertura: '0', movimentacoes: [] }),
-      ),
-    };
     depositoService = {
       depositar: vi.fn().mockReturnValue(of({ mensagem: 'Depósito confirmado' })),
     };
@@ -42,7 +35,6 @@ describe('Deposito', () => {
       providers: [
         provideRouter([]),
         { provide: AuthService, useValue: authService },
-        { provide: ExtratoService, useValue: extratoService },
         { provide: DepositoService, useValue: depositoService },
         { provide: ContaService, useValue: contaService },
       ],
@@ -61,6 +53,12 @@ describe('Deposito', () => {
     expect(conta?.readOnly).toBe(true);
     expect(elemento.querySelector('input[name="valor"]')).toBeTruthy();
     expect(elemento.textContent).toContain('Depósito');
+  });
+
+  it('mostra o saldo disponível antes do depósito', () => {
+    const saldo = (fixture.nativeElement as HTMLElement).querySelector('app-saldo-disponivel');
+
+    expect(saldo?.textContent).toContain('R$ 950,00');
   });
 
   it('rejeita valor vazio', () => {
@@ -106,7 +104,7 @@ describe('Deposito', () => {
 
   it('impede o envio quando não consegue carregar a conta do cliente', () => {
     fixture.destroy();
-    extratoService.obterExtrato.mockReturnValue(
+    contaService.obterResumo.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 0 })),
     );
     fixture = TestBed.createComponent(Deposito);
@@ -151,7 +149,7 @@ describe('Deposito', () => {
     component.confirmar();
     fixture.detectChanges();
 
-    expect(contaService.obterResumo).toHaveBeenCalledOnce();
+    expect(contaService.obterResumo).toHaveBeenCalledTimes(2);
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Saldo atual: R$ 950,00');
   });
 

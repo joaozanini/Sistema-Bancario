@@ -45,7 +45,7 @@ describe('Saque', () => {
 
     expect(conta?.value).toBe('1291');
     expect(conta?.readOnly).toBe(true);
-    expect(elemento.textContent).toContain('Saldo disponível: R$ 800,00');
+    expect(elemento.querySelector('app-saldo-disponivel')?.textContent).toContain('R$ 800,00');
   });
 
   it('rejeita valor vazio, zero e com mais de duas casas', () => {

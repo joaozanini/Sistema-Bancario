@@ -5,26 +5,25 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import Decimal from 'decimal.js';
 
+import { SaldoDisponivel } from '../../../../shared/components/saldo-disponivel/saldo-disponivel';
 import { BrlCurrencyPipe } from '../../../../shared/pipes/brl-currency.pipe';
-import { periodoPadrao } from '../../utils/linha-do-tempo';
 import { ContaService } from '../../services/conta';
-import { ExtratoService } from '../../services/extrato';
 import { TransferenciaService } from '../../services/transferencia';
 
 type EtapaTransferencia = 'dados' | 'confirmacao' | 'sucesso';
 
 @Component({
   selector: 'app-transferencia',
-  imports: [FormsModule, RouterLink, BrlCurrencyPipe],
+  imports: [FormsModule, RouterLink, BrlCurrencyPipe, SaldoDisponivel],
   templateUrl: './transferencia.html',
   styleUrl: './transferencia.scss',
 })
 export class Transferencia implements OnInit {
-  private readonly extratoService = inject(ExtratoService);
   private readonly transferenciaService = inject(TransferenciaService);
   private readonly contaService = inject(ContaService);
   private readonly destroyRef = inject(DestroyRef);
 
+  readonly saldo = signal<Decimal | null>(null);
   readonly saldoAtual = signal<Decimal | null>(null);
   readonly erroSaldo = signal(false);
 
@@ -39,14 +38,13 @@ export class Transferencia implements OnInit {
   valor = '';
 
   ngOnInit(): void {
-    const { inicio, fim } = periodoPadrao();
-
-    this.extratoService
-      .obterExtrato(inicio, fim)
+    this.contaService
+      .obterResumo()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (extrato) => {
-          const numeroConta = extrato.numeroConta?.trim();
+        next: (resumo) => {
+          const numeroConta = resumo.numeroConta?.trim();
+          this.saldo.set(resumo.saldo);
           this.contaOrigem.set(numeroConta || null);
           this.erroConta.set(
             numeroConta ? '' : 'A API não retornou o número da conta de origem.',

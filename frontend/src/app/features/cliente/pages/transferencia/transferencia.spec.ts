@@ -5,23 +5,16 @@ import { Subject, of, throwError } from 'rxjs';
 
 import { MoneyDecimal } from '../../../../shared/utils/money.util';
 import { ContaService } from '../../services/conta';
-import { ExtratoService } from '../../services/extrato';
 import { TransferenciaService } from '../../services/transferencia';
 import { Transferencia } from './transferencia';
 
 describe('Transferencia', () => {
   let fixture: ComponentFixture<Transferencia>;
   let component: Transferencia;
-  let extratoService: { obterExtrato: ReturnType<typeof vi.fn> };
   let transferenciaService: { transferir: ReturnType<typeof vi.fn> };
   let contaService: { obterResumo: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    extratoService = {
-      obterExtrato: vi.fn().mockReturnValue(
-        of({ numeroConta: '12345', saldoAbertura: '0', movimentacoes: [] }),
-      ),
-    };
     transferenciaService = {
       transferir: vi.fn().mockReturnValue(of({})),
     };
@@ -35,7 +28,6 @@ describe('Transferencia', () => {
       imports: [Transferencia],
       providers: [
         provideRouter([]),
-        { provide: ExtratoService, useValue: extratoService },
         { provide: TransferenciaService, useValue: transferenciaService },
         { provide: ContaService, useValue: contaService },
       ],
@@ -79,7 +71,7 @@ describe('Transferencia', () => {
 
   it('bloqueia o envio quando não consegue carregar a conta de origem', () => {
     fixture.destroy();
-    extratoService.obterExtrato.mockReturnValue(
+    contaService.obterResumo.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 0 })),
     );
     fixture = TestBed.createComponent(Transferencia);
@@ -210,7 +202,7 @@ describe('Transferencia', () => {
     fixture.detectChanges();
 
     expect(component.etapa()).toBe('sucesso');
-    expect(contaService.obterResumo).toHaveBeenCalledOnce();
+    expect(contaService.obterResumo).toHaveBeenCalledTimes(2);
     expect(component.saldoAtual()?.toFixed(2)).toBe('850.00');
     expect(fixture.nativeElement.textContent).toContain('Saldo atual');
   });
