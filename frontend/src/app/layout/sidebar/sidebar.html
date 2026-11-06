@@ -1,16 +1,21 @@
 <aside class="sidebar">
-  <h2>BANTADS</h2>
+  <app-logo class="logo" tema="claro" />
   <nav aria-label="Menu principal">
-        @for (item of itens; track item.rotulo) {
+    @for (item of itens; track item.rotulo) {
       <a
         [routerLink]="item.link"
         [queryParams]="item.queryParams"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: true }"
         ariaCurrentWhenActive="page"
-        >{{ item.rotulo }}</a
       >
+        <app-icone [nome]="item.icone" />
+        <span>{{ item.rotulo }}</span>
+      </a>
     }
-    <a class="logout" href="/login" (click)="sair($event)">{{ saindo ? 'Saindo...' : 'Sair' }}</a>
+    <a class="logout" href="/login" (click)="sair($event)">
+      <app-icone nome="sair" />
+      <span>{{ saindo ? 'Saindo...' : 'Sair' }}</span>
+    </a>
   </nav>
 </aside>

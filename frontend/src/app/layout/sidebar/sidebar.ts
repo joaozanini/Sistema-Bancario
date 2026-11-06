@@ -2,32 +2,36 @@
 import { Component, inject } from '@angular/core';
 import { Params, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService, TipoUsuario } from '../../core/services/auth';
+import { Icone } from '../../shared/components/icone/icone';
+import { NomeIcone } from '../../shared/components/icone/icones';
+import { Logo } from '../../shared/components/logo/logo';
 
 export interface ItemMenu {
   rotulo: string;
   link: string;
+  icone: NomeIcone;
   queryParams?: Params;
 }
 
 const MENUS: Record<TipoUsuario, ItemMenu[]> = {
   CLIENTE: [
-    { rotulo: 'Início', link: '/cliente' },
-    { rotulo: 'Extrato', link: '/extrato' },
-    { rotulo: 'Depósito', link: '/deposito' },
-    { rotulo: 'Saque', link: '/saque' },
-    { rotulo: 'Transferência', link: '/transferencia' },
+    { rotulo: 'Início', link: '/cliente', icone: 'painel' },
+    { rotulo: 'Depósito', link: '/deposito', icone: 'deposito' },
+    { rotulo: 'Saque', link: '/saque', icone: 'saque' },
+    { rotulo: 'Transferência', link: '/transferencia', icone: 'transferencia' },
+    { rotulo: 'Extrato', link: '/extrato', icone: 'extrato' },
   ],
   GERENTE: [
-    { rotulo: 'Início', link: '/gerente' },
-    { rotulo: 'Clientes', link: '/gerente/clientes' },
-    { rotulo: 'Gerentes', link: '/gerente/gerentes' },
-    { rotulo: 'Relatório', link: '/gerente/relatorio' },
+    { rotulo: 'Início', link: '/gerente', icone: 'painel' },
+    { rotulo: 'Clientes', link: '/gerente/clientes', icone: 'clientes' },
+    { rotulo: 'Gerentes', link: '/gerente/gerentes', icone: 'gerentes' },
+    { rotulo: 'Relatório', link: '/gerente/relatorio', icone: 'relatorio' },
   ],
 };
 
 @Component({
   selector: 'app-sidebar',
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, Icone, Logo],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.scss',
 })
