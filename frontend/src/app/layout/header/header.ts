@@ -1,10 +1,8 @@
-import { Component, inject } from '@angular/core';
-import { AuthService, TipoUsuario } from '../../core/services/auth';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-const ROTULO_TIPO: Record<TipoUsuario, string> = {
-  CLIENTE: 'Cliente',
-  GERENTE: 'Gerente',
-};
+import { AuthService } from '../../core/services/auth';
+import { ContaService } from '../../features/cliente/services/conta';
 
 @Component({
   selector: 'app-header',
@@ -14,13 +12,30 @@ const ROTULO_TIPO: Record<TipoUsuario, string> = {
 })
 export class HeaderComponent {
   private readonly auth = inject(AuthService);
+  private readonly contaService = inject(ContaService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly usuario = this.auth.obterUsuario();
   private readonly tipo = this.auth.obterTipo();
 
-  readonly rotuloTipo = this.tipo ? ROTULO_TIPO[this.tipo] : null;
+  readonly ehGerente = this.tipo === 'GERENTE';
 
   readonly iniciais = obterIniciais(this.usuario?.nome);
+
+  readonly numeroConta = signal<string | null>(null);
+
+  constructor() {
+    // R3: o cliente vê o número da sua conta em todas as telas
+    if (this.tipo === 'CLIENTE') {
+      this.contaService
+        .obterResumo()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (conta) => this.numeroConta.set(conta.numeroConta),
+          error: () => this.numeroConta.set(null),
+        });
+    }
+  }
 }
 
 /** "Roberto Souza" -> "RS" */

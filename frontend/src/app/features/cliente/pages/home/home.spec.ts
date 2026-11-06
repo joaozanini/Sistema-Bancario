@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
+import { AuthService } from '../../../../core/services/auth';
 import { MoneyDecimal } from '../../../../shared/utils/money.util';
 import { ContaService } from '../../services/conta';
 import { Home } from './home';
@@ -14,7 +15,16 @@ describe('Home do cliente', () => {
   async function criar() {
     await TestBed.configureTestingModule({
       imports: [Home],
-      providers: [provideRouter([]), { provide: ContaService, useValue: contaService }],
+      providers: [
+        provideRouter([]),
+        { provide: ContaService, useValue: contaService },
+        {
+          provide: AuthService,
+          useValue: {
+            obterUsuario: () => ({ cpf: '12912861012', nome: 'Catharyna Silva', email: 'cli1@bantads.com.br' }),
+          },
+        },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Home);
@@ -31,6 +41,15 @@ describe('Home do cliente', () => {
     expect(texto).toContain('1291');
     expect(texto).toContain('R$ 950,00');
     expect(texto).not.toContain('Demonstração');
+  });
+
+  it('cumprimenta o cliente pelo primeiro nome', async () => {
+    contaService = {
+      obterResumo: vi.fn().mockReturnValue(of({ numeroConta: '1291', saldo: new MoneyDecimal('950') })),
+    };
+    await criar();
+
+    expect(fixture.nativeElement.querySelector('h1').textContent).toContain('Olá, Catharyna!');
   });
 
   it('o menu de operações leva para depósito, saque, transferência e extrato', async () => {

@@ -1,19 +1,22 @@
 <header class="header">
-    @if (usuario) {
+  @if (usuario) {
     <div class="usuario">
       <span class="avatar" aria-hidden="true">{{ iniciais }}</span>
       <div class="dados">
         <strong>
           {{ usuario.nome }}
-          @if (rotuloTipo) {
-            <span class="tipo">({{ rotuloTipo }})</span>
+          @if (ehGerente) {
+            <span class="tipo">(Gerente)</span>
           }
         </strong>
-        <span>{{ usuario.email }}</span>
+        @if (numeroConta(); as numero) {
+          <span>Conta {{ numero }}</span>
+        } @else {
+          <span>{{ usuario.email }}</span>
+        }
       </div>
     </div>
   } @else {
     <span>Internet Banking</span>
   }
-  <span class="brand">BANTADS</span>
 </header>

@@ -3,8 +3,8 @@
   width: 100%;
 }
 .header {
-  min-height: 64px;
-  padding: 16px 36px;
+  min-height: 72px;
+  padding: 16px 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -13,12 +13,6 @@
   border-bottom: 1px solid #e2e8f0;
   color: #64748b;
   font-size: 13px;
-}
-.brand {
-  color: #182031;
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 1px;
 }
 @media (max-width: 760px) {
   .header {
@@ -35,14 +29,14 @@
 }
 .avatar {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #e2e8f0;
-  color: #334155;
-  font-size: 12px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 13px;
   font-weight: 700;
 }
 .dados {
