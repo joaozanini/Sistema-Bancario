@@ -21,6 +21,12 @@ public class ClienteCommandConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(ClienteCommandConsumer.class);
 
+    // nomes exatos do AprovarClienteSaga do orquestrador (R9)
+    public static final String APROVAR_SOLICITACAO = "cliente.aprovar-solicitacao";
+    public static final String COMPENSAR_APROVAR_SOLICITACAO = "cliente.aprovar-solicitacao.compensar";
+    public static final String CRIAR_CLIENTE = "cliente.criar-cliente";
+    public static final String COMPENSAR_CRIAR_CLIENTE = "cliente.criar-cliente.compensar";
+
     private final ClienteService clienteService;
     private final SagaIdempotenciaRepository idempotenciaRepository;
     private final RabbitTemplate rabbitTemplate;
@@ -104,6 +110,21 @@ public class ClienteCommandConsumer {
     }
 
     private RespostaSagaDTO executarComando(String sagaId, String tipo, Map<String, Object> payload) {
+        if (tipo != null) {
+            switch (tipo.trim()) {
+                case APROVAR_SOLICITACAO:
+                    return aprovarSolicitacao(sagaId, tipo, payload);
+                case COMPENSAR_APROVAR_SOLICITACAO:
+                    return compensarAprovacaoSolicitacao(sagaId, tipo, payload);
+                case CRIAR_CLIENTE:
+                    return criarCliente(sagaId, tipo, payload);
+                case COMPENSAR_CRIAR_CLIENTE:
+                    return compensarCriacaoCliente(sagaId, tipo, payload);
+                default:
+                    break;
+            }
+        }
+
         String tipoNorm = tipo != null ? tipo.toLowerCase().replace("_", "-").trim() : "";
 
         // 1. SAGA Remover Gerente (R15): Obter dados dos clientes transferidos
@@ -141,35 +162,52 @@ public class ClienteCommandConsumer {
 
         // 3. SAGA Aprovar Cliente (R9 - Compensação Passo 1)
         if (tipoNorm.contains("aprovar-solicitacao.compensar") || tipoNorm.contains("compensar-aprovar-solicitacao")) {
-            String cpf = extrairString(payload, "cpf", "cpfCliente");
-            String statusSolicitacao = extrairString(payload, "statusSolicitacao", "status");
-            String motivo = extrairString(payload, "motivo", "motivoRejeicao");
-            clienteService.compensarAprovacaoSolicitacao(cpf, statusSolicitacao, motivo);
-            return RespostaSagaDTO.sucesso(sagaId, tipo, Map.of("mensagem", "Compensação de solicitação efetuada."));
+            return compensarAprovacaoSolicitacao(sagaId, tipo, payload);
         }
 
         // 4. SAGA Aprovar Cliente (R9 - Passo 1)
         if (tipoNorm.contains("aprovar-solicitacao")) {
-            String cpf = extrairString(payload, "cpf", "cpfCliente");
-            Map<String, Object> resultado = clienteService.aprovarSolicitacao(cpf);
-            return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
+            return aprovarSolicitacao(sagaId, tipo, payload);
         }
 
         // 5. SAGA Aprovar Cliente (R9 - Compensação Passo 4)
         if (tipoNorm.contains("criar-cliente.compensar") || tipoNorm.contains("compensar-criar-cliente") || tipoNorm.contains("remover-cliente")) {
-            String cpf = extrairString(payload, "cpf", "cpfCliente");
-            clienteService.compensarCriacaoCliente(cpf);
-            return RespostaSagaDTO.sucesso(sagaId, tipo, Map.of("mensagem", "Compensação de criação de cliente efetuada."));
+            return compensarCriacaoCliente(sagaId, tipo, payload);
         }
 
         // 6. SAGA Aprovar Cliente (R9 - Passo 4)
         if (tipoNorm.contains("criar-cliente")) {
-            String cpf = extrairString(payload, "cpf", "cpfCliente");
-            Map<String, Object> resultado = clienteService.criarClienteDaSolicitacao(cpf);
-            return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
+            return criarCliente(sagaId, tipo, payload);
         }
 
         throw new IllegalArgumentException("Tipo de comando não reconhecido pelo MS Cliente: " + tipo);
+    }
+
+    private RespostaSagaDTO aprovarSolicitacao(String sagaId, String tipo, Map<String, Object> payload) {
+        String cpf = extrairString(payload, "cpf", "cpfCliente");
+        Map<String, Object> resultado = clienteService.aprovarSolicitacao(cpf);
+        return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
+    }
+
+    // o orquestrador manda PENDENTE (falha tecnica) ou NAO_APROVADA com motivo (login duplicado)
+    private RespostaSagaDTO compensarAprovacaoSolicitacao(String sagaId, String tipo, Map<String, Object> payload) {
+        String cpf = extrairString(payload, "cpf", "cpfCliente");
+        String statusSolicitacao = extrairString(payload, "statusSolicitacao", "status");
+        String motivo = extrairString(payload, "motivo", "motivoRejeicao");
+        clienteService.compensarAprovacaoSolicitacao(cpf, statusSolicitacao, motivo);
+        return RespostaSagaDTO.sucesso(sagaId, tipo, Map.of("mensagem", "Compensação de solicitação efetuada."));
+    }
+
+    private RespostaSagaDTO criarCliente(String sagaId, String tipo, Map<String, Object> payload) {
+        String cpf = extrairString(payload, "cpf", "cpfCliente");
+        Map<String, Object> resultado = clienteService.criarClienteDaSolicitacao(cpf);
+        return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
+    }
+
+    private RespostaSagaDTO compensarCriacaoCliente(String sagaId, String tipo, Map<String, Object> payload) {
+        String cpf = extrairString(payload, "cpf", "cpfCliente");
+        clienteService.compensarCriacaoCliente(cpf);
+        return RespostaSagaDTO.sucesso(sagaId, tipo, Map.of("mensagem", "Compensação de criação de cliente efetuada."));
     }
 
     private List<String> extrairCpfsClientes(Map<String, Object> payload) {

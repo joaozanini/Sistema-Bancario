@@ -10,6 +10,8 @@ import com.bantads.ms_gerente.repository.GerenteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 public class GerenteService {
 
@@ -17,6 +19,14 @@ public class GerenteService {
 
     public GerenteService(GerenteRepository repository) {
         this.repository = repository;
+    }
+
+    // SAGA Aprovar Cliente (R9): o MS Conta escolhe entre estes o gerente com menos clientes
+    @Transactional(readOnly = true)
+    public List<String> listarCpfsAtivos() {
+        return repository.findByAtivoTrueOrderByCpf().stream()
+                .map(Gerente::getCpf)
+                .toList();
     }
 
     @Transactional
