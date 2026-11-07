@@ -33,10 +33,10 @@ describe('Sidebar', () => {
   it('mostra as operações do cliente sem o item Minha conta', () => {
     expect(component.itens.map((i) => i.link)).toEqual([
       '/cliente',
-      '/extrato',
       '/deposito',
       '/saque',
       '/transferencia',
+      '/extrato',
     ]);
   });
 

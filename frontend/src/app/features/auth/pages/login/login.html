@@ -1,21 +1,46 @@
-<main class="login">
-  <form (ngSubmit)="entrar()">
-    <h1>BANTADS</h1>
-    <p>Entre na sua conta</p>
+<main class="login-page">
+  <app-logo class="logo" />
 
-    <input type="email" name="email" [(ngModel)]="email" placeholder="E-mail">
+  <section class="login-card" aria-labelledby="login-titulo">
+    <header class="card-header">
+      <h1 id="login-titulo">Acesse sua conta</h1>
+      <p>Entre com seu e-mail e senha do BANTADS.</p>
+    </header>
 
-    <input type="password" name="senha" [(ngModel)]="senha" placeholder="Senha">
+    <form (ngSubmit)="entrar()" novalidate>
+      <label>
+        <span>E-mail</span>
+        <input
+          type="email"
+          name="email"
+          [(ngModel)]="email"
+          placeholder="seu@email.com"
+          autocomplete="username"
+          required
+        >
+      </label>
 
-    @if (erro) {
-    <p class="erro">{{ erro }}</p>
-    }
+      <label>
+        <span>Senha</span>
+        <input
+          type="password"
+          name="senha"
+          [(ngModel)]="senha"
+          placeholder="Digite sua senha"
+          autocomplete="current-password"
+          required
+        >
+      </label>
 
-    <button type="submit" [disabled]="carregando">
-      {{ carregando ? 'Entrando...' : 'Entrar' }}
-    </button>
-    <a class="register-link" routerLink="/register">
-      Clique aqui para se registrar!
-    </a>
-  </form>
+      @if (erro) {
+        <p class="erro" role="alert">{{ erro }}</p>
+      }
+
+      <button type="submit" [disabled]="carregando">
+        {{ carregando ? 'Entrando...' : 'Entrar' }}
+      </button>
+    </form>
+
+    <p class="cadastro-link">Não tem conta? <a routerLink="/register">Cadastre-se</a></p>
+  </section>
 </main>

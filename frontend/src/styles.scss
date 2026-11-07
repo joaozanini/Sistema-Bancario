@@ -10,4 +10,14 @@ body {
 
 body {
   font-family: 'Inter', Arial, sans-serif;
+  color: #172033;
+  background: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
