@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth-guard';
 import { clienteGuard } from './core/guards/cliente-guard';
+import { gerenteGuard } from './core/guards/gerente-guard';
+import { visitanteGuard } from './core/guards/visitante-guard';
 
 export const routes: Routes = [
    {
@@ -10,11 +12,13 @@ export const routes: Routes = [
   },
   {
     path: 'login',
+    canActivate: [visitanteGuard],
     loadComponent: () =>
       import('./features/auth/pages/login/login').then((m) => m.Login),
   },
   {
     path: 'register',
+    canActivate: [visitanteGuard],
     loadComponent: () =>
       import('./features/auth/pages/register/register').then((m) => m.Register),
   },
@@ -28,6 +32,7 @@ export const routes: Routes = [
         children: [
           {
   path: 'extrato',
+  canActivate: [clienteGuard],
   loadComponent: () =>
     import('./features/cliente/pages/extrato/extrato').then((m) => m.Extrato),
 },
@@ -57,6 +62,7 @@ export const routes: Routes = [
   },
   {
     path: 'cliente',
+    canActivate: [clienteGuard],
     loadComponent: () =>
       import('./features/cliente/pages/home/home').then(
         (m) => m.Home,
@@ -64,6 +70,7 @@ export const routes: Routes = [
   },
   {
     path: 'gerente',
+    canActivate: [gerenteGuard],
     loadComponent: () =>
       import('./features/gerente/pages/home/home').then(
         (m) => m.Home,
@@ -71,6 +78,7 @@ export const routes: Routes = [
   },
   {
     path: 'gerente/clientes',
+    canActivate: [gerenteGuard],
     loadComponent: () =>
       import('./features/gerente/pages/clientes/clientes').then(
         (m) => m.Clientes,
@@ -78,6 +86,7 @@ export const routes: Routes = [
   },
   {
     path: 'gerente/relatorio',
+    canActivate: [gerenteGuard],
     loadComponent: () =>
       import('./features/gerente/pages/relatorio/relatorio').then(
         (m) => m.Relatorio,
@@ -85,6 +94,7 @@ export const routes: Routes = [
   },
   {
     path: 'gerente/gerentes',
+    canActivate: [gerenteGuard],
     loadComponent: () =>
       import('./features/gerente/pages/gerentes/gerentes').then(
         (m) => m.Gerentes,
@@ -92,6 +102,7 @@ export const routes: Routes = [
   },
   {
     path: 'gerente/gerentes/novo',
+    canActivate: [gerenteGuard],
     loadComponent: () =>
       import('./features/gerente/pages/novo-gerente/novo-gerente').then(
         (m) => m.NovoGerente,
@@ -99,6 +110,7 @@ export const routes: Routes = [
   },
   {
     path: 'gerente/gerentes/:cpf/editar',
+    canActivate: [gerenteGuard],
     loadComponent: () =>
       import('./features/gerente/pages/editar-gerente/editar-gerente').then(
         (m) => m.EditarGerente,
