@@ -16,9 +16,11 @@ const SERVICOS = [
   { nome: 'auth', url: authServiceUrl },
 ];
 
-// Sessões e jobs são do Gateway; o cache também. Nada disso pode sobreviver a um
-// reboot, senão a correção parte de um estado que não é o do seed.
-const PADROES_REDIS = ['sessao:*', 'job:*', 'cache:*'];
+// Nada disso pode sobreviver a um reboot, senão a correção parte de um estado
+// que não é o do seed. 'saga:*' cobre as três chaves do Orquestrador —
+// saga:<id>, saga:<id>:etapa:<n> e o sorted set saga:timeouts; sem apagar o
+// último, o agendador dispara timeout de uma SAGA que já não existe.
+const PADROES_REDIS = ['sessao:*', 'job:*', 'cache:*', 'saga:*'];
 
 async function resetar({ nome, url }) {
   let resposta;
@@ -28,11 +30,6 @@ async function resetar({ nome, url }) {
     return { nome, ok: false, motivo: err.message };
   }
 
-  // 404 = o serviço ainda não expõe /reset. Não é falha de reboot: o seed dele
-  // nasce no boot. Fica no resumo para ficar visível.
-  if (resposta.status === 404) {
-    return { nome, ok: true, semReset: true };
-  }
   if (!resposta.ok) {
     return { nome, ok: false, motivo: `respondeu ${resposta.status}` };
   }
@@ -88,8 +85,7 @@ async function reboot(req, res) {
     return res.status(502).json({ status: 'erro', message: 'Seed recriado, mas a contagem falhou.' });
   }
 
-  const semReset = resultados.filter((r) => r.semReset).map((r) => r.nome);
-  return res.json({ status: 'ok', ...contagens, ...(semReset.length > 0 ? { semReset } : {}) });
+  return res.json({ status: 'ok', ...contagens });
 }
 
 module.exports = { reboot };

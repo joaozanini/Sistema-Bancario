@@ -75,9 +75,8 @@ test('reseta os quatro servicos e devolve o resumo do enunciado', async () => {
 
     assert.equal(res.codigo, 200);
     assert.equal(res.corpo.status, 'ok');
-    assert.equal(res.corpo.clientes, 5);
-    assert.equal(res.corpo.gerentes, 4);
-    assert.equal(res.corpo.contas, 5);
+    assert.deepEqual(res.corpo, { status: 'ok', clientes: 5, gerentes: 4, contas: 5 },
+      'o resumo é exatamente o formato da seção 5.11');
 
     assert.equal(d.chamadas.reset.length, 4, 'cliente, conta, gerente e auth');
     assert.ok(d.chamadas.reset.every((c) => c.metodo === 'POST'));
@@ -87,26 +86,32 @@ test('reseta os quatro servicos e devolve o resumo do enunciado', async () => {
   }
 });
 
-test('limpa sessoes, jobs e cache do Redis', async () => {
+test('limpa sessoes, jobs, cache e estado das SAGAs do Redis', async () => {
   const d = comDublos();
   try {
     await reboot({}, respostaFalsa());
 
-    assert.deepEqual(d.chamadas.keys, ['sessao:*', 'job:*', 'cache:*']);
-    assert.equal(d.chamadas.del.length, 3, 'cada padrão com chave encontrada é apagado');
+    // saga:* cobre saga:<id>, saga:<id>:etapa:<n> e o sorted set saga:timeouts;
+    // deixar o último faz o agendador do Orquestrador disparar timeout de uma
+    // SAGA que o reboot já apagou
+    assert.deepEqual(d.chamadas.keys, ['sessao:*', 'job:*', 'cache:*', 'saga:*']);
+    assert.equal(d.chamadas.del.length, 4, 'cada padrão com chave encontrada é apagado');
   } finally {
     d.restaurar();
   }
 });
 
-test('servico sem /reset nao quebra o reboot e aparece no resumo', async () => {
-  const d = comDublos({ resetDe: (url) => (url.includes('8081') ? { status: 404 } : { status: 204 }) });
+test('404 em qualquer /reset e falha', async () => {
+  // todos os quatro MSs expõem /reset: um 404 agora é regressão, não tolerância
+  const d = comDublos({ resetDe: (url) => (url.includes('8080') ? { status: 404 } : { status: 204 }) });
+
   try {
     const res = respostaFalsa();
     await reboot({}, res);
 
-    assert.equal(res.codigo, 200);
-    assert.deepEqual(res.corpo.semReset, ['auth'], 'o resumo tem de dizer quem nao foi resetado');
+    assert.equal(res.codigo, 502);
+    assert.equal(res.corpo.servicos.conta, 'respondeu 404');
+    assert.equal(d.chamadas.keys.length, 0);
   } finally {
     d.restaurar();
   }
