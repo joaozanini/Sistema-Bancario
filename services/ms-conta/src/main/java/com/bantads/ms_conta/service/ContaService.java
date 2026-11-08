@@ -696,13 +696,7 @@ public class ContaService {
         if (contaQueryRepository != null) {
             Optional<ContaQuery> queryOpt = contaQueryRepository.findById(numeroConta);
             if (queryOpt.isPresent()) {
-                ContaQuery cq = queryOpt.get();
-                ContaDTO dto = new ContaDTO(cq.getNumeroConta(), cq.getCpfCliente(), cq.getGerenteCpf());
-                dto.addLink("self", "http://localhost:8080/contas/" + numeroConta);
-                dto.addLink("deposito", "http://localhost:8080/contas/" + numeroConta + "/deposito");
-                dto.addLink("saque", "http://localhost:8080/contas/" + numeroConta + "/saque");
-                dto.addLink("extrato", "http://localhost:8080/contas/" + numeroConta + "/extrato");
-                return dto;
+                return montarContaDTO(queryOpt.get());
             }
         }
         List<EventoConta> eventos = repository.findByObjetoIdOrderByVersaoAsc(numeroConta);
@@ -710,7 +704,58 @@ public class ContaService {
             throw new ContaNaoEncontradaException("Conta não encontrada: " + numeroConta);
         }
         EstadoConta estado = reconstruirEstadoPorReplay(eventos);
-        ContaDTO dto = new ContaDTO(numeroConta, estado.getCpfCliente(), estado.getGerenteCpf());
+        return montarContaDTO(numeroConta, estado.getCpfCliente(), estado.getGerenteCpf(), estado.getSaldo());
+    }
+
+    @Transactional
+    public ContaDTO buscarContaPorCpf(String xUserCpf) {
+        if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
+            throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");
+        }
+        String cpfLimpo = xUserCpf.trim();
+
+        if (contaQueryRepository != null) {
+            Optional<ContaQuery> contaQueryOpt = contaQueryRepository.findByCpfCliente(cpfLimpo);
+            if (contaQueryOpt.isPresent()) {
+                String numeroConta = contaQueryOpt.get().getNumeroConta();
+                sincronizarLadoQuerySeNecessario(numeroConta);
+                return buscarContaPorNumero(numeroConta);
+            }
+        }
+
+        // Fallback sincronizando a partir do Event Store caso a projeção assíncrona ainda não tenha processado
+        List<EventoConta> criados = repository.findByTipoIn(List.of("Criado", "CRIADO"));
+        for (EventoConta evento : criados) {
+            JsonNode node = parseJsonNode(evento.getPayload());
+            String cpf = node.has("cpfCliente") ? node.get("cpfCliente").asText()
+                    : (node.has("cpf") ? node.get("cpf").asText() : null);
+            if (cpfLimpo.equals(cpf)) {
+                return buscarContaPorNumero(evento.getObjetoId());
+            }
+        }
+
+        throw new ContaNaoEncontradaException("Conta não encontrada para o cliente: " + cpfLimpo);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ContaDTO> listarContas() {
+        if (contaQueryRepository != null) {
+            return contaQueryRepository.findAll().stream().map(this::montarContaDTO).toList();
+        }
+        List<ContaDTO> contas = new ArrayList<>();
+        for (EventoConta evento : repository.findByTipoIn(List.of("Criado", "CRIADO"))) {
+            contas.add(buscarContaPorNumero(evento.getObjetoId()));
+        }
+        return contas;
+    }
+
+    private ContaDTO montarContaDTO(ContaQuery contaQuery) {
+        return montarContaDTO(contaQuery.getNumeroConta(), contaQuery.getCpfCliente(), contaQuery.getGerenteCpf(), contaQuery.getSaldo());
+    }
+
+    private ContaDTO montarContaDTO(String numeroConta, String cpfCliente, String gerenteCpf, BigDecimal saldo) {
+        ContaDTO dto = new ContaDTO(numeroConta, cpfCliente, gerenteCpf);
+        dto.setSaldo(saldo.setScale(2, RoundingMode.HALF_UP).toString());
         dto.addLink("self", "http://localhost:8080/contas/" + numeroConta);
         dto.addLink("deposito", "http://localhost:8080/contas/" + numeroConta + "/deposito");
         dto.addLink("saque", "http://localhost:8080/contas/" + numeroConta + "/saque");
