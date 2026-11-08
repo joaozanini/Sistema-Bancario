@@ -181,6 +181,26 @@ public class ContaCommandConsumer {
             return RespostaSagaDTO.sucesso(sagaId, tipo, respostaPayload);
         }
 
+        // 7. Compensação de Transferir Contas (Rollback do Passo 5 da SAGA Remover Gerente - R15)
+        if (tipoNorm.contains("transferir-contas.compensar") || tipoNorm.contains("compensar-transferir")) {
+            String gerenteOriginalCpf = extrairString(payload, "gerenteOriginalCpf", "gerenteRemovidoCpf");
+
+            contaService.compensarTransferenciaContas(sagaId, gerenteOriginalCpf);
+
+            Map<String, Object> respostaPayload = new HashMap<>();
+            respostaPayload.put("mensagem", "Compensação de transferência de contas efetuada.");
+            return RespostaSagaDTO.sucesso(sagaId, tipo, respostaPayload);
+        }
+
+        // 8. Transferir Contas do Gerente Removido (Passo 5 da SAGA Remover Gerente - R15)
+        if (tipoNorm.contains("transferir-contas")) {
+            String gerenteRemovidoCpf = extrairString(payload, "gerenteRemovidoCpf", "cpf");
+            List<String> gerentes = extrairListaGerentes(payload);
+
+            Map<String, Object> resultado = contaService.transferirContas(sagaId, gerenteRemovidoCpf, gerentes);
+            return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
+        }
+
         throw new IllegalArgumentException("Tipo de comando não reconhecido pelo MS Conta: " + tipo);
     }
 

@@ -10,6 +10,8 @@ public interface GerenteRepository extends JpaRepository<Gerente, String> {
 
     List<Gerente> findByAtivoTrueOrderByCpf();
 
+    long countByAtivoTrue();
+
     boolean existsByCpf(String cpf);
 
     boolean existsByEmail(String email);
