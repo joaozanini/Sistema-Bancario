@@ -228,6 +228,11 @@ public class ContaService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> atribuirConta(String numeroConta, String novoGerenteCpf, String gerenteAntigoCpf) {
+        return atribuirConta(numeroConta, novoGerenteCpf, gerenteAntigoCpf, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> atribuirConta(String numeroConta, String novoGerenteCpf, String gerenteAntigoCpf, String sagaId) {
         if (numeroConta == null || numeroConta.isBlank()) {
             throw new IllegalArgumentException("Número da conta é obrigatório.");
         }
@@ -247,6 +252,9 @@ public class ContaService {
         payloadMap.put("gerenteCpf", novoGerenteCpf.trim());
         payloadMap.put("gerenteAntigoCpf", gerenteAntigoCpf != null ? gerenteAntigoCpf.trim() : null);
         payloadMap.put("dataAlteracao", agora.toString());
+        if (sagaId != null) {
+            payloadMap.put("sagaId", sagaId);
+        }
 
         EventoConta evento = new EventoConta();
         evento.setId(UUID.randomUUID().toString());
@@ -278,6 +286,57 @@ public class ContaService {
         }
         atribuirConta(numeroConta, gerenteOriginalCpf, null);
         log.warn("Compensação SAGA executada: Conta {} reassociada ao gerente original {}", numeroConta, gerenteOriginalCpf);
+    }
+
+    // SAGA Remover Gerente (R15): todas as contas do removido vao para o ativo com menos clientes, um GerenteAlterado por conta
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> transferirContas(String sagaId, String gerenteRemovidoCpf, List<String> gerentesAtivos) {
+        if (gerenteRemovidoCpf == null || gerenteRemovidoCpf.isBlank()) {
+            throw new IllegalArgumentException("CPF do gerente removido é obrigatório.");
+        }
+
+        List<String> contas = mapearGerenteAtualPorConta().entrySet().stream()
+                .filter(entry -> entry.getValue().equals(gerenteRemovidoCpf.trim()))
+                .map(Map.Entry::getKey)
+                .sorted()
+                .toList();
+
+        List<String> cpfsClientes = new ArrayList<>();
+        if (!contas.isEmpty()) {
+            String novoGerenteCpf = identificarGerenteComMenosClientes(gerentesAtivos);
+            for (String numeroConta : contas) {
+                atribuirConta(numeroConta, novoGerenteCpf, gerenteRemovidoCpf, sagaId);
+                EstadoConta estado = reconstruirEstadoPorReplay(repository.findByObjetoIdOrderByVersaoAsc(numeroConta));
+                cpfsClientes.add(estado.getCpfCliente());
+            }
+        }
+
+        log.info("{} conta(s) do gerente {} transferida(s) na SAGA {}", contas.size(), gerenteRemovidoCpf, sagaId);
+
+        Map<String, Object> resultado = new HashMap<>();
+        resultado.put("contas", contas);
+        resultado.put("cpfsClientes", cpfsClientes);
+        return resultado;
+    }
+
+    // compensacao da R15: as contas movidas nesta SAGA sao achadas pelo sagaId gravado no evento
+    @Transactional(rollbackFor = Exception.class)
+    public void compensarTransferenciaContas(String sagaId, String gerenteOriginalCpf) {
+        if (sagaId == null || gerenteOriginalCpf == null) {
+            return;
+        }
+        List<String> contas = repository.findByTipoIn(List.of("GerenteAlterado", "GERENTEALTERADO")).stream()
+                .filter(evento -> {
+                    JsonNode node = parseJsonNode(evento.getPayload());
+                    return node.has("sagaId") && sagaId.equals(node.get("sagaId").asText());
+                })
+                .map(EventoConta::getObjetoId)
+                .distinct()
+                .toList();
+        for (String numeroConta : contas) {
+            atribuirConta(numeroConta, gerenteOriginalCpf, null);
+        }
+        log.warn("Compensação SAGA executada: {} conta(s) reassociada(s) ao gerente original {}", contas.size(), gerenteOriginalCpf);
     }
 
     /**

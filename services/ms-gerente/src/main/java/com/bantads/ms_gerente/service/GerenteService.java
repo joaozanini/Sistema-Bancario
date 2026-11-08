@@ -5,6 +5,7 @@ import com.bantads.ms_gerente.dto.GerenteDTO;
 import com.bantads.ms_gerente.exception.CpfJaCadastradoException;
 import com.bantads.ms_gerente.exception.EmailJaCadastradoException;
 import com.bantads.ms_gerente.exception.GerenteNaoEncontradoException;
+import com.bantads.ms_gerente.exception.UltimoGerenteAtivoException;
 import com.bantads.ms_gerente.model.Gerente;
 import com.bantads.ms_gerente.repository.GerenteRepository;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,27 @@ public class GerenteService {
     @Transactional
     public void remover(String cpf) {
         repository.deleteById(cpf);
+    }
+
+    // SAGA Remover Gerente (R15): o ultimo gerente ativo do banco nao pode ser removido
+    @Transactional
+    public void inativar(String cpf) {
+        Gerente gerente = repository.findById(cpf)
+                .orElseThrow(() -> new GerenteNaoEncontradoException("Gerente não encontrado."));
+        if (gerente.isAtivo() && repository.countByAtivoTrue() <= 1) {
+            throw new UltimoGerenteAtivoException("Não é permitido remover o último gerente ativo do banco.");
+        }
+        gerente.setAtivo(false);
+        repository.save(gerente);
+    }
+
+    // compensacao da SAGA Remover Gerente (R15)
+    @Transactional
+    public void reativar(String cpf) {
+        repository.findById(cpf).ifPresent(gerente -> {
+            gerente.setAtivo(true);
+            repository.save(gerente);
+        });
     }
 
     @Transactional

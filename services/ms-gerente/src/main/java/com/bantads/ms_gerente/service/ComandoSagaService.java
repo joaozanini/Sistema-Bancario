@@ -17,6 +17,8 @@ import com.bantads.ms_gerente.dto.GerenteDTO;
 import com.bantads.ms_gerente.dto.MensagemSaga;
 import com.bantads.ms_gerente.exception.CpfJaCadastradoException;
 import com.bantads.ms_gerente.exception.EmailJaCadastradoException;
+import com.bantads.ms_gerente.exception.GerenteNaoEncontradoException;
+import com.bantads.ms_gerente.exception.UltimoGerenteAtivoException;
 import com.bantads.ms_gerente.model.Gerente;
 import com.bantads.ms_gerente.model.SagaIdempotencia;
 import com.bantads.ms_gerente.repository.SagaIdempotenciaRepository;
@@ -33,6 +35,9 @@ public class ComandoSagaService {
     // contrato com o InserirGerenteSaga do orquestrador (R13)
     public static final String INSERIR = "gerente.inserir";
     public static final String INSERIR_COMPENSAR = "gerente.inserir.compensar";
+    // contrato com o RemoverGerenteSaga do orquestrador (R15)
+    public static final String INATIVAR = "gerente.inativar";
+    public static final String INATIVAR_COMPENSAR = "gerente.inativar.compensar";
 
     private static final DateTimeFormatter FORMATO_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
@@ -59,6 +64,8 @@ public class ComandoSagaService {
             case LISTAR_ATIVOS -> Optional.of(listarAtivos(comando));
             case INSERIR -> Optional.of(umaVez(comando, this::inserir));
             case INSERIR_COMPENSAR -> Optional.of(umaVez(comando, this::inserirCompensar));
+            case INATIVAR -> Optional.of(umaVez(comando, this::inativar));
+            case INATIVAR_COMPENSAR -> Optional.of(umaVez(comando, this::inativarCompensar));
             default -> Optional.of(MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(),
                     "Tipo de comando nao reconhecido pelo MS Gerente: " + comando.tipo()));
         };
@@ -110,6 +117,27 @@ public class ComandoSagaService {
         String cpf = campo(comando, "cpf");
         gerenteService.remover(cpf);
         log.info("[{}] gerente removido: cpf={} sagaId={}", comando.tipo(), cpf, comando.sagaId());
+        return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of());
+    }
+
+    // recebe { cpf } e responde { cpf }; o ultimo gerente ativo e FALHA (R15)
+    private MensagemSaga inativar(MensagemSaga comando) {
+        String cpf = campo(comando, "cpf");
+        try {
+            gerenteService.inativar(cpf);
+            log.info("[{}] gerente inativado: cpf={} sagaId={}", comando.tipo(), cpf, comando.sagaId());
+            return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of("cpf", cpf));
+        } catch (GerenteNaoEncontradoException | UltimoGerenteAtivoException e) {
+            log.warn("[{}] remocao recusada: {} sagaId={}", comando.tipo(), e.getMessage(), comando.sagaId());
+            return MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(), e.getMessage());
+        }
+    }
+
+    // recebe { cpf } e reativa o gerente
+    private MensagemSaga inativarCompensar(MensagemSaga comando) {
+        String cpf = campo(comando, "cpf");
+        gerenteService.reativar(cpf);
+        log.info("[{}] gerente reativado: cpf={} sagaId={}", comando.tipo(), cpf, comando.sagaId());
         return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of());
     }
 
