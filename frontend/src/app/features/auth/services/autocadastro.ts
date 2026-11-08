@@ -8,7 +8,7 @@ export interface SolicitacaoCadastroRequest {
   cpf: string;
   email: string;
   telefone: string;
-  salario: string; // decimal em string, ex.: "2500.00"
+  salario: string;
   logradouro: string;
   numero: string;
   complemento: string;

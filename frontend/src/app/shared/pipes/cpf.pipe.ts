@@ -1,6 +1,5 @@
 import { Pipe, PipeTransform } from '@angular/core';
 
-/** 12345678900 -> 123.456.789-00 */
 @Pipe({
   name: 'cpf',
   standalone: true,

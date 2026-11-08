@@ -3,7 +3,6 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, concatMap, EmptyError, first, Observable, take, throwError, timer } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
-// Formato do job no Redis (enunciado 5.8)
 export type StatusJob = 'PENDENTE' | 'CONCLUIDO' | 'FALHA';
 
 export interface Job {
@@ -30,7 +29,6 @@ export class JobsService {
 
   private readonly jobsUrl = `${environment.apiUrl}/jobs`;
 
-  // Polling de /jobs/{id}/status até o job sair de PENDENTE (CONCLUIDO ou FALHA)
   aguardar(jobId: string): Observable<Job> {
     return timer(0, INTERVALO_MS).pipe(
       take(MAX_TENTATIVAS),
@@ -46,7 +44,6 @@ export class JobsService {
     );
   }
 
-  // resultType "inline": o resultado vem de /jobs/{id}/result
   resultado<T>(jobId: string): Observable<T> {
     return this.http.get<T>(`${this.jobsUrl}/${jobId}/result`);
   }

@@ -19,7 +19,6 @@ export class Gerentes implements OnInit {
   private auth = inject(AuthService);
   private destroyRef = inject(DestroyRef);
 
-  // R15: o gerente logado não pode remover a si mesmo
   readonly cpfLogado = this.auth.obterUsuario()?.cpf ?? null;
 
   readonly gerentes = signal<GerenteDto[]>([]);
@@ -27,7 +26,6 @@ export class Gerentes implements OnInit {
   readonly erro = signal('');
   readonly mensagem = signal('');
 
-  // Modal de confirmação da remoção
   readonly emRemocao = signal<GerenteDto | null>(null);
   readonly removendo = signal(false);
   readonly erroRemocao = signal('');
@@ -98,7 +96,6 @@ export class Gerentes implements OnInit {
       });
   }
 
-  // 403: auto-remoção (Gateway); FALHA do job: ex. último gerente ativo (vem em job.erro)
   private mensagemDeErro(err: HttpErrorResponse | Error): string {
     if (!(err instanceof HttpErrorResponse)) {
       return err.message;

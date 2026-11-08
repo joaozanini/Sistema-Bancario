@@ -23,7 +23,6 @@ describe('Gerentes', () => {
       providers: [
         provideRouter([]),
         { provide: GerentesService, useValue: gerentesService },
-        // logado como Geniéve
         { provide: AuthService, useValue: { obterUsuario: () => ({ cpf: '98574307084' }) } },
       ],
     }).compileComponents();

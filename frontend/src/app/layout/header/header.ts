@@ -25,7 +25,6 @@ export class HeaderComponent {
   readonly numeroConta = signal<string | null>(null);
 
   constructor() {
-    // R3: o cliente vê o número da sua conta em todas as telas
     if (this.tipo === 'CLIENTE') {
       this.contaService
         .obterResumo()
@@ -38,7 +37,6 @@ export class HeaderComponent {
   }
 }
 
-/** "Roberto Souza" -> "RS" */
 function obterIniciais(nome: string | undefined): string {
   const partes = (nome ?? '').trim().split(/\s+/).filter(Boolean);
   if (partes.length === 0) {

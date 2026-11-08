@@ -78,7 +78,6 @@ export class Register {
       });
   }
 
-  // o MS Cliente devolve 400 { erro } para CPF ou e-mail já usados em outra solicitação
   private mensagemDeErro(err: HttpErrorResponse): string {
     if (err.status === 0) {
       return 'Não foi possível conectar ao servidor. Tente novamente.';

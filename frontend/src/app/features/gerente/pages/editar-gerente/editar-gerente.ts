@@ -85,7 +85,6 @@ export class EditarGerente implements OnInit {
       });
   }
 
-  // o MS Gerente devolve { erro }: 400 sem nome, 404 se o gerente não existe
   private mensagemDeErro(err: HttpErrorResponse, padrao: string): string {
     if (err.status === 0) {
       return 'Não foi possível conectar ao servidor. Tente novamente.';

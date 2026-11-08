@@ -58,7 +58,6 @@ export class SolicitacoesService {
       );
   }
 
-  // R10: o contrato final do recusar vem com a task própria
   recusar(id: string, motivo: string): Observable<void> {
     return this.http
       .post<unknown>(`${this.solicitacoesUrl}/${id}/rejeitar`, { motivo })

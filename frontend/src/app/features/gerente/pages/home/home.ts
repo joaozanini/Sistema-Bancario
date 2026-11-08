@@ -30,7 +30,6 @@ export class Home implements OnInit {
   readonly mensagem = signal('');
   readonly processandoId = signal<string | null>(null);
 
-  // Modal de recusa (R10 exige o motivo)
   readonly emRecusa = signal<Solicitacao | null>(null);
   readonly erroMotivo = signal('');
   motivo = '';
