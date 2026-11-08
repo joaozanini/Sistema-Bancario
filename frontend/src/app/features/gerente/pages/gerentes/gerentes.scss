@@ -168,6 +168,11 @@ tbody td.nome {
   white-space: nowrap;
 }
 
+th.centro,
+td.centro {
+  text-align: center;
+}
+
 .acoes-botoes {
   display: flex;
   justify-content: center;

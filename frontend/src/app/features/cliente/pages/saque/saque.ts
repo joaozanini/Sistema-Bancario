@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import Decimal from 'decimal.js';
 
+import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
 import { SaldoDisponivel } from '../../../../shared/components/saldo-disponivel/saldo-disponivel';
 import { BrlCurrencyPipe } from '../../../../shared/pipes/brl-currency.pipe';
 import { ContaService } from '../../services/conta';
@@ -14,7 +15,7 @@ type EtapaSaque = 'dados' | 'confirmacao' | 'sucesso';
 
 @Component({
   selector: 'app-saque',
-  imports: [FormsModule, RouterLink, BrlCurrencyPipe, SaldoDisponivel],
+  imports: [FormsModule, RouterLink, BrlCurrencyPipe, SaldoDisponivel, MascaraDirective],
   templateUrl: './saque.html',
   styleUrl: './saque.scss',
 })

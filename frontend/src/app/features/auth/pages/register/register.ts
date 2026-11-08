@@ -23,7 +23,7 @@ export class Register {
   cpf = '';
   telefone = '';
   email = '';
-  salario: number | null = null;
+  salario = '';
   logradouro = '';
   numero = '';
   complemento = '';
@@ -57,7 +57,7 @@ export class Register {
         cpf: this.cpf.replace(/\D/g, ''),
         email: this.email.trim(),
         telefone: this.telefone.trim(),
-        salario: new MoneyDecimal(this.salario ?? 0).toFixed(2),
+        salario: new MoneyDecimal(this.salario || 0).toFixed(2),
         logradouro: this.logradouro.trim(),
         numero: this.numero.trim(),
         complemento: this.complemento.trim(),

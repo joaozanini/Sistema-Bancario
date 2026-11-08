@@ -50,6 +50,12 @@ export class Extrato implements OnInit {
     this.consultar();
   }
 
+  alterarPeriodo(): void {
+    if (this.dataInicio && this.dataFim) {
+      this.consultar();
+    }
+  }
+
   consultar(): void {
     const inicio = lerDataInput(this.dataInicio);
     const fim = lerDataInput(this.dataFim);
