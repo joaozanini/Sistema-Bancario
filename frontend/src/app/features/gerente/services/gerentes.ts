@@ -18,7 +18,6 @@ export class GerentesService {
 
   private readonly gerentesUrl = `${environment.apiUrl}/gerentes`;
 
-  // R12: só os ativos, ordenados por nome
   listar(): Observable<GerenteDto[]> {
     return this.http
       .get<GerenteDto[]>(this.gerentesUrl)
@@ -69,7 +68,6 @@ export class GerentesService {
       );
   }
 
-  // R15 é SAGA: o Gateway responde 202 com o jobId e o resultado (inline) sai do polling do job
   remover(cpf: string): Observable<string> {
     return this.http
       .delete<JobAceito>(`${this.gerentesUrl}/${cpf}`, { observe: 'response' })
@@ -96,7 +94,6 @@ export class GerentesService {
   }
 }
 
-// o enunciado só diz "mensagem de sucesso": aceita string ou { mensagem } / { message }
 function mensagemDoResultado(resultado: unknown): string {
   if (typeof resultado === 'string' && resultado.trim()) {
     return resultado;

@@ -40,7 +40,6 @@ describe('JobsService', () => {
     http.expectOne(URL).flush(job('CONCLUIDO'));
     expect(final?.status).toBe('CONCLUIDO');
 
-    // parou de consultar
     vi.advanceTimersByTime(3000);
     http.expectNone(URL);
   });

@@ -164,7 +164,13 @@ tbody td.nome {
 }
 
 .numero {
-  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+th.centro,
+td.centro {
+  text-align: center;
 }
 
 .acoes-botoes {

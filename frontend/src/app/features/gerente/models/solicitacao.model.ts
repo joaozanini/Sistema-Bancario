@@ -11,9 +11,9 @@ export interface SolicitacaoDto {
   nome: string;
   email?: string;
   salario: string;
-  status: string; // "PENDENTE" | "APROVADO" | "NAO_APROVADO"
+  status: string;
   motivoRejeicao?: string | null;
-  dataAprovacaoRejeicao?: string | null; // ISO 8601
+  dataAprovacaoRejeicao?: string | null;
   _links?: Record<string, HateoasLink>;
 }
 

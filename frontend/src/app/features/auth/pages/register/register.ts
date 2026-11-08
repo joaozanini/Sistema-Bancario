@@ -4,13 +4,14 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
 import { Logo } from '../../../../shared/components/logo/logo';
 import { MoneyDecimal } from '../../../../shared/utils/money.util';
 import { AutocadastroService } from '../../services/autocadastro';
 
 @Component({
   selector: 'app-register',
-  imports: [FormsModule, RouterLink, Logo],
+  imports: [FormsModule, RouterLink, Logo, MascaraDirective],
   templateUrl: './register.html',
   styleUrl: './register.scss',
 })
@@ -22,7 +23,7 @@ export class Register {
   cpf = '';
   telefone = '';
   email = '';
-  salario: number | null = null;
+  salario = '';
   logradouro = '';
   numero = '';
   complemento = '';
@@ -56,7 +57,7 @@ export class Register {
         cpf: this.cpf.replace(/\D/g, ''),
         email: this.email.trim(),
         telefone: this.telefone.trim(),
-        salario: new MoneyDecimal(this.salario ?? 0).toFixed(2),
+        salario: new MoneyDecimal(this.salario || 0).toFixed(2),
         logradouro: this.logradouro.trim(),
         numero: this.numero.trim(),
         complemento: this.complemento.trim(),
@@ -78,7 +79,6 @@ export class Register {
       });
   }
 
-  // o MS Cliente devolve 400 { erro } para CPF ou e-mail já usados em outra solicitação
   private mensagemDeErro(err: HttpErrorResponse): string {
     if (err.status === 0) {
       return 'Não foi possível conectar ao servidor. Tente novamente.';

@@ -14,6 +14,8 @@
 
   @if (etapa() === 'dados') {
     <form class="card formulario" (ngSubmit)="continuar()" novalidate>
+      <app-saldo-disponivel [saldo]="saldo()" [carregando]="carregandoConta()" />
+
       <label>
         <span>Conta de origem</span>
         <input
@@ -44,6 +46,7 @@
           <input
             type="text"
             name="valor"
+            appMascara="moeda"
             [(ngModel)]="valor"
             (ngModelChange)="limparErro()"
             inputmode="decimal"

@@ -10,7 +10,8 @@
       <input
         type="date"
         name="dataInicio"
-        [(ngModel)]="dataInicio"
+        [ngModel]="dataInicio"
+        (ngModelChange)="dataInicio = $event; alterarPeriodo()"
         [max]="dataFim || hojeInput"
         required
       >
@@ -21,16 +22,17 @@
       <input
         type="date"
         name="dataFim"
-        [(ngModel)]="dataFim"
+        [ngModel]="dataFim"
+        (ngModelChange)="dataFim = $event; alterarPeriodo()"
         [min]="dataInicio"
         [max]="hojeInput"
         required
       >
     </label>
 
-    <button type="submit" [disabled]="carregando()">
-      {{ carregando() ? 'Consultando...' : 'Consultar' }}
-    </button>
+    <p class="status-consulta" aria-live="polite">
+      {{ carregando() ? 'Atualizando extrato...' : '' }}
+    </p>
 
     @if (erro()) {
       <p class="erro" role="alert">{{ erro() }}</p>

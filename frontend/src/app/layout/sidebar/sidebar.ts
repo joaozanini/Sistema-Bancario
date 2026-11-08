@@ -1,6 +1,6 @@
 
 import { Component, inject } from '@angular/core';
-import { Params, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService, TipoUsuario } from '../../core/services/auth';
 import { Icone } from '../../shared/components/icone/icone';
 import { NomeIcone } from '../../shared/components/icone/icones';
@@ -10,7 +10,6 @@ export interface ItemMenu {
   rotulo: string;
   link: string;
   icone: NomeIcone;
-  queryParams?: Params;
 }
 
 const MENUS: Record<TipoUsuario, ItemMenu[]> = {

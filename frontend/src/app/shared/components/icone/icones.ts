@@ -23,9 +23,13 @@ const rect = (x: number, y: number, width: number, height: number, rx = 1): Form
 const circle = (cx: number, cy: number, r: number): Forma => ({ tipo: 'circle', cx, cy, r });
 
 export const ICONES = {
-  escudo: [
-    path('M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'),
-    path('m9 12 2 2 4-4'),
+  banco: [
+    path('M11.12 2.198a2 2 0 0 1 1.76.006l7.866 3.847c.476.233.31.949-.22.949H3.474c-.53 0-.695-.716-.22-.949z'),
+    path('M6 18v-7'),
+    path('M10 18v-7'),
+    path('M14 18v-7'),
+    path('M18 18v-7'),
+    path('M3 22h18'),
   ],
   painel: [rect(3, 3, 7, 9), rect(14, 3, 7, 5), rect(14, 12, 7, 9), rect(3, 16, 7, 5)],
   deposito: [path('M12 17V3'), path('m6 11 6 6 6-6'), path('M19 21H5')],

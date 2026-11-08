@@ -4,7 +4,6 @@
     @for (item of itens; track item.rotulo) {
       <a
         [routerLink]="item.link"
-        [queryParams]="item.queryParams"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: true }"
         ariaCurrentWhenActive="page"

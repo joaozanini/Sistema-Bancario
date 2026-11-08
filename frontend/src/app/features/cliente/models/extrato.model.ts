@@ -1,30 +1,26 @@
 import Decimal from 'decimal.js';
 import { DateTime } from 'luxon';
 
-/* ---------- DTOs (formato que vem do API Gateway) ---------- */
-
 export interface HateoasLink {
   href: string;
 }
 
 export interface MovimentacaoDto {
-  dataHora: string; // ISO 8601
-  tipo: string; // "DEPOSITO" | "SAQUE" | "TRANSFERENCIA" (aceita acentos e os nomes dos eventos)
+  dataHora: string;
+  tipo: string;
   cpfOrigem?: string | null;
   nomeOrigem?: string | null;
   cpfDestino?: string | null;
   nomeDestino?: string | null;
-  valor: string; // monetário sempre como string
+  valor: string;
 }
 
 export interface ExtratoDto {
   numeroConta: string;
-  saldoAbertura: string; // saldo consolidado ANTES da data inicial
+  saldoAbertura: string;
   movimentacoes: MovimentacaoDto[];
   _links?: Record<string, HateoasLink>;
 }
-
-/* ---------- Modelo da tela ---------- */
 
 export type TipoMovimentacao = 'DEPOSITO' | 'SAQUE' | 'TRANSFERENCIA';
 
@@ -35,9 +31,9 @@ export interface Movimentacao {
   tipo: TipoMovimentacao;
   descricao: string;
   natureza: Natureza;
-  contraparte: string | null; // "De Fulano" / "Para Fulano" (só transferência)
-  valor: Decimal; // sempre positivo
-  valorComSinal: Decimal; // negativo quando é saída
+  contraparte: string | null;
+  valor: Decimal;
+  valorComSinal: Decimal;
 }
 
 export interface DiaExtrato {

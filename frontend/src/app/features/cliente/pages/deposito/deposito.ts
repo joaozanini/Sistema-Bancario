@@ -5,26 +5,26 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import Decimal from 'decimal.js';
 
+import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
+import { SaldoDisponivel } from '../../../../shared/components/saldo-disponivel/saldo-disponivel';
 import { BrlCurrencyPipe } from '../../../../shared/pipes/brl-currency.pipe';
 import { ContaService } from '../../services/conta';
-import { ExtratoService } from '../../services/extrato';
 import { DepositoService } from '../../services/deposito';
-import { periodoPadrao } from '../../utils/linha-do-tempo';
 
 type EtapaDeposito = 'dados' | 'confirmacao' | 'sucesso';
 
 @Component({
   selector: 'app-deposito',
-  imports: [FormsModule, RouterLink, BrlCurrencyPipe],
+  imports: [FormsModule, RouterLink, BrlCurrencyPipe, SaldoDisponivel, MascaraDirective],
   templateUrl: './deposito.html',
   styleUrl: './deposito.scss',
 })
 export class Deposito implements OnInit {
-  private readonly extratoService = inject(ExtratoService);
   private readonly depositoService = inject(DepositoService);
   private readonly contaService = inject(ContaService);
   private readonly destroyRef = inject(DestroyRef);
 
+  readonly saldo = signal<Decimal | null>(null);
   readonly saldoAtual = signal<Decimal | null>(null);
   readonly erroSaldo = signal(false);
 
@@ -38,14 +38,13 @@ export class Deposito implements OnInit {
   valor = '';
 
   ngOnInit(): void {
-    const { inicio, fim } = periodoPadrao();
-
-    this.extratoService
-      .obterExtrato(inicio, fim)
+    this.contaService
+      .obterResumo()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (extrato) => {
-          const numeroConta = extrato.numeroConta?.trim();
+        next: (resumo) => {
+          const numeroConta = resumo.numeroConta?.trim();
+          this.saldo.set(resumo.saldo);
           this.conta.set(numeroConta || null);
           this.erroConta.set(
             numeroConta ? '' : 'A API não retornou o número da conta do cliente.',
