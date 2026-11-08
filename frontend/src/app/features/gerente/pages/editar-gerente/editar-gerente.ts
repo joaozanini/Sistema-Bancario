@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
+import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
 import { CpfPipe } from '../../../../shared/pipes/cpf.pipe';
 import { GerenteDto } from '../../models/gerente.model';
 import { GerentesService } from '../../services/gerentes';
@@ -12,7 +13,7 @@ export const ROTA_LISTAGEM_GERENTES = '/gerente/gerentes';
 
 @Component({
   selector: 'app-editar-gerente',
-  imports: [FormsModule, RouterLink, CpfPipe],
+  imports: [FormsModule, RouterLink, CpfPipe, MascaraDirective],
   templateUrl: './editar-gerente.html',
   styleUrl: './editar-gerente.scss',
 })

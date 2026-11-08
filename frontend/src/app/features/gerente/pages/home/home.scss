@@ -171,7 +171,8 @@ tbody td.nome {
 }
 
 .valor {
-  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 tbody td.motivo {

@@ -4,11 +4,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
 import { GerentesService } from '../../services/gerentes';
 
 @Component({
   selector: 'app-novo-gerente',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, MascaraDirective],
   templateUrl: './novo-gerente.html',
   styleUrl: './novo-gerente.scss',
 })

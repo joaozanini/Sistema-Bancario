@@ -4,13 +4,14 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
 import { Logo } from '../../../../shared/components/logo/logo';
 import { MoneyDecimal } from '../../../../shared/utils/money.util';
 import { AutocadastroService } from '../../services/autocadastro';
 
 @Component({
   selector: 'app-register',
-  imports: [FormsModule, RouterLink, Logo],
+  imports: [FormsModule, RouterLink, Logo, MascaraDirective],
   templateUrl: './register.html',
   styleUrl: './register.scss',
 })

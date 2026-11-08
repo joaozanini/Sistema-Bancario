@@ -112,7 +112,8 @@ tbody td.nome {
 }
 
 .numero {
-  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .negativo {
