@@ -11,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/contas")
 public class ContaController {
@@ -70,6 +72,20 @@ public class ContaController {
     ) {
         ExtratoResponseDTO resposta = service.consultarExtrato(numeroConta, inicio, fim, xUserCpf);
         return ResponseEntity.ok(resposta);
+    }
+
+    @GetMapping("/cliente")
+    public ResponseEntity<ContaDTO> buscarContaDoCliente(
+            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
+    ) {
+        ContaDTO dto = service.buscarContaPorCpf(xUserCpf);
+        return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<ContaDTO>> listarContas() {
+        List<ContaDTO> contas = service.listarContas();
+        return ResponseEntity.ok(contas);
     }
 
     @GetMapping("/{numero}")

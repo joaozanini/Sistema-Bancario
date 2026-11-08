@@ -10,6 +10,7 @@ public class ContaDTO {
     private String numeroConta;
     private String cpfCliente;
     private String gerenteCpf;
+    private String saldo;
 
     @JsonProperty("_links")
     private Map<String, Map<String, String>> _links = new HashMap<>();
@@ -51,6 +52,14 @@ public class ContaDTO {
 
     public void setGerenteCpf(String gerenteCpf) {
         this.gerenteCpf = gerenteCpf;
+    }
+
+    public String getSaldo() {
+        return saldo;
+    }
+
+    public void setSaldo(String saldo) {
+        this.saldo = saldo;
     }
 
     @JsonProperty("_links")
