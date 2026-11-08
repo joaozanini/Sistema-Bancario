@@ -1,0 +1,32 @@
+<svg
+  [attr.width]="tamanho()"
+  [attr.height]="tamanho()"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+  focusable="false"
+>
+  @for (forma of formas(); track $index) {
+    @switch (forma.tipo) {
+      @case ('rect') {
+        <rect
+          [attr.x]="forma.x"
+          [attr.y]="forma.y"
+          [attr.width]="forma.width"
+          [attr.height]="forma.height"
+          [attr.rx]="forma.rx"
+        />
+      }
+      @case ('circle') {
+        <circle [attr.cx]="forma.cx" [attr.cy]="forma.cy" [attr.r]="forma.r" />
+      }
+      @default {
+        <path [attr.d]="forma.d" />
+      }
+    }
+  }
+</svg>

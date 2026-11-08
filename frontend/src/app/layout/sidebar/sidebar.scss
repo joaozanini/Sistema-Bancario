@@ -8,15 +8,12 @@
   padding: 32px 20px;
   display: flex;
   flex-direction: column;
-  background: #182031;
+  background: #0f172a;
   color: #f8fafc;
 }
-.sidebar h2 {
+.logo {
   margin: 0 0 40px;
-  padding: 0 12px;
-  color: white;
-  font-size: 19px;
-  letter-spacing: 1px;
+  padding: 0 8px;
 }
 .sidebar nav {
   display: flex;
@@ -30,18 +27,19 @@
   border-radius: 7px;
   display: flex;
   align-items: center;
+  gap: 12px;
   color: #cbd5e1;
   font-size: 14px;
   text-decoration: none;
 }
 .sidebar a:hover {
   color: white;
-  background: #263349;
+  background: #1e293b;
 }
 .sidebar a.active {
   color: white;
   font-weight: 600;
-  background: #2e4261;
+  background: #1e293b;
 }
 .sidebar a:focus-visible {
   outline: 2px solid #93c5fd;
@@ -56,9 +54,8 @@
     min-height: auto;
     padding: 18px 16px;
   }
-  .sidebar h2 {
+  .logo {
     margin: 0 0 16px;
-    padding: 0 8px;
   }
   .sidebar nav {
     flex-direction: row;
