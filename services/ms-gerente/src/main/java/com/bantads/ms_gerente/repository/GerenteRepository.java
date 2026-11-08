@@ -3,9 +3,12 @@ package com.bantads.ms_gerente.repository;
 import com.bantads.ms_gerente.model.Gerente;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface GerenteRepository extends JpaRepository<Gerente, String> {
+
+    List<Gerente> findByAtivoTrueOrderByCpf();
 
     boolean existsByCpf(String cpf);
 
