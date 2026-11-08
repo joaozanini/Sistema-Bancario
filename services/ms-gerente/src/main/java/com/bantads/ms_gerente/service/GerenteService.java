@@ -29,6 +29,12 @@ public class GerenteService {
                 .toList();
     }
 
+    // compensacao da SAGA Inserir Gerente (R13): remover quem nao existe tambem e sucesso
+    @Transactional
+    public void remover(String cpf) {
+        repository.deleteById(cpf);
+    }
+
     @Transactional
     public GerenteDTO inserir(Gerente novoGerente) {
         if (novoGerente == null) {
