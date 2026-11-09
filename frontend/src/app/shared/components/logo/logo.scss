@@ -10,13 +10,10 @@
 }
 
 .simbolo {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: #2563eb;
-  color: white;
+  width: 40px;
+  height: 40px;
+  display: block;
+  object-fit: contain;
 }
 
 .nome {
