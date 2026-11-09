@@ -176,17 +176,17 @@ test('a constante de insercao bate com o tipo da saga', () => {
   assert.equal(TIPO_INSERIR_GERENTE, 'inserir-gerente');
 });
 
-test('listar responde 200 com a composição de gerentes', async () => {
+test('listar responde 200 com a composição dentro de { gerentes }', async () => {
   const gerentesService = require('../services/gerentes.service');
   const original = gerentesService.listarTodos;
-  const lista = [{ cpf: CPF_ALVO, nome: 'Godophredo', quantidadeClientes: 2 }];
+  const lista = [{ cpf: CPF_ALVO, nome: 'Godophredo', ativo: true, quantidadeClientes: 2 }];
   gerentesService.listarTodos = async () => lista;
 
   try {
     const res = resposta();
     await listar({}, res);
     assert.equal(res.codigo, null);
-    assert.deepEqual(res.corpo, lista);
+    assert.deepEqual(res.corpo, { gerentes: lista });
   } finally {
     gerentesService.listarTodos = original;
   }
