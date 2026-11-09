@@ -17,6 +17,7 @@ public class EmailService {
     public static final String TIPO_SOLICITACAO_NAO_EFETUADA = "email.solicitacao-nao-efetuada";
     public static final String TIPO_TROCA_GERENTE = "email.troca-gerente";
     public static final String TIPO_REMOCAO_GERENTE = "email.remocao-gerente";
+    public static final String TIPO_SOLICITACAO_REJEITADA = "email.solicitacao-rejeitada";
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
@@ -32,7 +33,8 @@ public class EmailService {
         return TIPO_ENVIAR_SENHA.equals(tipo)
                 || TIPO_SOLICITACAO_NAO_EFETUADA.equals(tipo)
                 || TIPO_TROCA_GERENTE.equals(tipo)
-                || TIPO_REMOCAO_GERENTE.equals(tipo);
+                || TIPO_REMOCAO_GERENTE.equals(tipo)
+                || TIPO_SOLICITACAO_REJEITADA.equals(tipo);
     }
 
     public void enviar(ComandoEmail comando) {
@@ -47,7 +49,7 @@ public class EmailService {
         }
 
         String nome = comando.texto("nome") == null ? "cliente" : comando.texto("nome");
-        despachar(destinatario, assunto(comando.tipo()), corpo(comando.tipo(), nome, comando.texto("senha"), null));
+        despachar(destinatario, assunto(comando.tipo()), corpo(comando.tipo(), nome, comando.texto("senha"), null, comando.texto("motivo")));
     }
 
     private boolean ehAvisoDeGerente(String tipo) {
@@ -73,7 +75,7 @@ public class EmailService {
             }
 
             String nome = valor(cliente, "nome") == null ? "cliente" : valor(cliente, "nome");
-            despachar(destinatario, assunto(comando.tipo()), corpo(comando.tipo(), nome, null, nomeGerente));
+            despachar(destinatario, assunto(comando.tipo()), corpo(comando.tipo(), nome, null, nomeGerente, null));
             enviados++;
         }
 
@@ -102,11 +104,12 @@ public class EmailService {
         return switch (tipo) {
             case TIPO_ENVIAR_SENHA -> "BANTADS - sua conta foi aprovada";
             case TIPO_TROCA_GERENTE, TIPO_REMOCAO_GERENTE -> "BANTADS - seu gerente de contas mudou";
+            case TIPO_SOLICITACAO_REJEITADA -> "BANTADS - sua solicitacao de conta foi recusada";
             default -> "BANTADS - sua solicitacao nao foi efetuada";
         };
     }
 
-    private String corpo(String tipo, String nome, String senha, String nomeGerente) {
+    private String corpo(String tipo, String nome, String senha, String nomeGerente, String motivo) {
         return switch (tipo) {
             case TIPO_ENVIAR_SENHA -> ("Ola, %s!%n%nSua conta no BANTADS foi aprovada.%nSua senha de acesso e: %s"
                     + "%n%nRecomendamos trocar a senha apos o primeiro acesso.").formatted(nome, senha);
@@ -115,6 +118,8 @@ public class EmailService {
                     .formatted(nome, nomeGerente == null ? "responsavel" : nomeGerente);
             case TIPO_REMOCAO_GERENTE -> ("Ola, %s!%n%nSeu gerente de contas no BANTADS foi removido e sua conta "
                     + "foi transferida para outro gerente.%n%nNenhuma acao e necessaria da sua parte.").formatted(nome);
+            case TIPO_SOLICITACAO_REJEITADA -> ("Ola, %s!%n%nSua solicitacao de abertura de conta no BANTADS foi recusada."
+                    + "%nMotivo: %s").formatted(nome, motivo);
             default -> ("Ola, %s!%n%nNao foi possivel efetuar sua solicitacao de abertura de conta no BANTADS."
                     + "%nEntre em contato conosco para mais informacoes.").formatted(nome);
         };
