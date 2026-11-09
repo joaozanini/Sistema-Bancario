@@ -2,7 +2,7 @@ package com.bantads.ms_conta.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ContaDTO {
@@ -13,7 +13,7 @@ public class ContaDTO {
     private String saldo;
 
     @JsonProperty("_links")
-    private Map<String, Map<String, String>> _links = new HashMap<>();
+    private Map<String, Map<String, String>> _links = new LinkedHashMap<>();
 
     public ContaDTO() {
     }
@@ -25,9 +25,7 @@ public class ContaDTO {
     }
 
     public void addLink(String rel, String href) {
-        Map<String, String> link = new HashMap<>();
-        link.put("href", href);
-        this._links.put(rel, link);
+        this._links.put(rel, Map.of("href", href));
     }
 
     public String getNumeroConta() {

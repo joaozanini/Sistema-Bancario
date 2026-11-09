@@ -818,7 +818,9 @@ public class ContaService {
         dto.addLink("self", "http://localhost:8080/contas/" + numeroConta);
         dto.addLink("deposito", "http://localhost:8080/contas/" + numeroConta + "/deposito");
         dto.addLink("saque", "http://localhost:8080/contas/" + numeroConta + "/saque");
+        dto.addLink("transferencia", "http://localhost:8080/contas/" + numeroConta + "/transferencia");
         dto.addLink("extrato", "http://localhost:8080/contas/" + numeroConta + "/extrato");
+        dto.addLink("cliente", "http://localhost:8080/clientes/" + cpfCliente);
         return dto;
     }
 
