@@ -160,7 +160,21 @@ public class ContaService {
      */
     @Transactional(readOnly = true)
     public Map<String, Object> identificarContaParaNovoGerente(List<String> gerentesAtivos) {
+        return identificarContaParaNovoGerente(gerentesAtivos, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> identificarContaParaNovoGerente(List<String> gerentesAtivos, String novoGerenteCpf) {
+        // Se a lista de gerentes veio vazia do Orquestrador, descobre os gerentes que já possuem contas
         if (gerentesAtivos == null || gerentesAtivos.isEmpty()) {
+            Map<String, String> gerentePorContaAtual = mapearGerenteAtualPorConta();
+            gerentesAtivos = gerentePorContaAtual.values().stream()
+                    .distinct()
+                    .filter(cpf -> novoGerenteCpf == null || !cpf.equals(novoGerenteCpf.trim()))
+                    .toList();
+        }
+
+        if (gerentesAtivos.isEmpty()) {
             return null;
         }
 
