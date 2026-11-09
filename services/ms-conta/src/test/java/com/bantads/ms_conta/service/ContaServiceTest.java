@@ -574,7 +574,11 @@ class ContaServiceTest {
         assertEquals("12912861012", dto.getCpfCliente());
         assertEquals("98574307084", dto.getGerenteCpf());
         assertNotNull(dto.get_links());
-        assertTrue(dto.get_links().containsKey("self"));
+        assertEquals(
+                List.of("self", "deposito", "saque", "transferencia", "extrato", "cliente"),
+                List.copyOf(dto.get_links().keySet()));
+        assertEquals("http://localhost:8080/contas/1291", dto.get_links().get("self").get("href"));
+        assertEquals("http://localhost:8080/clientes/12912861012", dto.get_links().get("cliente").get("href"));
     }
 
     @Test

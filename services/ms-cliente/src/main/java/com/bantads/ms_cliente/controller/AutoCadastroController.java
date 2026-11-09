@@ -18,6 +18,9 @@ import java.util.stream.Collectors;
 @RequestMapping("/solicitacoes")
 public class AutoCadastroController {
 
+    private static final String SOLICITACOES_URL = "http://localhost:8082/solicitacoes";
+    private static final String CLIENTES_URL = "http://localhost:8082/clientes";
+
     private final AutoCadastroService service;
 
     public AutoCadastroController(AutoCadastroService service) {
@@ -109,8 +112,14 @@ public class AutoCadastroController {
         dto.setMotivoRejeicao(entidade.getMotivoRejeicao());
         dto.setDataAprovacaoRejeicao(entidade.getDataAprovacaoRejeicao());
 
-        // Adiciona links HATEOAS
-        dto.addLink("self", "http://localhost:8081/solicitacoes/" + entidade.getId());
+        // HATEOAS (enunciado 5.6): URL interna do MS; o Gateway reescreve o host para o dele.
+        // Não há GET por id de solicitação, então o item aponta para a coleção e para as ações possíveis.
+        dto.addLink("solicitacoes", SOLICITACOES_URL);
+        if ("PENDENTE".equalsIgnoreCase(entidade.getStatus())) {
+            dto.addLink("aprovar", SOLICITACOES_URL + "/" + entidade.getCpf() + "/aprovar");
+        } else if ("APROVADO".equalsIgnoreCase(entidade.getStatus())) {
+            dto.addLink("cliente", CLIENTES_URL + "/" + entidade.getCpf());
+        }
         return dto;
     }
 }

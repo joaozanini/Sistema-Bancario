@@ -70,9 +70,13 @@ class AutoCadastroControllerTest {
                 .andExpect(jsonPath("$[0].nome").value("Catharyna"))
                 .andExpect(jsonPath("$[0].cpf").value("12912861012"))
                 .andExpect(jsonPath("$[0].status").value("PENDENTE"))
-                .andExpect(jsonPath("$[0]._links.self.href").exists())
+                .andExpect(jsonPath("$[0]._links.solicitacoes.href").value("http://localhost:8082/solicitacoes"))
+                .andExpect(jsonPath("$[0]._links.aprovar.href").value("http://localhost:8082/solicitacoes/12912861012/aprovar"))
+                .andExpect(jsonPath("$[0]._links.cliente").doesNotExist())
                 .andExpect(jsonPath("$[1].nome").value("Cutardo"))
-                .andExpect(jsonPath("$[1].status").value("APROVADO"));
+                .andExpect(jsonPath("$[1].status").value("APROVADO"))
+                .andExpect(jsonPath("$[1]._links.cliente.href").value("http://localhost:8082/clientes/58872160006"))
+                .andExpect(jsonPath("$[1]._links.aprovar").doesNotExist());
     }
 
     @Test

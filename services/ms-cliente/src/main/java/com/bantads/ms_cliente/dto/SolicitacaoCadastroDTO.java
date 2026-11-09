@@ -5,7 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,12 +31,10 @@ public class SolicitacaoCadastroDTO {
     private LocalDateTime dataAprovacaoRejeicao;
     
     @JsonProperty("_links")
-    private Map<String, Map<String, String>> _links = new HashMap<>();
+    private Map<String, Map<String, String>> _links = new LinkedHashMap<>();
     
     public void addLink(String rel, String href) {
-        Map<String, String> link = new HashMap<>();
-        link.put("href", href);
-        this._links.put(rel, link);
+        this._links.put(rel, Map.of("href", href));
     }
 
     @JsonProperty("_links")

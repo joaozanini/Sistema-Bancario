@@ -1,8 +1,11 @@
 package com.bantads.ms_cliente.dto;
 
 import com.bantads.ms_cliente.model.Cliente;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.RoundingMode;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public record ClienteDTO(
         String cpf,
@@ -15,7 +18,11 @@ public record ClienteDTO(
         String complemento,
         String cep,
         String cidade,
-        String uf) {
+        String uf,
+        @JsonProperty("_links") Map<String, Map<String, String>> _links) {
+
+    // Enunciado 5.6: URL interna do MS; o Gateway reescreve o host para o dele
+    private static final String BASE_URL = "http://localhost:8082/clientes";
 
     public static ClienteDTO de(Cliente cliente) {
         return new ClienteDTO(
@@ -29,6 +36,14 @@ public record ClienteDTO(
                 cliente.getComplemento(),
                 cliente.getCep(),
                 cliente.getCidade(),
-                cliente.getUf());
+                cliente.getUf(),
+                criarLinks(cliente.getCpf()));
+    }
+
+    private static Map<String, Map<String, String>> criarLinks(String cpf) {
+        Map<String, Map<String, String>> links = new LinkedHashMap<>();
+        links.put("self", Map.of("href", BASE_URL + "/" + cpf));
+        links.put("clientes", Map.of("href", BASE_URL));
+        return links;
     }
 }
