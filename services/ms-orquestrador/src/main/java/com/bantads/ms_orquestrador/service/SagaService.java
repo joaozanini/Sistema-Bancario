@@ -30,8 +30,8 @@ import com.bantads.ms_orquestrador.saga.DefinicaoSaga;
 import com.bantads.ms_orquestrador.saga.PassoSaga;
 
 /**
- * Motor das SAGAs. Nunca loga payload: a resposta do MS Auth e o comando de
- * e-mail da R9 carregam a senha em claro.
+ * Motor das SAGAs. Nunca loga payload nem os segredos em memoria: a resposta do
+ * MS Auth e o comando de e-mail da R9 carregam a senha em claro.
  */
 @Service
 public class SagaService {
@@ -87,7 +87,7 @@ public class SagaService {
         EstadoSaga estado = new EstadoSaga(mensagem.sagaId(), definicao.tipo(), ETAPA_INICIO,
                 StatusSaga.EM_ANDAMENTO, dados, agora());
         log.info("SAGA iniciada: sagaId={} tipo={}", estado.sagaId(), estado.tipo());
-        executarAPartirDe(estado, definicao, 0, Map.of());
+        executarAPartirDe(estado, definicao, 0);
     }
 
     public void processarResposta(MensagemSaga resposta) {
@@ -180,26 +180,28 @@ public class SagaService {
             payloadResposta.forEach((chave, valor) ->
                     (definicao.chavesTransitorias().contains(chave) ? transitorios : dados).put(chave, valor));
         }
-        executarAPartirDe(estado.comEtapa(estado.etapaAtual(), dados, agora()), definicao,
-                estado.etapaAtual(), transitorios);
+        segredos.acrescentar(estado.sagaId(), transitorios);
+        executarAPartirDe(estado.comEtapa(estado.etapaAtual(), dados, agora()), definicao, estado.etapaAtual());
     }
 
     /**
      * Envia os passos fire-and-forget em sequencia ate o proximo passo que
-     * aguarda resposta, ou conclui a SAGA.
+     * aguarda resposta, ou conclui a SAGA. Os comandos recebem os dados do
+     * estado mais os segredos em memoria daquela SAGA.
      */
-    private void executarAPartirDe(EstadoSaga estado, DefinicaoSaga definicao, int indice,
-            Map<String, Object> transitorios) {
+    private void executarAPartirDe(EstadoSaga estado, DefinicaoSaga definicao, int indice) {
         List<PassoSaga> passos = definicao.passos();
         Map<String, Object> dadosComando = new LinkedHashMap<>(estado.payload());
         dadosComando.putAll(segredos.buscar(estado.sagaId()));
-        dadosComando.putAll(transitorios);
 
         List<Integer> semResposta = new ArrayList<>();
         int proximo = indice;
         while (proximo < passos.size()
                 && (passos.get(proximo).fireAndForget() || !passos.get(proximo).executa(estado.payload()))) {
             if (passos.get(proximo).executa(estado.payload())) {
+                if (faltamDados(estado, definicao, proximo, dadosComando)) {
+                    return;
+                }
                 semResposta.add(proximo);
             } else {
                 log.info("Passo pulado: sagaId={} tipo={}", estado.sagaId(), passos.get(proximo).tipoComando());
@@ -217,12 +219,34 @@ public class SagaService {
             return;
         }
 
+        if (faltamDados(estado, definicao, proximo, dadosComando)) {
+            return;
+        }
         int etapa = proximo + 1;
         PassoSaga passo = passos.get(proximo);
         repository.salvar(estado.comEtapa(etapa, estado.payload(), agora()));
         repository.agendarTimeout(estado.sagaId(), etapa, clock.instant().plus(timeoutPasso));
         enviarSemResposta(estado.sagaId(), passos, semResposta, dadosComando);
         enviar(estado.sagaId(), etapa, passo.fila(), passo.tipoComando(), passo.payloadComando().apply(dadosComando));
+    }
+
+    /**
+     * Um segredo exigido pelo passo sumiu da memoria (o Orquestrador reiniciou
+     * depois de recebe-lo): o passo falha antes do envio e todos os anteriores
+     * sao compensados. So os nomes das chaves vao para o log.
+     */
+    private boolean faltamDados(EstadoSaga estado, DefinicaoSaga definicao, int indice,
+            Map<String, Object> dadosComando) {
+        PassoSaga passo = definicao.passos().get(indice);
+        List<String> faltando = passo.chavesFaltando(dadosComando);
+        if (faltando.isEmpty()) {
+            return false;
+        }
+        log.warn("Dados em memoria ausentes: sagaId={} tipo={} chaves={}",
+                estado.sagaId(), passo.tipoComando(), faltando);
+        compensar(estado.comEtapa(indice, estado.payload(), agora()), definicao,
+                "Dados temporários indisponíveis para o passo " + passo.tipoComando(), true);
+        return true;
     }
 
     private void enviarSemResposta(String sagaId, List<PassoSaga> passos, List<Integer> indices,

@@ -11,8 +11,10 @@ import com.bantads.ms_orquestrador.config.RabbitMQConfig;
 import static com.bantads.ms_orquestrador.saga.DefinicaoSaga.campos;
 
 /**
- * R9. O MS Auth vem logo antes do e-mail para que a senha em claro da resposta
- * dele siga direto para o comando de e-mail sem passar pelo estado no Redis.
+ * R9, na ordem do enunciado (5.9): o MS Auth cria o usuario antes da conta, entao
+ * um e-mail ja usado falha antes de existir conta para compensar. A senha em
+ * claro da resposta do Auth fica so na memoria do Orquestrador ate o comando de
+ * e-mail; se ela se perder (reinicio no meio), o e-mail falha e a SAGA compensa.
  */
 @Component
 public class AprovarClienteSaga implements DefinicaoSaga {
@@ -33,14 +35,15 @@ public class AprovarClienteSaga implements DefinicaoSaga {
             PassoSaga.transacional(RabbitMQConfig.FILA_CLIENTE_CMD,
                     "cliente.criar-cliente", dados -> campos(dados, "cpf"),
                     "cliente.criar-cliente.compensar", (dados, erro) -> campos(dados, "cpf")),
-            PassoSaga.transacional(RabbitMQConfig.FILA_CONTA_CMD,
-                    "conta.criar-conta", dados -> campos(dados, "cpf", "cpfGerente"),
-                    "conta.criar-conta.compensar", (dados, erro) -> campos(dados, "cpf")),
             PassoSaga.transacional(RabbitMQConfig.FILA_AUTH_CMD,
                     "auth.criar-usuario", AprovarClienteSaga::comandoCriarUsuario,
                     "auth.criar-usuario.compensar", (dados, erro) -> campos(dados, "cpf")),
+            PassoSaga.transacional(RabbitMQConfig.FILA_CONTA_CMD,
+                    "conta.criar-conta", dados -> campos(dados, "cpf", "cpfGerente"),
+                    "conta.criar-conta.compensar", (dados, erro) -> campos(dados, "cpf")),
             PassoSaga.fireAndForget(RabbitMQConfig.FILA_EMAIL_CMD,
-                    "email.enviar-senha", dados -> campos(dados, "email", "nome", CHAVE_SENHA)));
+                    "email.enviar-senha", dados -> campos(dados, "email", "nome", CHAVE_SENHA))
+                    .exige(CHAVE_SENHA));
 
     @Override
     public String tipo() {
