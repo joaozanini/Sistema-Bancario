@@ -2,9 +2,10 @@ const sagaService = require('../services/saga.service');
 const gerenteService = require('../services/gerente.service');
 const gerentesService = require('../services/gerentes.service');
 
+// a suíte de testes lê a lista dentro de { gerentes: [...] }
 async function listar(req, res) {
   try {
-    return res.json(await gerentesService.listarTodos());
+    return res.json({ gerentes: await gerentesService.listarTodos() });
   } catch (err) {
     console.error('Falha ao listar gerentes (API Composition):', err.message);
     return res.status(502).json({ message: 'Serviço de gerentes indisponível.' });

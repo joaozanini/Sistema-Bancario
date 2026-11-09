@@ -49,6 +49,7 @@ test('junta a quantidade de clientes aos dados do gerente', async () => {
         cpf: '111',
         email: '111@bantads.com.br',
         telefone: '41999990000',
+        ativo: true,
         quantidadeClientes: 2,
         _links: undefined,
       },
@@ -81,6 +82,20 @@ test('ordena por nome sem deixar os acentuados para o fim', async () => {
   try {
     const nomes = (await listarTodos()).map((g) => g.nome);
     assert.deepEqual(nomes, ['Érica', 'Godophredo', 'Zuleica']);
+  } finally {
+    ms.restaurar();
+  }
+});
+
+test('ordena por nome sem separar maiúsculas de minúsculas', async () => {
+  const ms = comMicrosservicos({
+    gerentes: json([gerente('1', 'bruna'), gerente('2', 'Carla'), gerente('3', 'Ana')]),
+    contas: json([]),
+  });
+
+  try {
+    const nomes = (await listarTodos()).map((g) => g.nome);
+    assert.deepEqual(nomes, ['Ana', 'bruna', 'Carla']);
   } finally {
     ms.restaurar();
   }

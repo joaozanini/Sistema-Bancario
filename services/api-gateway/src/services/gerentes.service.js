@@ -21,6 +21,7 @@ async function listarTodos() {
       cpf: gerente.cpf,
       email: gerente.email,
       telefone: gerente.telefone,
+      ativo: gerente.ativo,
       quantidadeClientes: clientesPorGerente.get(gerente.cpf) ?? 0,
       _links: gerente._links,
     }))
