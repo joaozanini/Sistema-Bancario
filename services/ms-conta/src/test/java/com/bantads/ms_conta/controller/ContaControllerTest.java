@@ -3,6 +3,7 @@ package com.bantads.ms_conta.controller;
 import com.bantads.ms_conta.dto.*;
 import com.bantads.ms_conta.exception.AcessoNegadoException;
 import com.bantads.ms_conta.exception.GlobalExceptionHandler;
+import com.bantads.ms_conta.exception.RegraNegocioException;
 import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.service.ContaService;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +51,7 @@ class ContaControllerTest {
     }
 
     @Test
-    @DisplayName("Deve retornar 200 ao realizar transferência com sucesso")
+    @DisplayName("Deve retornar 201 com origem e destino ao realizar transferência com sucesso (R6)")
     void deveTransferirComSucesso() throws Exception {
         TransferenciaRequestDTO request = new TransferenciaRequestDTO("0950", "250.00");
         TransferenciaResponseDTO response = new TransferenciaResponseDTO();
@@ -59,6 +60,8 @@ class ContaControllerTest {
         response.setValor("250.00");
         response.setDataHora(LocalDateTime.now());
         response.setMensagem("Transferência realizada com sucesso.");
+        response.setOrigem(new TransferenciaResponseDTO.Participante("1291", "12912861012", "Catharyna"));
+        response.setDestino(new TransferenciaResponseDTO.Participante("0950", "09506382000", "Cleuddônio"));
         response.addLink("self", "http://localhost:8080/contas/1291/transferencia");
 
         when(service.transferir(eq("1291"), any(TransferenciaRequestDTO.class), eq("12912861012")))
@@ -68,9 +71,11 @@ class ContaControllerTest {
                         .header("X-User-CPF", "12912861012")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.contaOrigem").value("1291"))
                 .andExpect(jsonPath("$.contaDestino").value("0950"))
+                .andExpect(jsonPath("$.destino.nome").value("Cleuddônio"))
+                .andExpect(jsonPath("$.origem.numero").value("1291"))
                 .andExpect(jsonPath("$.valor").value("250.00"))
                 .andExpect(jsonPath("$._links.self.href").exists());
     }
@@ -262,5 +267,34 @@ class ContaControllerTest {
                 .andExpect(jsonPath("$.cpfCliente").value("12912861012"))
                 .andExpect(jsonPath("$.gerenteCpf").value("98574307084"))
                 .andExpect(jsonPath("$._links.self.href").exists());
+    }
+
+    @Test
+    @DisplayName("Deve retornar 422 ao transferir para a própria conta ou para conta inexistente (R6)")
+    void deveRetornar422QuandoRegraDaTransferenciaViolada() throws Exception {
+        TransferenciaRequestDTO request = new TransferenciaRequestDTO("1291", "10.00");
+
+        when(service.transferir(eq("1291"), any(TransferenciaRequestDTO.class), eq("12912861012")))
+                .thenThrow(new RegraNegocioException("A conta de destino não pode ser igual à conta de origem."));
+
+        mockMvc.perform(post("/contas/1291/transferencia")
+                        .header("X-User-CPF", "12912861012")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.erro").value("A conta de destino não pode ser igual à conta de origem."));
+    }
+
+    @Test
+    @DisplayName("Deve retornar 422 quando o extrato passar de 365 dias (R7)")
+    void deveRetornar422QuandoExtratoPassaDe365Dias() throws Exception {
+        when(service.consultarExtrato("1291", "2020-01-01", "2023-01-01", "12912861012"))
+                .thenThrow(new RegraNegocioException("O intervalo do extrato não pode passar de 365 dias."));
+
+        mockMvc.perform(get("/contas/1291/extrato")
+                        .param("inicio", "2020-01-01")
+                        .param("fim", "2023-01-01")
+                        .header("X-User-CPF", "12912861012"))
+                .andExpect(status().isUnprocessableEntity());
     }
 }

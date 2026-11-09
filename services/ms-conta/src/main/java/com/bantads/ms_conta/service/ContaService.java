@@ -10,6 +10,7 @@ import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
 import com.bantads.ms_conta.dto.TransferenciaResponseDTO;
 import com.bantads.ms_conta.exception.AcessoNegadoException;
 import com.bantads.ms_conta.exception.ContaNaoEncontradaException;
+import com.bantads.ms_conta.exception.RegraNegocioException;
 import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.exception.TransferenciaInvalidaException;
 import com.bantads.ms_conta.model.ContaQuery;
@@ -24,10 +25,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
@@ -36,6 +41,7 @@ import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -45,6 +51,7 @@ public class ContaService {
 
     private static final Logger log = LoggerFactory.getLogger(ContaService.class);
     private static final int MAX_TENTATIVAS_REPLAY = 3;
+    private static final long MAX_DIAS_EXTRATO = 365;
 
     // Até 15 dígitos inteiros e 2 casas decimais, o que cabe no NUMERIC(19, 4). Também barra a notação
     // científica: "1E-99999999" passa no new BigDecimal() e prende a thread por mais de 1 min no setScale
@@ -91,6 +98,23 @@ public class ContaService {
         return acao.get();
     }
 
+    // Optimistic locking (enunciado 5.10): quem perde a disputa pela versão refaz o replay e revalida.
+    // ConcurrencyFailureException cobre o deadlock do Postgres, que não chega como DataIntegrityViolation
+    private <T> T executarComNovoReplay(String operacao, Supplier<T> acao) {
+        for (int tentativa = 1; ; tentativa++) {
+            try {
+                return executarEmTransacao(acao);
+            } catch (DataIntegrityViolationException | ConcurrencyFailureException ex) {
+                if (tentativa >= MAX_TENTATIVAS_REPLAY) {
+                    throw ex;
+                }
+                log.warn("Conflito de versão detectado no {} (tentativa {}/{}). Realizando novo replay...",
+                        operacao, tentativa, MAX_TENTATIVAS_REPLAY);
+                pausarBrevemente(tentativa);
+            }
+        }
+    }
+
     /**
      * SAGA Aprovar Cliente (R9 - Passo 3): Identifica, dentre os gerentes ativos informados,
      * o que possui menos clientes/contas atreladas (gerentes sem conta possuem 0 clientes).
@@ -101,7 +125,8 @@ public class ContaService {
             throw new IllegalArgumentException("Lista de gerentes ativos não pode ser vazia.");
         }
 
-        Map<String, Long> contagemPorGerente = new HashMap<>();
+        // LinkedHashMap: no empate fica o primeiro da lista recebida, e a escolha não muda de uma execução para outra
+        Map<String, Long> contagemPorGerente = new LinkedHashMap<>();
         for (String cpf : gerentesAtivos) {
             if (cpf != null && !cpf.isBlank()) {
                 contagemPorGerente.put(cpf.trim(), 0L);
@@ -141,7 +166,9 @@ public class ContaService {
 
         Map<String, String> gerentePorConta = mapearGerenteAtualPorConta();
 
-        Map<String, List<String>> contasPorGerente = new HashMap<>();
+        // Ordem estável nos empates (mesma quantidade de contas, mesmo saldo): ordem da lista de gerentes
+        // e, dentro de cada gerente, número da conta
+        Map<String, List<String>> contasPorGerente = new LinkedHashMap<>();
         for (String cpf : gerentesAtivos) {
             if (cpf != null && !cpf.isBlank()) {
                 contasPorGerente.put(cpf.trim(), new ArrayList<>());
@@ -155,6 +182,7 @@ public class ContaService {
                 contasPorGerente.get(gerente).add(conta);
             }
         }
+        contasPorGerente.values().forEach(Collections::sort);
 
         int maxContas = 0;
         for (List<String> contas : contasPorGerente.values()) {
@@ -303,7 +331,17 @@ public class ContaService {
 
         List<String> cpfsClientes = new ArrayList<>();
         if (!contas.isEmpty()) {
-            String novoGerenteCpf = identificarGerenteComMenosClientes(gerentesAtivos);
+            // O removido não pode receber as próprias contas, mesmo que ainda apareça na lista de ativos
+            List<String> candidatos = gerentesAtivos == null ? List.of() : gerentesAtivos.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(cpf -> !cpf.isEmpty() && !cpf.equals(gerenteRemovidoCpf.trim()))
+                    .distinct()
+                    .toList();
+            if (candidatos.isEmpty()) {
+                throw new IllegalArgumentException("Não há outro gerente ativo para receber as contas do gerente removido.");
+            }
+            String novoGerenteCpf = identificarGerenteComMenosClientes(candidatos);
             for (String numeroConta : contas) {
                 atribuirConta(numeroConta, novoGerenteCpf, gerenteRemovidoCpf, sagaId);
                 EstadoConta estado = reconstruirEstadoPorReplay(repository.findByObjetoIdOrderByVersaoAsc(numeroConta));
@@ -349,6 +387,12 @@ public class ContaService {
         }
         if (gerenteCpf == null || gerenteCpf.isBlank()) {
             throw new IllegalArgumentException("CPF do gerente é obrigatório para criação de conta.");
+        }
+        // R1: cada cliente tem uma só conta. A idempotência por (sagaId, tipo) não cobre uma segunda SAGA
+        // para o mesmo CPF, e duas contas quebrariam a busca da conta pelo CPF (R3, R7)
+        Optional<String> contaExistente = buscarNumeroContaNoEventStore(cpfCliente.trim());
+        if (contaExistente.isPresent()) {
+            throw new IllegalStateException("O cliente " + cpfCliente.trim() + " já possui a conta " + contaExistente.get() + ".");
         }
 
         String numeroConta;
@@ -444,7 +488,7 @@ public class ContaService {
             throw new TransferenciaInvalidaException("Conta de destino é obrigatória.");
         }
         if (contaOrigem.trim().equals(contaDestino.trim())) {
-            throw new TransferenciaInvalidaException("A conta de destino não pode ser igual à conta de origem.");
+            throw new RegraNegocioException("A conta de destino não pode ser igual à conta de origem.");
         }
 
         if (!formatoValorValido(dto.getValor())) {
@@ -456,22 +500,8 @@ public class ContaService {
             throw new TransferenciaInvalidaException("O valor da transferência deve ser maior que zero.");
         }
 
-        int tentativas = 0;
-        while (tentativas < MAX_TENTATIVAS_REPLAY) {
-            tentativas++;
-            try {
-                return executarEmTransacao(() -> executarTransferencia(contaOrigem, contaDestino, dto, valorTransferencia, xUserCpf));
-            } catch (DataIntegrityViolationException ex) {
-                log.warn("Conflito de versão detectado na transferência (tentativa {}/{}). Realizando novo replay...",
-                        tentativas, MAX_TENTATIVAS_REPLAY);
-                if (tentativas >= MAX_TENTATIVAS_REPLAY) {
-                    throw ex;
-                }
-                pausarBrevemente(tentativas);
-            }
-        }
-
-        throw new IllegalStateException("Falha ao executar transferência.");
+        return executarComNovoReplay("transferência",
+                () -> executarTransferencia(contaOrigem, contaDestino, dto, valorTransferencia, xUserCpf));
     }
 
     private TransferenciaResponseDTO executarTransferencia(
@@ -500,7 +530,8 @@ public class ContaService {
         // Novo replay dos eventos da conta de destino
         List<EventoConta> eventosDestino = repository.findByObjetoIdOrderByVersaoAsc(contaDestino.trim());
         if (eventosDestino.isEmpty()) {
-            throw new ContaNaoEncontradaException("Conta de destino não encontrada: " + contaDestino);
+            // 422 e não 404: o recurso da URL (a conta de origem) existe; o que falha é a regra do R6
+            throw new RegraNegocioException("Conta de destino não encontrada: " + contaDestino);
         }
         EstadoConta estadoDestino = reconstruirEstadoPorReplay(eventosDestino);
 
@@ -545,8 +576,12 @@ public class ContaService {
         eventoDestino.setVersao(proximaVersaoDestino);
         eventoDestino.setTimestamp(agora);
 
-        repository.save(eventoOrigem);
-        repository.save(eventoDestino);
+        // Grava sempre na ordem do número da conta. Em duas transferências cruzadas (A→B e B→A), as duas
+        // disputam primeiro a mesma chave (objeto_id, versao) e uma perde por versão duplicada, que tem
+        // novo replay; na ordem origem→destino cada uma travaria a chave que a outra espera (deadlock)
+        List<EventoConta> novosEventos = new ArrayList<>(List.of(eventoOrigem, eventoDestino));
+        novosEventos.sort(Comparator.comparing(EventoConta::getObjetoId));
+        novosEventos.forEach(repository::save);
         repository.flush();
 
         publicarEventoCqrs(eventoOrigem);
@@ -560,6 +595,8 @@ public class ContaService {
         resposta.setValor(valorStr);
         resposta.setDataHora(agora);
         resposta.setMensagem("Transferência realizada com sucesso.");
+        resposta.setOrigem(new TransferenciaResponseDTO.Participante(contaOrigem.trim(), cpfOrigem, nomeOrigem));
+        resposta.setDestino(new TransferenciaResponseDTO.Participante(contaDestino.trim(), cpfDestino, nomeDestino));
 
         resposta.addLink("self", "http://localhost:8080/contas/" + contaOrigem.trim() + "/transferencia");
         resposta.addLink("deposito", "http://localhost:8080/contas/" + contaOrigem.trim() + "/deposito");
@@ -590,22 +627,7 @@ public class ContaService {
             throw new IllegalArgumentException("O valor do saque deve ser maior que zero.");
         }
 
-        int tentativas = 0;
-        while (tentativas < MAX_TENTATIVAS_REPLAY) {
-            tentativas++;
-            try {
-                return executarEmTransacao(() -> executarSaque(numeroConta, valorSaque, xUserCpf));
-            } catch (DataIntegrityViolationException ex) {
-                log.warn("Conflito de versão detectado no saque (tentativa {}/{}). Realizando novo replay...",
-                        tentativas, MAX_TENTATIVAS_REPLAY);
-                if (tentativas >= MAX_TENTATIVAS_REPLAY) {
-                    throw ex;
-                }
-                pausarBrevemente(tentativas);
-            }
-        }
-
-        throw new IllegalStateException("Falha ao executar saque.");
+        return executarComNovoReplay("saque", () -> executarSaque(numeroConta, valorSaque, xUserCpf));
     }
 
     private MovimentacaoResponseDTO executarSaque(String numeroConta, BigDecimal valorSaque, String xUserCpf) {
@@ -683,22 +705,7 @@ public class ContaService {
             throw new IllegalArgumentException("O valor do depósito deve ser maior que zero.");
         }
 
-        int tentativas = 0;
-        while (tentativas < MAX_TENTATIVAS_REPLAY) {
-            tentativas++;
-            try {
-                return executarEmTransacao(() -> executarDeposito(numeroConta, valorDeposito, xUserCpf));
-            } catch (DataIntegrityViolationException ex) {
-                log.warn("Conflito de versão detectado no depósito (tentativa {}/{}). Realizando novo replay...",
-                        tentativas, MAX_TENTATIVAS_REPLAY);
-                if (tentativas >= MAX_TENTATIVAS_REPLAY) {
-                    throw ex;
-                }
-                pausarBrevemente(tentativas);
-            }
-        }
-
-        throw new IllegalStateException("Falha ao executar depósito.");
+        return executarComNovoReplay("depósito", () -> executarDeposito(numeroConta, valorDeposito, xUserCpf));
     }
 
     private MovimentacaoResponseDTO executarDeposito(String numeroConta, BigDecimal valorDeposito, String xUserCpf) {
@@ -782,30 +789,38 @@ public class ContaService {
             }
         }
 
-        // Fallback sincronizando a partir do Event Store caso a projeção assíncrona ainda não tenha processado
-        List<EventoConta> criados = repository.findByTipoIn(List.of("Criado", "CRIADO"));
-        for (EventoConta evento : criados) {
-            JsonNode node = parseJsonNode(evento.getPayload());
-            String cpf = node.has("cpfCliente") ? node.get("cpfCliente").asText()
-                    : (node.has("cpf") ? node.get("cpf").asText() : null);
-            if (cpfLimpo.equals(cpf)) {
-                return buscarContaPorNumero(evento.getObjetoId());
-            }
-        }
-
-        throw new ContaNaoEncontradaException("Conta não encontrada para o cliente: " + cpfLimpo);
+        // Fallback pelo Event Store caso a projeção assíncrona ainda não tenha processado
+        return buscarNumeroContaNoEventStore(cpfLimpo)
+                .map(this::buscarContaPorNumero)
+                .orElseThrow(() -> new ContaNaoEncontradaException("Conta não encontrada para o cliente: " + cpfLimpo));
     }
 
     @Transactional(readOnly = true)
     public List<ContaDTO> listarContas() {
         if (contaQueryRepository != null) {
-            return contaQueryRepository.findAll().stream().map(this::montarContaDTO).toList();
+            // Ordem estável por número; quem ordena por nome do cliente (R11, R16) é o Gateway, que tem o nome
+            return contaQueryRepository.findAll(Sort.by("numeroConta")).stream().map(this::montarContaDTO).toList();
         }
-        List<ContaDTO> contas = new ArrayList<>();
-        for (EventoConta evento : repository.findByTipoIn(List.of("Criado", "CRIADO"))) {
-            contas.add(buscarContaPorNumero(evento.getObjetoId()));
-        }
-        return contas;
+        return repository.findByTipoIn(List.of("Criado", "CRIADO")).stream()
+                .map(EventoConta::getObjetoId)
+                .distinct()
+                .sorted()
+                .map(this::buscarContaPorNumero)
+                .toList();
+    }
+
+    // Lado command: o evento Criado guarda o CPF do titular. Em ordem de número, para o resultado ser estável
+    private Optional<String> buscarNumeroContaNoEventStore(String cpfCliente) {
+        return repository.findByTipoIn(List.of("Criado", "CRIADO")).stream()
+                .filter(evento -> {
+                    JsonNode node = parseJsonNode(evento.getPayload());
+                    String cpf = node.has("cpfCliente") ? node.get("cpfCliente").asText()
+                            : (node.has("cpf") ? node.get("cpf").asText() : null);
+                    return cpf != null && cpfCliente.equals(cpf.trim());
+                })
+                .map(EventoConta::getObjetoId)
+                .sorted()
+                .findFirst();
     }
 
     private ContaDTO montarContaDTO(ContaQuery contaQuery) {
@@ -839,18 +854,10 @@ public class ContaService {
             }
         }
 
-        // Fallback sincronizando a partir do Event Store caso a projeção assíncrona ainda não tenha processado
-        List<EventoConta> criados = repository.findByTipoIn(List.of("Criado", "CRIADO"));
-        for (EventoConta evento : criados) {
-            JsonNode node = parseJsonNode(evento.getPayload());
-            String cpf = node.has("cpfCliente") ? node.get("cpfCliente").asText()
-                    : (node.has("cpf") ? node.get("cpf").asText() : null);
-            if (cpfLimpo.equals(cpf)) {
-                return consultarExtrato(evento.getObjetoId(), inicioStr, fimStr, cpfLimpo);
-            }
-        }
-
-        throw new ContaNaoEncontradaException("Conta não encontrada para o cliente: " + cpfLimpo);
+        // Fallback pelo Event Store caso a projeção assíncrona ainda não tenha processado
+        return buscarNumeroContaNoEventStore(cpfLimpo)
+                .map(numeroConta -> consultarExtrato(numeroConta, inicioStr, fimStr, cpfLimpo))
+                .orElseThrow(() -> new ContaNaoEncontradaException("Conta não encontrada para o cliente: " + cpfLimpo));
     }
 
     /**
@@ -875,6 +882,10 @@ public class ContaService {
 
         if (inicio.isAfter(fim)) {
             throw new IllegalArgumentException("A data de início deve ser anterior ou igual à data de fim.");
+        }
+        // R7: intervalo máximo de 365 dias (2020-01-01 a 2020-12-31 ainda passa)
+        if (ChronoUnit.DAYS.between(inicio, fim) > MAX_DIAS_EXTRATO) {
+            throw new RegraNegocioException("O intervalo do extrato não pode passar de " + MAX_DIAS_EXTRATO + " dias.");
         }
 
         LocalDateTime dataHoraInicio = inicio.atStartOfDay();
@@ -974,10 +985,19 @@ public class ContaService {
 
     /**
      * Projeta de forma idempotente um EventoConta nas tabelas do lado Query (conta_query e movimentacao_query).
+     * Entrada dos eventos que chegam de fora do Event Store (fila ms.conta.events e seed do reboot).
      */
     @Transactional
     public void projetarEventoNoLadoQuery(EventoConta evento) {
-        if (evento == null || contaQueryRepository == null || movimentacaoQueryRepository == null) {
+        projetarEvento(evento, true);
+    }
+
+    // recebidoDeFora = false quando o evento acabou de ser lido do Event Store pela sincronização: aí ele
+    // existe com certeza e uma lacuna não dispara outra sincronização (evita recursão se o Event Store
+    // tiver um buraco de versão)
+    private void projetarEvento(EventoConta evento, boolean recebidoDeFora) {
+        if (evento == null || evento.getVersao() == null
+                || contaQueryRepository == null || movimentacaoQueryRepository == null) {
             return;
         }
 
@@ -989,6 +1009,13 @@ public class ContaService {
         if ("CRIADO".equals(tipoNorm)) {
             ContaQuery conta = contaQueryRepository.findById(numeroConta).orElseGet(ContaQuery::new);
             if (conta.getUltimaVersao() != null && conta.getUltimaVersao() >= evento.getVersao()) {
+                return;
+            }
+            // A compensação da R9 apaga a conta do Event Store e do lado query. Se o Criado ainda estava na
+            // fila, projetá-lo agora recriaria no lado query uma conta que não existe mais
+            if (recebidoDeFora && !repository.existsById(evento.getId())) {
+                log.warn("Evento Criado {} da conta {} não está mais no Event Store (conta compensada). Ignorado.",
+                        evento.getId(), numeroConta);
                 return;
             }
             conta.setNumeroConta(numeroConta);
@@ -1012,30 +1039,44 @@ public class ContaService {
         }
 
         Optional<ContaQuery> contaOpt = contaQueryRepository.findById(numeroConta);
-        if (contaOpt.isEmpty()) {
+        int ultimaVersaoProjetada = contaOpt.map(ContaQuery::getUltimaVersao).orElse(0);
+        if (evento.getVersao() <= ultimaVersaoProjetada) {
+            return; // reentrega (at-least-once): esta versão já foi aplicada
+        }
+        if (contaOpt.isEmpty() || evento.getVersao() > ultimaVersaoProjetada + 1) {
+            if (!recebidoDeFora) {
+                log.error("Event Store da conta {} sem a versão {}: projeção interrompida em v{}.",
+                        numeroConta, ultimaVersaoProjetada + 1, ultimaVersaoProjetada);
+                return;
+            }
+            // Lacuna: uma versão anterior não chegou (publicação perdida ou Criado ainda na fila). Aplicar
+            // esta fora de ordem adiantaria ultima_versao e a anterior nunca mais seria projetada. Refaz a
+            // partir do Event Store, a fonte da verdade, em ordem de versão (inclui este evento)
+            log.warn("Lacuna na projeção da conta {}: projetada até v{}, recebida v{}. Sincronizando pelo Event Store.",
+                    numeroConta, ultimaVersaoProjetada, evento.getVersao());
+            sincronizarLadoQuerySeNecessario(numeroConta);
             return;
         }
         ContaQuery conta = contaOpt.get();
 
         if ("GERENTEALTERADO".equals(tipoNorm)) {
-            if (conta.getUltimaVersao() < evento.getVersao()) {
-                if (payload.has("gerenteCpf")) {
-                    conta.setGerenteCpf(payload.get("gerenteCpf").asText());
-                } else if (payload.has("cpfGerente")) {
-                    conta.setGerenteCpf(payload.get("cpfGerente").asText());
-                }
-                conta.setUltimaVersao(evento.getVersao());
-                contaQueryRepository.save(conta);
+            if (payload.has("gerenteCpf")) {
+                conta.setGerenteCpf(payload.get("gerenteCpf").asText());
+            } else if (payload.has("cpfGerente")) {
+                conta.setGerenteCpf(payload.get("cpfGerente").asText());
             }
+            conta.setUltimaVersao(evento.getVersao());
+            contaQueryRepository.save(conta);
             return;
         }
 
-        if (movimentacaoQueryRepository.existsById(evento.getId())) {
-            return;
-        }
-
-        MovimentacaoQuery mov = construirMovimentacaoQuery(evento, conta.getCpfCliente());
+        MovimentacaoQuery mov = movimentacaoQueryRepository.existsById(evento.getId())
+                ? null
+                : construirMovimentacaoQuery(evento, conta.getCpfCliente());
         if (mov == null) {
+            // Movimentação já gravada ou evento sem efeito no saldo: só avança a versão, para não abrir lacuna
+            conta.setUltimaVersao(evento.getVersao());
+            contaQueryRepository.save(conta);
             return;
         }
 
@@ -1046,9 +1087,7 @@ public class ContaService {
         } else {
             conta.setSaldo(conta.getSaldo().subtract(mov.getValor()).setScale(2, RoundingMode.HALF_UP));
         }
-        if (evento.getVersao() > conta.getUltimaVersao()) {
-            conta.setUltimaVersao(evento.getVersao());
-        }
+        conta.setUltimaVersao(evento.getVersao());
         contaQueryRepository.save(conta);
     }
 
@@ -1067,7 +1106,7 @@ public class ContaService {
         if (ultimaVersaoProjetada < ultimaVersaoEventos) {
             for (EventoConta evento : eventos) {
                 if (evento.getVersao() > ultimaVersaoProjetada) {
-                    projetarEventoNoLadoQuery(evento);
+                    projetarEvento(evento, false);
                 }
             }
         }
@@ -1254,13 +1293,31 @@ public class ContaService {
         return estado;
     }
 
+    // O lado query só pode ver eventos que foram de fato gravados. Dentro de uma transação a publicação
+    // espera o commit: se a R15 falhar na terceira conta, ou o depósito perder a disputa de versão, o
+    // rollback desfaz os eventos e nada chega a ms.conta.events
     private void publicarEventoCqrs(EventoConta evento) {
-        if (rabbitTemplate != null) {
-            try {
-                rabbitTemplate.convertAndSend(RabbitMQConfig.FILA_CONTA_EVENTS, evento);
-            } catch (Exception e) {
-                log.warn("Não foi possível publicar evento CQRS na fila {}: {}", RabbitMQConfig.FILA_CONTA_EVENTS, e.getMessage());
-            }
+        if (rabbitTemplate == null) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    enviarEventoCqrs(evento);
+                }
+            });
+        } else {
+            enviarEventoCqrs(evento);
+        }
+    }
+
+    private void enviarEventoCqrs(EventoConta evento) {
+        try {
+            rabbitTemplate.convertAndSend(RabbitMQConfig.FILA_CONTA_EVENTS, evento);
+        } catch (Exception e) {
+            // Sem retentativa aqui: a lacuna de versão é recuperada pelo Event Store no próximo evento ou consulta
+            log.warn("Não foi possível publicar evento CQRS na fila {}: {}", RabbitMQConfig.FILA_CONTA_EVENTS, e.getMessage());
         }
     }
 
