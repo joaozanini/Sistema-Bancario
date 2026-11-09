@@ -42,12 +42,15 @@ class SagaServiceTest {
     private static final String CPF = "12912861012";
     private static final String EMAIL = "cli1@bantads.com.br";
     private static final Instant AGORA = Instant.parse("2026-04-30T10:00:00Z");
+    private static final String SENHA = "Xy7-senha-gerada";
 
     private record Publicada(String fila, MensagemSaga mensagem) {
     }
 
     private final SagaRepository repository = mock(SagaRepository.class);
     private final SagaPublisher publisher = mock(SagaPublisher.class);
+    private final Clock clock = Clock.fixed(AGORA, ZoneOffset.UTC);
+    private SegredosSaga segredos = new SegredosSaga();
 
     private final Map<String, EstadoSaga> estados = new HashMap<>();
     private final List<EstadoSaga> salvos = new ArrayList<>();
@@ -71,8 +74,11 @@ class SagaServiceTest {
         doAnswer(inv -> publicadas.add(new Publicada(inv.getArgument(0), inv.getArgument(1))))
                 .when(publisher).publicar(anyString(), any());
 
-        Clock clock = Clock.fixed(AGORA, ZoneOffset.UTC);
-        service = new SagaService(List.of(new AprovarClienteSaga()), repository, publisher, new SegredosSaga(),
+        service = novoOrquestrador();
+    }
+
+    private SagaService novoOrquestrador() {
+        return new SagaService(List.of(new AprovarClienteSaga()), repository, publisher, segredos,
                 clock, Duration.ofSeconds(30));
     }
 
@@ -139,8 +145,8 @@ class SagaServiceTest {
                 "gerente.listar-ativos",
                 "conta.escolher-gerente",
                 "cliente.criar-cliente",
-                "conta.criar-conta",
                 "auth.criar-usuario",
+                "conta.criar-conta",
                 "email.enviar-senha");
         assertThat(mensagem("conta.escolher-gerente").payload())
                 .containsEntry("gerentes", List.of("98574307084", "64065268052"));
@@ -149,9 +155,10 @@ class SagaServiceTest {
         assertThat(mensagem("auth.criar-usuario").payload())
                 .containsExactlyInAnyOrderEntriesOf(Map.of("cpf", CPF, "email", EMAIL, "tipo", "CLIENTE"));
 
+        // a senha da resposta do Auth atravessa o passo da Conta e chega ao e-mail
         assertThat(ultima().fila()).isEqualTo("ms.email.cmd");
         assertThat(ultima().mensagem().payload()).containsExactlyInAnyOrderEntriesOf(
-                Map.of("email", EMAIL, "nome", "Catharyna", "senha", "Xy7-senha-gerada"));
+                Map.of("email", EMAIL, "nome", "Catharyna", "senha", SENHA));
 
         EstadoSaga estado = estados.get(SAGA_ID);
         assertThat(estado.status()).isEqualTo(StatusSaga.CONCLUIDA);
@@ -168,18 +175,78 @@ class SagaServiceTest {
         assertThat(salvos).isNotEmpty()
                 .allSatisfy(estado -> assertThat(estado.payload()).doesNotContainKey("senha"));
         assertThat(salvos).allSatisfy(estado -> assertThat(estado.payload().values())
-                .doesNotContain("Xy7-senha-gerada"));
+                .doesNotContain(SENHA));
+    }
+
+    @Test
+    void senhaFicaEmMemoriaEntreAuthEEmail() {
+        iniciar();
+        responderPassos(5);
+
+        assertThat(ultima().mensagem().tipo()).isEqualTo("conta.criar-conta");
+        assertThat(segredos.buscar(SAGA_ID)).containsExactlyEntriesOf(Map.of("senha", SENHA));
+        assertThat(estados.get(SAGA_ID).payload()).doesNotContainKey("senha");
+    }
+
+    @Test
+    void memoriaLimpaDepoisDoEnvioDoEmail() {
+        iniciar();
+        responderPassos(6);
+
+        assertThat(ultima().mensagem().tipo()).isEqualTo("email.enviar-senha");
+        assertThat(segredos.buscar(SAGA_ID)).isEmpty();
+    }
+
+    @Test
+    void memoriaLimpaDepoisDaCompensacao() {
+        iniciar();
+        responderPassos(5);
+
+        falhar("conta.criar-conta", "Erro ao gravar conta");
+
+        assertThat(estados.get(SAGA_ID).status()).isEqualTo(StatusSaga.FALHA);
+        assertThat(segredos.buscar(SAGA_ID)).isEmpty();
+    }
+
+    @Test
+    void reinicioEntreAuthEEmailCompensaTudoSemEnviarSenha() {
+        iniciar();
+        responderPassos(5);
+        publicadas.clear();
+        // o processo reinicia: o estado continua no Redis, a memoria nao
+        segredos = new SegredosSaga();
+        service = novoOrquestrador();
+
+        sucesso("conta.criar-conta", Map.of("numeroConta", "4821"));
+
+        assertThat(tipos()).containsExactly(
+                "conta.criar-conta.compensar",
+                "auth.criar-usuario.compensar",
+                "cliente.criar-cliente.compensar",
+                "cliente.aprovar-solicitacao.compensar",
+                "email.solicitacao-nao-efetuada");
+        assertThat(mensagem("auth.criar-usuario.compensar").payload())
+                .containsExactlyEntriesOf(Map.of("cpf", CPF));
+        assertThat(mensagem("cliente.aprovar-solicitacao.compensar").payload())
+                .containsExactlyInAnyOrderEntriesOf(Map.of("cpf", CPF, "statusSolicitacao", "PENDENTE"));
+        assertThat(estados.get(SAGA_ID).status()).isEqualTo(StatusSaga.FALHA);
+        assertThat(segredos.buscar(SAGA_ID)).isEmpty();
+
+        ArgumentCaptor<Job> job = ArgumentCaptor.forClass(Job.class);
+        verify(repository).salvarJob(job.capture());
+        assertThat(job.getValue().status()).isEqualTo(StatusJob.FALHA);
     }
 
     @Test
     void falhaCompensaEmOrdemInversaEAvisaCliente() {
         iniciar();
-        responderPassos(4);
+        responderPassos(5);
         publicadas.clear();
 
         falhar("conta.criar-conta", "Erro ao gravar conta");
 
         assertThat(tipos()).containsExactly(
+                "auth.criar-usuario.compensar",
                 "cliente.criar-cliente.compensar",
                 "cliente.aprovar-solicitacao.compensar",
                 "email.solicitacao-nao-efetuada");
@@ -195,15 +262,15 @@ class SagaServiceTest {
     }
 
     @Test
-    void loginDuplicadoMarcaSolicitacaoComoNaoAprovada() {
+    void loginDuplicadoNaoCriaContaEMarcaSolicitacaoComoNaoAprovada() {
         iniciar();
-        responderPassos(5);
-        publicadas.clear();
+        responderPassos(4);
+        int antesDoAuth = publicadas.size();
 
         falhar("auth.criar-usuario", AprovarClienteSaga.ERRO_LOGIN_DUPLICADO);
 
-        assertThat(tipos()).containsExactly(
-                "conta.criar-conta.compensar",
+        assertThat(tipos()).doesNotContain("conta.criar-conta", "conta.criar-conta.compensar");
+        assertThat(tipos().subList(antesDoAuth, publicadas.size())).containsExactly(
                 "cliente.criar-cliente.compensar",
                 "cliente.aprovar-solicitacao.compensar",
                 "email.solicitacao-nao-efetuada");
@@ -228,7 +295,7 @@ class SagaServiceTest {
         service.processarTimeout(new TimeoutPasso(SAGA_ID, 5));
 
         assertThat(tipos()).containsExactly(
-                "conta.criar-conta.compensar",
+                "auth.criar-usuario.compensar",
                 "cliente.criar-cliente.compensar",
                 "cliente.aprovar-solicitacao.compensar",
                 "email.solicitacao-nao-efetuada");
@@ -330,7 +397,7 @@ class SagaServiceTest {
     void compensacaoNaDlqSoEhRegistrada() {
         iniciar();
         responderPassos(4);
-        falhar("conta.criar-conta", "Erro ao gravar conta");
+        falhar("auth.criar-usuario", "Erro ao gravar usuario");
         int enviadas = publicadas.size();
         int gravacoes = salvos.size();
 
@@ -350,8 +417,8 @@ class SagaServiceTest {
                 () -> sucesso("gerente.listar-ativos", Map.of("gerentes", List.of("98574307084", "64065268052"))),
                 () -> sucesso("conta.escolher-gerente", Map.of("cpfGerente", "98574307084")),
                 () -> sucesso("cliente.criar-cliente", Map.of()),
-                () -> sucesso("conta.criar-conta", Map.of("numeroConta", "4821")),
-                () -> sucesso("auth.criar-usuario", Map.of("senha", "Xy7-senha-gerada")));
+                () -> sucesso("auth.criar-usuario", Map.of("senha", SENHA)),
+                () -> sucesso("conta.criar-conta", Map.of("numeroConta", "4821")));
         respostas.subList(0, quantidade).forEach(Runnable::run);
     }
 

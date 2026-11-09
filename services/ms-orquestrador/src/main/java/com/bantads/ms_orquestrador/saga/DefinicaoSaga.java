@@ -18,10 +18,6 @@ public interface DefinicaoSaga {
     String resourceId(Map<String, Object> dados);
 
     /**
-     * Chaves de resposta que seguem apenas para o comando seguinte e nunca
-     * entram no estado salvo no Redis.
-     */
-    /**
      * Job gravado quando a SAGA conclui. Por padrao aponta para o recurso criado
      * (resultType "resource"); a SAGA que devolve so uma mensagem usa "inline".
      */
@@ -29,6 +25,11 @@ public interface DefinicaoSaga {
         return Job.concluidoComRecurso(sagaId, dominioJob(), resourceId(dados));
     }
 
+    /**
+     * Chaves de resposta que ficam so na memoria do Orquestrador, disponiveis para
+     * todos os comandos seguintes da SAGA ate ela terminar, e nunca entram no
+     * estado salvo no Redis.
+     */
     default Set<String> chavesTransitorias() {
         return Set.of();
     }
