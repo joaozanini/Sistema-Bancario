@@ -4,6 +4,7 @@ import com.bantads.ms_conta.config.RabbitMQConfig;
 import com.bantads.ms_conta.dto.*;
 import com.bantads.ms_conta.exception.AcessoNegadoException;
 import com.bantads.ms_conta.exception.ContaNaoEncontradaException;
+import com.bantads.ms_conta.exception.RegraNegocioException;
 import com.bantads.ms_conta.exception.SaldoInsuficienteException;
 import com.bantads.ms_conta.exception.TransferenciaInvalidaException;
 import com.bantads.ms_conta.model.ContaQuery;
@@ -24,7 +25,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -275,13 +279,18 @@ class ContaServiceTest {
         List<EventoConta> eventosSalvos = captor.getAllValues();
         assertEquals(2, eventosSalvos.size());
 
-        EventoConta evtOrigem = eventosSalvos.get(0);
+        // Gravados em ordem de número da conta (0950 antes de 1291), para transferências cruzadas não travarem
+        EventoConta evtDestino = eventosSalvos.get(0);
+        EventoConta evtOrigem = eventosSalvos.get(1);
+        assertEquals("Cleuddônio", response.getDestino().getNome());
+        assertEquals("09506382000", response.getDestino().getCpf());
+        assertEquals(contaOrigem, response.getOrigem().getNumero());
+
         assertEquals(contaOrigem, evtOrigem.getObjetoId());
         assertEquals("TransferênciaOrigem", evtOrigem.getTipo());
         assertEquals(3, evtOrigem.getVersao());
         assertTrue(evtOrigem.getPayload().contains("\"valor\":\"350.00\""));
 
-        EventoConta evtDestino = eventosSalvos.get(1);
         assertEquals(contaDestino, evtDestino.getObjetoId());
         assertEquals("TransferênciaDestino", evtDestino.getTipo());
         assertEquals(2, evtDestino.getVersao());
@@ -370,7 +379,8 @@ class ContaServiceTest {
         request.setContaDestino(contaDestino);
         request.setValor("100.00");
 
-        assertThrows(ContaNaoEncontradaException.class, () ->
+        // 422 (regra do R6), não 404: a conta da URL existe
+        assertThrows(RegraNegocioException.class, () ->
                 service.transferir(contaOrigem, request, "12912861012")
         );
 
@@ -384,7 +394,7 @@ class ContaServiceTest {
         request.setContaDestino("1291");
         request.setValor("100.00");
 
-        assertThrows(TransferenciaInvalidaException.class, () ->
+        assertThrows(RegraNegocioException.class, () ->
                 service.transferir("1291", request, "12912861012")
         );
 
@@ -678,6 +688,7 @@ class ContaServiceTest {
         );
 
         when(contaQueryRepository.findById(numeroConta)).thenReturn(Optional.empty());
+        when(repository.existsById(evtCriado.getId())).thenReturn(true);
 
         service.projetarEventoNoLadoQuery(evtCriado);
 
@@ -709,5 +720,182 @@ class ContaServiceTest {
         assertEquals("ENTRADA", movCaptor.getValue().getNatureza());
         assertEquals(new BigDecimal("500.00"), movCaptor.getValue().getValor());
         assertEquals(new BigDecimal("500.00"), contaSalva.getSaldo());
+    }
+
+    // ------------------------------- casos de borda do Event Store -------------------------------
+
+    private ContaQuery contaProjetada(String numeroConta, String cpf, String saldo, int ultimaVersao) {
+        ContaQuery conta = new ContaQuery();
+        conta.setNumeroConta(numeroConta);
+        conta.setCpfCliente(cpf);
+        conta.setGerenteCpf("98574307084");
+        conta.setSaldo(new BigDecimal(saldo));
+        conta.setDataCriacao(LocalDateTime.of(2026, 10, 1, 9, 0));
+        conta.setUltimaVersao(ultimaVersao);
+        return conta;
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar com 422 extrato de mais de 365 dias e aceitar exatamente 365 (R7)")
+    void deveRejeitarExtratoComMaisDe365Dias() {
+        assertThrows(RegraNegocioException.class, () ->
+                service.consultarExtrato("1291", "2020-01-01", "2023-01-01", "12912861012"));
+        assertThrows(RegraNegocioException.class, () ->
+                service.consultarExtrato("1291", "2021-01-01", "2022-01-02", "12912861012"));
+
+        when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of(
+                criarEventoComData("1291", "Criado", "{\"cpfCliente\":\"12912861012\"}", 1, LocalDateTime.of(2019, 1, 1, 0, 0))
+        ));
+        when(contaQueryRepository.findById("1291")).thenReturn(Optional.of(contaProjetada("1291", "12912861012", "0.00", 1)));
+
+        ExtratoResponseDTO extrato = service.consultarExtrato("1291", "2020-01-01", "2020-12-31", "12912861012");
+        assertNotNull(extrato);
+    }
+
+    @Test
+    @DisplayName("Não deve criar uma segunda conta para o mesmo CPF (R1: uma conta por cliente)")
+    void naoDeveCriarSegundaContaParaMesmoCpf() {
+        when(repository.findByTipoIn(anyList())).thenReturn(List.of(
+                criarEvento("1291", "Criado", "{\"cpfCliente\":\"12912861012\",\"gerenteCpf\":\"98574307084\"}", 1)
+        ));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                service.criarConta("12912861012", "98574307084", "5000.00"));
+
+        assertTrue(ex.getMessage().contains("1291"));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("R15 nunca devolve as contas ao próprio gerente removido, mesmo que ele venha na lista de ativos")
+    void naoDeveTransferirContasParaOProprioGerenteRemovido() {
+        String removido = "98574307084";
+        String outro = "64065268052";
+        // o removido tem 1 conta e o outro tem 2: sem o filtro, o "menos clientes" seria o próprio removido
+        when(repository.findByTipoIn(anyList())).thenReturn(List.of(
+                criarEvento("1291", "Criado", "{\"cpfCliente\":\"111\",\"gerenteCpf\":\"" + removido + "\"}", 1),
+                criarEvento("0950", "Criado", "{\"cpfCliente\":\"222\",\"gerenteCpf\":\"" + outro + "\"}", 1),
+                criarEvento("8573", "Criado", "{\"cpfCliente\":\"333\",\"gerenteCpf\":\"" + outro + "\"}", 1)
+        ));
+        when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of(
+                criarEvento("1291", "Criado", "{\"cpfCliente\":\"111\",\"gerenteCpf\":\"" + removido + "\"}", 1)
+        ));
+
+        Map<String, Object> resultado = service.transferirContas("saga-1", removido, List.of(removido, outro));
+
+        assertEquals(List.of("1291"), resultado.get("contas"));
+        ArgumentCaptor<EventoConta> captor = ArgumentCaptor.forClass(EventoConta.class);
+        verify(repository).save(captor.capture());
+        assertTrue(captor.getValue().getPayload().contains("\"gerenteCpf\":\"" + outro + "\""));
+    }
+
+    @Test
+    @DisplayName("R15 falha quando não há outro gerente ativo para receber as contas")
+    void deveFalharTransferenciaDeContasSemOutroGerente() {
+        String removido = "98574307084";
+        when(repository.findByTipoIn(anyList())).thenReturn(List.of(
+                criarEvento("1291", "Criado", "{\"gerenteCpf\":\"" + removido + "\"}", 1)
+        ));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                service.transferirContas("saga-1", removido, List.of(removido)));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("No empate de clientes, o gerente escolhido é sempre o primeiro da lista (R9)")
+    void deveDesempatarGerenteComMenosClientesPelaOrdemDaLista() {
+        when(repository.findByTipoIn(anyList())).thenReturn(List.of());
+
+        for (int i = 0; i < 5; i++) {
+            assertEquals("33333333333", service.identificarGerenteComMenosClientes(
+                    List.of("33333333333", "11111111111", "22222222222")));
+        }
+    }
+
+    @Test
+    @DisplayName("Deve refazer o replay também em deadlock entre transferências cruzadas")
+    void deveFazerNovoReplayEmDeadlock() {
+        String cpf = "12912861012";
+        when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of(
+                criarEvento("1291", "Criado", "{\"cpfCliente\":\"" + cpf + "\",\"saldo\":\"1000.00\"}", 1)
+        ));
+        when(repository.findByObjetoIdOrderByVersaoAsc("0950")).thenReturn(List.of(
+                criarEvento("0950", "Criado", "{\"cpfCliente\":\"09506382000\"}", 1)
+        ));
+        doThrow(new CannotAcquireLockException("deadlock detected"))
+                .doNothing()
+                .when(repository).flush();
+
+        TransferenciaResponseDTO response = service.transferir("1291", new TransferenciaRequestDTO("0950", "10.00"), cpf);
+
+        assertNotNull(response);
+        verify(repository, times(2)).findByObjetoIdOrderByVersaoAsc("1291");
+    }
+
+    @Test
+    @DisplayName("Dentro de uma transação, o evento só vai para ms.conta.events depois do commit")
+    void devePublicarEventoSomenteDepoisDoCommit() {
+        when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of(
+                criarEvento("1291", "Criado", "{\"cpfCliente\":\"12912861012\"}", 1)
+        ));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.depositar("1291", new MovimentacaoRequestDTO("50.00"), "12912861012");
+            verify(rabbitTemplate, never()).convertAndSend(anyString(), any(Object.class));
+
+            TransactionSynchronizationUtils.invokeAfterCommit(TransactionSynchronizationManager.getSynchronizations());
+            verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_CONTA_EVENTS), any(EventoConta.class));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("Projeção ignora evento reentregue (versão já aplicada)")
+    void deveIgnorarEventoJaProjetado() {
+        ContaQuery conta = contaProjetada("1291", "12912861012", "500.00", 2);
+        when(contaQueryRepository.findById("1291")).thenReturn(Optional.of(conta));
+
+        service.projetarEventoNoLadoQuery(criarEvento("1291", "Depósito", "{\"valor\":\"500.00\"}", 2));
+
+        verify(movimentacaoQueryRepository, never()).save(any());
+        verify(contaQueryRepository, never()).save(any());
+        assertEquals(new BigDecimal("500.00"), conta.getSaldo());
+    }
+
+    @Test
+    @DisplayName("Projeção com lacuna de versão recupera a versão perdida pelo Event Store, em ordem")
+    void deveRecuperarLacunaDeVersaoPeloEventStore() {
+        ContaQuery conta = contaProjetada("1291", "12912861012", "100.00", 1);
+        when(contaQueryRepository.findById("1291")).thenReturn(Optional.of(conta));
+        EventoConta v2 = criarEvento("1291", "Depósito", "{\"valor\":\"50.00\"}", 2);
+        EventoConta v3 = criarEvento("1291", "Saque", "{\"valor\":\"30.00\"}", 3);
+        when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of(
+                criarEvento("1291", "Criado", "{\"cpfCliente\":\"12912861012\"}", 1), v2, v3
+        ));
+
+        // a v2 se perdeu na fila; chega a v3
+        service.projetarEventoNoLadoQuery(v3);
+
+        ArgumentCaptor<MovimentacaoQuery> captor = ArgumentCaptor.forClass(MovimentacaoQuery.class);
+        verify(movimentacaoQueryRepository, times(2)).save(captor.capture());
+        assertEquals("DEPOSITO", captor.getAllValues().get(0).getTipo());
+        assertEquals("SAQUE", captor.getAllValues().get(1).getTipo());
+        assertEquals(new BigDecimal("120.00"), conta.getSaldo());
+        assertEquals(3, conta.getUltimaVersao());
+    }
+
+    @Test
+    @DisplayName("Projeção ignora o Criado de uma conta já compensada (removida do Event Store)")
+    void deveIgnorarCriadoDeContaCompensada() {
+        EventoConta criado = criarEvento("4321", "Criado", "{\"cpfCliente\":\"11122233344\"}", 1);
+        when(contaQueryRepository.findById("4321")).thenReturn(Optional.empty());
+        when(repository.existsById(criado.getId())).thenReturn(false);
+
+        service.projetarEventoNoLadoQuery(criado);
+
+        verify(contaQueryRepository, never()).save(any());
     }
 }

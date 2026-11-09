@@ -30,7 +30,8 @@ public class ContaController {
             @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
     ) {
         TransferenciaResponseDTO resposta = service.transferir(numeroContaOrigem, dto, xUserCpf);
-        return ResponseEntity.ok(resposta);
+        // 201, como saque e depósito: a transferência cria os eventos TransferênciaOrigem/Destino
+        return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
     }
 
     @PostMapping("/{numero}/saque")
