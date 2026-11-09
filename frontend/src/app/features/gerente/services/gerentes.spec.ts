@@ -45,15 +45,17 @@ describe('GerentesService', () => {
     return saida;
   }
 
-  it('lista só os gerentes ativos, ordenados por nome', () => {
+  it('lê a lista em { gerentes } e mostra só os ativos, ordenados por nome', () => {
     let nomes: string[] = [];
     service.listar().subscribe((lista) => (nomes = lista.map((g) => g.nome)));
 
-    http.expectOne(URL).flush([
-      { cpf: '2', nome: 'Godophredo', email: '', telefone: null, ativo: true },
-      { cpf: '3', nome: 'Gyândula', email: '', telefone: null, ativo: false },
-      { cpf: '1', nome: 'Geniéve', email: '', telefone: null, ativo: true },
-    ]);
+    http.expectOne(URL).flush({
+      gerentes: [
+        { cpf: '2', nome: 'Godophredo', email: '', telefone: null, ativo: true },
+        { cpf: '3', nome: 'Gyândula', email: '', telefone: null, ativo: false },
+        { cpf: '1', nome: 'Geniéve', email: '', telefone: null, ativo: true },
+      ],
+    });
 
     expect(nomes).toEqual(['Geniéve', 'Godophredo']);
   });

@@ -20,9 +20,9 @@ export class GerentesService {
 
   listar(): Observable<GerenteDto[]> {
     return this.http
-      .get<GerenteDto[]>(this.gerentesUrl)
+      .get<{ gerentes: GerenteDto[] }>(this.gerentesUrl)
       .pipe(
-        map((gerentes) =>
+        map(({ gerentes }) =>
           gerentes
             .filter((g) => g.ativo !== false)
             .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
