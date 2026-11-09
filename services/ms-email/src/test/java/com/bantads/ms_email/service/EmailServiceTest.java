@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.bantads.ms_email.dto.ComandoEmail;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,11 +38,81 @@ class EmailServiceTest {
     }
 
     @Test
-    void trataApenasOsDoisTiposDaSagaAprovarCliente() {
+    void trataOsQuatroTiposQueOOrquestradorPublica() {
         assertThat(service.sabeTratar(EmailService.TIPO_ENVIAR_SENHA)).isTrue();
         assertThat(service.sabeTratar(EmailService.TIPO_SOLICITACAO_NAO_EFETUADA)).isTrue();
+        assertThat(service.sabeTratar(EmailService.TIPO_TROCA_GERENTE)).isTrue();
+        assertThat(service.sabeTratar(EmailService.TIPO_REMOCAO_GERENTE)).isTrue();
         assertThat(service.sabeTratar("email.qualquer-outro")).isFalse();
         assertThat(service.sabeTratar(null)).isFalse();
+    }
+
+    private List<SimpleMailMessage> capturarEnvios(int quantos) {
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, org.mockito.Mockito.times(quantos)).send(captor.capture());
+        return captor.getAllValues();
+    }
+
+    private static Map<String, Object> cliente(String nome, String email) {
+        Map<String, Object> mapa = new java.util.HashMap<>();
+        mapa.put("nome", nome);
+        mapa.put("email", email);
+        return mapa;
+    }
+
+    @Test
+    void trocaDeGerenteAvisaTodosOsClientesComONomeDoNovoGerente() {
+        service.enviar(comando(EmailService.TIPO_TROCA_GERENTE, Map.of(
+                "nomeGerente", "Genieve",
+                "clientes", List.of(
+                        cliente("Catharyna", "cli1@bantads.com.br"),
+                        cliente("Cutardo", "cli2@bantads.com.br")))));
+
+        List<SimpleMailMessage> enviadas = capturarEnvios(2);
+        assertThat(enviadas).extracting(m -> m.getTo()[0])
+                .containsExactly("cli1@bantads.com.br", "cli2@bantads.com.br");
+        assertThat(enviadas.get(0).getSubject()).contains("gerente");
+        assertThat(enviadas.get(0).getText()).contains("Catharyna").contains("Genieve");
+        assertThat(enviadas.get(1).getText()).contains("Cutardo").contains("Genieve");
+    }
+
+    @Test
+    void remocaoDeGerenteAvisaTodosSemCitarNomeDeGerente() {
+        service.enviar(comando(EmailService.TIPO_REMOCAO_GERENTE, Map.of(
+                "clientes", List.of(cliente("Catharyna", "cli1@bantads.com.br")))));
+
+        SimpleMailMessage enviada = capturarEnvio();
+        assertThat(enviada.getTo()).containsExactly("cli1@bantads.com.br");
+        assertThat(enviada.getText()).contains("Catharyna").contains("transferida");
+    }
+
+    @Test
+    void clienteSemEmailEPuladoSemAbortarOsDemais() {
+        service.enviar(comando(EmailService.TIPO_REMOCAO_GERENTE, Map.of(
+                "clientes", List.of(
+                        cliente("Sem Email", ""),
+                        cliente("Catharyna", "cli1@bantads.com.br")))));
+
+        // um destinatario invalido nao pode impedir o aviso de quem tem e-mail:
+        // abortar no meio faria a retentativa reenviar para quem ja recebeu
+        assertThat(capturarEnvios(1).get(0).getTo()).containsExactly("cli1@bantads.com.br");
+    }
+
+    @Test
+    void avisoSemNenhumClienteComEmailFalhaSemChamarOSmtp() {
+        assertThatThrownBy(() -> service.enviar(comando(EmailService.TIPO_REMOCAO_GERENTE,
+                Map.of("clientes", List.of(cliente("Sem Email", ""))))))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoInteractions(mailSender);
+    }
+
+    @Test
+    void avisoComListaVaziaFalha() {
+        assertThatThrownBy(() -> service.enviar(comando(EmailService.TIPO_TROCA_GERENTE, Map.of())))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verifyNoInteractions(mailSender);
     }
 
     @Test
