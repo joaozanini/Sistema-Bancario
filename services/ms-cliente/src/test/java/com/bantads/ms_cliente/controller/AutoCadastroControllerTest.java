@@ -1,6 +1,7 @@
 package com.bantads.ms_cliente.controller;
 
 import com.bantads.ms_cliente.dto.SolicitacaoCadastroDTO;
+import com.bantads.ms_cliente.exception.CadastroDuplicadoException;
 import com.bantads.ms_cliente.model.SolicitacaoCadastro;
 import com.bantads.ms_cliente.service.AutoCadastroService;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,8 +19,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -89,5 +92,32 @@ class AutoCadastroControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].status").value("PENDENTE"));
+    }
+
+    private static final String CORPO_SOLICITACAO = """
+            {"nome": "Maria Silva", "cpf": "12912861012", "email": "maria@bantads.com.br",
+             "telefone": "41999998888", "salario": "3500.00", "logradouro": "Rua XV de Novembro",
+             "numero": "100", "cep": "80000000", "cidade": "Curitiba", "uf": "PR"}
+            """;
+
+    @Test
+    @DisplayName("Deve responder 409 quando o CPF ou o e-mail já foi usado (R1)")
+    void deveRetornar409QuandoCadastroDuplicado() throws Exception {
+        when(service.registrarSolicitacao(any()))
+                .thenThrow(new CadastroDuplicadoException("CPF já possui uma solicitação de cadastro."));
+
+        mockMvc.perform(post("/solicitacoes").contentType("application/json").content(CORPO_SOLICITACAO))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.erro").value("CPF já possui uma solicitação de cadastro."));
+    }
+
+    @Test
+    @DisplayName("Deve responder 400 quando o dado é inválido (R1)")
+    void deveRetornar400QuandoDadoInvalido() throws Exception {
+        when(service.registrarSolicitacao(any()))
+                .thenThrow(new IllegalArgumentException("CPF deve conter 11 dígitos numéricos."));
+
+        mockMvc.perform(post("/solicitacoes").contentType("application/json").content(CORPO_SOLICITACAO))
+                .andExpect(status().isBadRequest());
     }
 }

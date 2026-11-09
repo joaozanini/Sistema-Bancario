@@ -100,4 +100,80 @@ class ClienteServiceTest {
         assertTrue(ex.getMessage().contains("E-mail já cadastrado como cliente"));
         verify(clienteRepository, never()).save(any());
     }
+
+    private SolicitacaoCadastro criarSolicitacao(String cpf, String status) {
+        SolicitacaoCadastro solicitacao = new SolicitacaoCadastro();
+        solicitacao.setCpf(cpf);
+        solicitacao.setNome("Novo Cliente");
+        solicitacao.setEmail("novo@bantads.com.br");
+        solicitacao.setSalario(new BigDecimal("5000.00"));
+        solicitacao.setStatus(status);
+        return solicitacao;
+    }
+
+    @Test
+    @DisplayName("Deve falhar ao aprovar uma solicitação que não está mais pendente (R9)")
+    void deveFalharAoAprovarSolicitacaoNaoPendente() {
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADO");
+        when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                service.aprovarSolicitacao("11122233344")
+        );
+
+        assertTrue(ex.getMessage().contains("não está pendente"));
+        verify(solicitacaoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve aprovar uma solicitação pendente (R9)")
+    void deveAprovarSolicitacaoPendente() {
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "PENDENTE");
+        when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
+
+        Map<String, Object> dados = service.aprovarSolicitacao("11122233344");
+
+        assertEquals("APROVADO", dados.get("status"));
+        assertNotNull(solicitacao.getDataAprovacaoRejeicao());
+        verify(solicitacaoRepository).save(solicitacao);
+    }
+
+    @Test
+    @DisplayName("Compensação do passo 1 devolve para PENDENTE a aprovação desfeita pela SAGA (R9)")
+    void deveCompensarAprovacaoQuandoClienteJaFoiRemovido() {
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADO");
+        when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
+        when(clienteRepository.existsById("11122233344")).thenReturn(false);
+
+        service.compensarAprovacaoSolicitacao("11122233344", "PENDENTE", null);
+
+        assertEquals("PENDENTE", solicitacao.getStatus());
+        assertNull(solicitacao.getDataAprovacaoRejeicao());
+        verify(solicitacaoRepository).save(solicitacao);
+    }
+
+    @Test
+    @DisplayName("Compensação do passo 1 não mexe na solicitação de um cliente que já existe (R9)")
+    void naoDeveCompensarAprovacaoDeClienteExistente() {
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADO");
+        when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
+        when(clienteRepository.existsById("11122233344")).thenReturn(true);
+
+        service.compensarAprovacaoSolicitacao("11122233344", "PENDENTE", null);
+
+        assertEquals("APROVADO", solicitacao.getStatus());
+        verify(solicitacaoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Compensação do passo 1 ignora solicitação que não está APROVADO (R9)")
+    void naoDeveCompensarSolicitacaoNaoAprovada() {
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "NAO_APROVADA");
+        when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
+
+        service.compensarAprovacaoSolicitacao("11122233344", "PENDENTE", null);
+
+        assertEquals("NAO_APROVADA", solicitacao.getStatus());
+        verify(solicitacaoRepository, never()).save(any());
+    }
 }

@@ -1,5 +1,6 @@
 package com.bantads.ms_cliente.service;
 
+import com.bantads.ms_cliente.exception.CadastroDuplicadoException;
 import com.bantads.ms_cliente.model.SolicitacaoCadastro;
 import com.bantads.ms_cliente.repository.ClienteRepository;
 import com.bantads.ms_cliente.repository.SolicitacaoCadastroRepository;
@@ -30,18 +31,18 @@ public class AutoCadastroService {
 
         // Unicidade de CPF contra solicitações e contra clientes já cadastrados (R1)
         if (solicitacaoRepository.existsByCpf(cpf)) {
-            throw new IllegalArgumentException("CPF já possui uma solicitação de cadastro.");
+            throw new CadastroDuplicadoException("CPF já possui uma solicitação de cadastro.");
         }
         if (clienteRepository.existsById(cpf) || clienteRepository.existsByCpf(cpf)) {
-            throw new IllegalArgumentException("CPF já cadastrado como cliente no sistema.");
+            throw new CadastroDuplicadoException("CPF já cadastrado como cliente no sistema.");
         }
 
         // Unicidade de E-mail contra solicitações e contra clientes já cadastrados (R1)
         if (solicitacaoRepository.existsByEmail(email) || solicitacaoRepository.existsByEmailIgnoreCase(email)) {
-            throw new IllegalArgumentException("E-mail já utilizado em outra solicitação.");
+            throw new CadastroDuplicadoException("E-mail já utilizado em outra solicitação.");
         }
         if (clienteRepository.existsByEmail(email) || clienteRepository.existsByEmailIgnoreCase(email)) {
-            throw new IllegalArgumentException("E-mail já cadastrado como cliente no sistema.");
+            throw new CadastroDuplicadoException("E-mail já cadastrado como cliente no sistema.");
         }
 
         solicitacao.setStatus("PENDENTE");
@@ -55,6 +56,8 @@ public class AutoCadastroService {
         if (solicitacao.getNome() == null || solicitacao.getNome().trim().isBlank()) {
             throw new IllegalArgumentException("Nome é obrigatório.");
         }
+        // Espaço nas pontas jogaria o cliente para o início da listagem ordenada por nome (R11, R16)
+        solicitacao.setNome(solicitacao.getNome().trim());
         if (solicitacao.getCpf() == null || solicitacao.getCpf().trim().isBlank()) {
             throw new IllegalArgumentException("CPF é obrigatório.");
         }

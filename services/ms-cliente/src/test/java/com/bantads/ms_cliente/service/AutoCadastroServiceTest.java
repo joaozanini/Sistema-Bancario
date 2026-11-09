@@ -1,5 +1,6 @@
 package com.bantads.ms_cliente.service;
 
+import com.bantads.ms_cliente.exception.CadastroDuplicadoException;
 import com.bantads.ms_cliente.model.SolicitacaoCadastro;
 import com.bantads.ms_cliente.repository.ClienteRepository;
 import com.bantads.ms_cliente.repository.SolicitacaoCadastroRepository;
@@ -70,7 +71,8 @@ class AutoCadastroServiceTest {
     void deveRejeitarQuandoCpfExisteEmSolicitacao() {
         when(solicitacaoRepository.existsByCpf("12912861012")).thenReturn(true);
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        // CadastroDuplicadoException vira 409 no controller (R1: CPF duplicado)
+        CadastroDuplicadoException ex = assertThrows(CadastroDuplicadoException.class, () ->
                 service.registrarSolicitacao(solicitacaoValida)
         );
 
@@ -145,5 +147,16 @@ class AutoCadastroServiceTest {
         solicitacaoValida.setEmail("maria@bantads.com.br");
         solicitacaoValida.setSalario(new BigDecimal("-10"));
         assertThrows(IllegalArgumentException.class, () -> service.registrarSolicitacao(solicitacaoValida));
+    }
+
+    @Test
+    @DisplayName("Deve gravar o nome sem espaços nas pontas, para não bagunçar a ordenação por nome (R11, R16)")
+    void deveGravarNomeSemEspacosNasPontas() {
+        solicitacaoValida.setNome("  Maria Silva ");
+        when(solicitacaoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SolicitacaoCadastro salva = service.registrarSolicitacao(solicitacaoValida);
+
+        assertEquals("Maria Silva", salva.getNome());
     }
 }

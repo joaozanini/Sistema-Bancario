@@ -1,6 +1,7 @@
 package com.bantads.ms_cliente.controller;
 
 import com.bantads.ms_cliente.dto.SolicitacaoCadastroDTO;
+import com.bantads.ms_cliente.exception.CadastroDuplicadoException;
 import com.bantads.ms_cliente.model.SolicitacaoCadastro;
 import com.bantads.ms_cliente.service.AutoCadastroService;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -63,9 +64,13 @@ public class AutoCadastroController {
                 "mensagem", "Solicitação enviada com sucesso.",
                 "solicitacao", respostaDto
             ));
+        } catch (CadastroDuplicadoException e) {
+            // R1: CPF ou e-mail repetido é conflito com um cadastro existente, não dado malformado
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("erro", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("erro", e.getMessage()));
         } catch (DataIntegrityViolationException e) {
+            // Dois autocadastros simultâneos passam pela checagem acima; o índice único barra o segundo
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("erro", "CPF ou e-mail já cadastrado no sistema."));
         }
     }
