@@ -75,12 +75,6 @@ jobs:
           path: services/${{ matrix.service }}/target/surefire-reports/
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: jar-${{ matrix.service }}
-          path: services/${{ matrix.service }}/target/*.jar
-          retention-days: 1
-
   gateway:
     name: API Gateway
     runs-on: ubuntu-latest
@@ -120,6 +114,8 @@ jobs:
 
   images:
     name: Imagem - ${{ matrix.service }}
+    # O jar e gerado dentro da imagem (Dockerfile em duas etapas); o needs so
+    # garante que nao se constroi imagem de codigo que falhou nos testes.
     needs: [java, gateway, frontend]
     runs-on: ubuntu-latest
     permissions:
@@ -129,26 +125,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { service: api-gateway,     dockerfile: Dockerfile, java: false }
-          - { service: ms-auth,         dockerfile: Dockerfile, java: true }
-          - { service: ms-cliente,      dockerfile: Dockerfile, java: true }
-          - { service: ms-conta,        dockerfile: Dockerfile, java: true }
-          - { service: ms-email,        dockerfile: Dockerfile, java: true }
-          - { service: ms-gerente,      dockerfile: Dockerfile, java: true }
-          - { service: ms-orquestrador, dockerfile: Dockerfile, java: true }
+          - { service: api-gateway,     dockerfile: Dockerfile }
+          - { service: ms-auth,         dockerfile: Dockerfile }
+          - { service: ms-cliente,      dockerfile: Dockerfile }
+          - { service: ms-conta,        dockerfile: Dockerfile }
+          - { service: ms-email,        dockerfile: Dockerfile }
+          - { service: ms-gerente,      dockerfile: Dockerfile }
+          - { service: ms-orquestrador, dockerfile: Dockerfile }
 
     env:
       PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Baixar o jar
-        if: matrix.java
-        uses: actions/download-artifact@v4
-        with:
-          name: jar-${{ matrix.service }}
-          path: services/${{ matrix.service }}/target
 
       - uses: docker/setup-buildx-action@v3
 
