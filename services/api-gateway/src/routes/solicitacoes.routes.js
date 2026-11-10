@@ -20,6 +20,9 @@ router.post('/solicitacoes', clienteProxy);
 // R8: a tela inicial do gerente lista as solicitações em todos os status
 router.get('/solicitacoes', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, clienteProxy);
 
+// R10: rejeição é síncrona (200), não SAGA — o MS Cliente grava e publica o e-mail
+router.post('/solicitacoes/:id/rejeitar', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, clienteProxy);
+
 router.post('/solicitacoes/:cpf/aprovar', verifyJwtAndSession, exigirTipo('GERENTE'), aprovar);
 
 module.exports = router;
