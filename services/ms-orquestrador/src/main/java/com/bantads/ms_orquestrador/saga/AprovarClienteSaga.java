@@ -96,7 +96,7 @@ public class AprovarClienteSaga implements DefinicaoSaga {
     private static Map<String, Object> compensacaoSolicitacao(Map<String, Object> dados, String erro) {
         Map<String, Object> payload = campos(dados, "cpf");
         if (ERRO_LOGIN_DUPLICADO.equals(erro)) {
-            payload.put("statusSolicitacao", "NAO_APROVADA");
+            payload.put("statusSolicitacao", "NAO_APROVADO");
             payload.put("motivo", "E-mail já cadastrado");
         } else {
             payload.put("statusSolicitacao", "PENDENTE");

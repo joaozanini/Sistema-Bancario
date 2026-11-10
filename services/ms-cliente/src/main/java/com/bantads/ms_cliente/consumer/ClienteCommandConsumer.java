@@ -127,8 +127,10 @@ public class ClienteCommandConsumer {
 
         String tipoNorm = tipo != null ? tipo.toLowerCase().replace("_", "-").trim() : "";
 
-        // 1. SAGA Remover Gerente (R15): Obter dados dos clientes transferidos
-        if (tipoNorm.contains("clientes-transferidos")
+        // 1. SAGAs Inserir Gerente (R13) e Remover Gerente (R15): Obter dados dos clientes transferidos
+        // "cliente.obter-dados" e o nome que o Orquestrador publica nas duas SAGAs
+        if (tipoNorm.contains("obter-dados")
+                || tipoNorm.contains("clientes-transferidos")
                 || tipoNorm.contains("obter-clientes")
                 || tipoNorm.contains("buscar-clientes")
                 || tipoNorm.contains("dados-clientes")
