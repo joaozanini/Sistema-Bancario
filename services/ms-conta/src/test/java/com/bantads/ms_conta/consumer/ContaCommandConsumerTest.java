@@ -84,7 +84,7 @@ class ContaCommandConsumerTest {
 
         when(idempotenciaRepository.findBySagaIdAndTipo("saga-r13-1", "conta.identificar-conta-transferir"))
                 .thenReturn(Optional.empty());
-        when(contaService.identificarContaParaNovoGerente(anyList()))
+        when(contaService.identificarContaParaNovoGerente(anyList(), any()))
                 .thenReturn(Map.of("numeroConta", "1291", "cpfCliente", "12912861012"));
 
         consumer.processarComandoSaga(mensagem);
@@ -108,7 +108,7 @@ class ContaCommandConsumerTest {
 
         when(idempotenciaRepository.findBySagaIdAndTipo("saga-r13-2", "conta.identificar-conta-transferir"))
                 .thenReturn(Optional.empty());
-        when(contaService.identificarContaParaNovoGerente(anyList()))
+        when(contaService.identificarContaParaNovoGerente(anyList(), any()))
                 .thenReturn(null);
 
         consumer.processarComandoSaga(mensagem);
@@ -208,5 +208,137 @@ class ContaCommandConsumerTest {
 
         verify(contaService, never()).criarConta(any(), any(), any());
         verify(rabbitTemplate, times(1)).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), any(RespostaSagaDTO.class));
+    }
+
+    @Test
+    @DisplayName("Deve processar comando 'conta.escolher-gerente' publicado pelo Orquestrador (R9)")
+    void deveProcessarEscolherGerenteOrquestrador() {
+        MensagemSagaDTO mensagem = new MensagemSagaDTO();
+        mensagem.setSagaId("saga-orq-1");
+        mensagem.setTipo("conta.escolher-gerente");
+        mensagem.setPayload(Map.of("gerentes", List.of("11111111111", "22222222222")));
+
+        when(idempotenciaRepository.findBySagaIdAndTipo("saga-orq-1", "conta.escolher-gerente"))
+                .thenReturn(Optional.empty());
+        when(contaService.identificarGerenteComMenosClientes(anyList()))
+                .thenReturn("11111111111");
+
+        consumer.processarComandoSaga(mensagem);
+
+        ArgumentCaptor<RespostaSagaDTO> captor = ArgumentCaptor.forClass(RespostaSagaDTO.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), captor.capture());
+
+        RespostaSagaDTO resposta = captor.getValue();
+        assertEquals("conta.escolher-gerente", resposta.getTipo());
+        assertEquals("SUCESSO", resposta.getStatus());
+        assertEquals("11111111111", resposta.getPayload().get("cpfGerente"));
+    }
+
+    @Test
+    @DisplayName("Deve processar comando 'conta.criar-conta' publicado pelo Orquestrador (R9)")
+    void deveProcessarCriarContaOrquestrador() {
+        MensagemSagaDTO mensagem = new MensagemSagaDTO();
+        mensagem.setSagaId("saga-orq-2");
+        mensagem.setTipo("conta.criar-conta");
+        mensagem.setPayload(Map.of("cpf", "12912861012", "cpfGerente", "98574307084"));
+
+        when(idempotenciaRepository.findBySagaIdAndTipo("saga-orq-2", "conta.criar-conta"))
+                .thenReturn(Optional.empty());
+        when(contaService.criarConta(eq("12912861012"), eq("98574307084"), any()))
+                .thenReturn(Map.of("numeroConta", "9988", "cpfCliente", "12912861012"));
+
+        consumer.processarComandoSaga(mensagem);
+
+        ArgumentCaptor<RespostaSagaDTO> captor = ArgumentCaptor.forClass(RespostaSagaDTO.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), captor.capture());
+
+        RespostaSagaDTO resposta = captor.getValue();
+        assertEquals("conta.criar-conta", resposta.getTipo());
+        assertEquals("SUCESSO", resposta.getStatus());
+        assertEquals("9988", resposta.getPayload().get("numeroConta"));
+    }
+
+    @Test
+    @DisplayName("Deve processar compensação 'conta.criar-conta.compensar' publicada pelo Orquestrador (R9)")
+    void deveProcessarCompensacaoCriarContaOrquestrador() {
+        MensagemSagaDTO mensagem = new MensagemSagaDTO();
+        mensagem.setSagaId("saga-orq-3");
+        mensagem.setTipo("conta.criar-conta.compensar");
+        mensagem.setPayload(Map.of("cpf", "12912861012"));
+
+        when(idempotenciaRepository.findBySagaIdAndTipo("saga-orq-3", "conta.criar-conta.compensar"))
+                .thenReturn(Optional.empty());
+
+        consumer.processarComandoSaga(mensagem);
+
+        verify(contaService).compensarCriacaoConta(null, "12912861012");
+
+        ArgumentCaptor<RespostaSagaDTO> captor = ArgumentCaptor.forClass(RespostaSagaDTO.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), captor.capture());
+
+        RespostaSagaDTO resposta = captor.getValue();
+        assertEquals("conta.criar-conta.compensar", resposta.getTipo());
+        assertEquals("SUCESSO", resposta.getStatus());
+    }
+
+    @Test
+    @DisplayName("Deve processar comando 'conta.escolher-conta-transferencia' publicado pelo Orquestrador (R13)")
+    void deveProcessarEscolherContaTransferenciaOrquestrador() {
+        MensagemSagaDTO mensagem = new MensagemSagaDTO();
+        mensagem.setSagaId("saga-orq-4");
+        mensagem.setTipo("conta.escolher-conta-transferencia");
+        mensagem.setPayload(Map.of("cpf", "40501740066"));
+
+        when(idempotenciaRepository.findBySagaIdAndTipo("saga-orq-4", "conta.escolher-conta-transferencia"))
+                .thenReturn(Optional.empty());
+        when(contaService.identificarContaParaNovoGerente(anyList(), eq("40501740066")))
+                .thenReturn(Map.of("numeroConta", "5887", "cpfCliente", "12912861012", "gerenteAntigoCpf", "98574307084"));
+
+        consumer.processarComandoSaga(mensagem);
+
+        ArgumentCaptor<RespostaSagaDTO> captor = ArgumentCaptor.forClass(RespostaSagaDTO.class);
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), captor.capture());
+
+        RespostaSagaDTO resposta = captor.getValue();
+        assertEquals("conta.escolher-conta-transferencia", resposta.getTipo());
+        assertEquals("SUCESSO", resposta.getStatus());
+        assertEquals("5887", resposta.getPayload().get("numeroConta"));
+        assertEquals(true, resposta.getPayload().get("temConta"));
+    }
+
+    @Test
+    @DisplayName("Deve processar comando 'conta.atribuir-gerente' publicado pelo Orquestrador (R13)")
+    void deveProcessarAtribuirGerenteOrquestrador() {
+        MensagemSagaDTO mensagem = new MensagemSagaDTO();
+        mensagem.setSagaId("saga-orq-5");
+        mensagem.setTipo("conta.atribuir-gerente");
+        mensagem.setPayload(Map.of("numeroConta", "5887", "novoGerenteCpf", "40501740066", "gerenteAntigoCpf", "98574307084"));
+
+        when(idempotenciaRepository.findBySagaIdAndTipo("saga-orq-5", "conta.atribuir-gerente"))
+                .thenReturn(Optional.empty());
+        when(contaService.atribuirConta("5887", "40501740066", "98574307084"))
+                .thenReturn(Map.of("numeroConta", "5887", "status", "ATRIBUIDO"));
+
+        consumer.processarComandoSaga(mensagem);
+
+        verify(contaService).atribuirConta("5887", "40501740066", "98574307084");
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), any(RespostaSagaDTO.class));
+    }
+
+    @Test
+    @DisplayName("Deve processar compensação 'conta.atribuir-gerente.compensar' publicada pelo Orquestrador (R13)")
+    void deveProcessarCompensacaoAtribuirGerenteOrquestrador() {
+        MensagemSagaDTO mensagem = new MensagemSagaDTO();
+        mensagem.setSagaId("saga-orq-6");
+        mensagem.setTipo("conta.atribuir-gerente.compensar");
+        mensagem.setPayload(Map.of("numeroConta", "5887", "gerenteAntigoCpf", "98574307084"));
+
+        when(idempotenciaRepository.findBySagaIdAndTipo("saga-orq-6", "conta.atribuir-gerente.compensar"))
+                .thenReturn(Optional.empty());
+
+        consumer.processarComandoSaga(mensagem);
+
+        verify(contaService).compensarAtribuicaoConta("5887", "98574307084");
+        verify(rabbitTemplate).convertAndSend(eq(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY), any(RespostaSagaDTO.class));
     }
 }
