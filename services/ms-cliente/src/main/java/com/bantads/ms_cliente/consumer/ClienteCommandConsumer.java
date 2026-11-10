@@ -127,10 +127,11 @@ public class ClienteCommandConsumer {
 
         String tipoNorm = tipo != null ? tipo.toLowerCase().replace("_", "-").trim() : "";
 
-        // 1. SAGAs Inserir Gerente (R13) e Remover Gerente (R15): Obter dados dos clientes transferidos
-        // "cliente.obter-dados" e o nome que o Orquestrador publica nas duas SAGAs
-        if (tipoNorm.contains("obter-dados")
-                || tipoNorm.contains("clientes-transferidos")
+        // 1. SAGA Remover Gerente (R15): Obter dados dos clientes transferidos
+        if (tipoNorm.contains("clientes-transferidos")
+                // o Orquestrador publica "cliente.obter-dados" no R13 e no R15, sempre
+                // com uma lista em "cpfs" — sem esta linha as duas SAGAs compensam
+                || tipoNorm.contains("obter-dados")
                 || tipoNorm.contains("obter-clientes")
                 || tipoNorm.contains("buscar-clientes")
                 || tipoNorm.contains("dados-clientes")
@@ -191,7 +192,7 @@ public class ClienteCommandConsumer {
         return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
     }
 
-    // o orquestrador manda PENDENTE (falha tecnica) ou NAO_APROVADA com motivo (login duplicado)
+    // o orquestrador manda PENDENTE (falha tecnica) ou NAO_APROVADO com motivo (login duplicado)
     private RespostaSagaDTO compensarAprovacaoSolicitacao(String sagaId, String tipo, Map<String, Object> payload) {
         String cpf = extrairString(payload, "cpf", "cpfCliente");
         String statusSolicitacao = extrairString(payload, "statusSolicitacao", "status");
