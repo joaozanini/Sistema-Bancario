@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Sobe a frota inteira do BANTADS: prepara config local, gera os jars, constroi
-# as imagens e levanta o docker-compose. Idempotente — rodar de novo nao estraga
-# nada e so refaz o que mudou.
+# Sobe a frota inteira do BANTADS: prepara a config local, constroi as imagens e
+# levanta o docker-compose. Nao exige Java nem Maven na maquina — os Dockerfiles
+# dos MSs sao multi-stage e geram o jar dentro da imagem. Idempotente: rodar de
+# novo nao estraga nada e so refaz o que mudou.
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
 SERVICOS_SPRING=(ms-auth ms-cliente ms-conta ms-gerente ms-orquestrador ms-email)
-PULAR_BUILD="${PULAR_BUILD:-0}"
 
 info() { printf '\n\033[1;34m==>\033[0m %s\n' "$1"; }
 erro() { printf '\n\033[1;31mERRO:\033[0m %s\n' "$1" >&2; exit 1; }
@@ -47,8 +47,8 @@ done
 [ ${#faltando[@]} -eq 0 ] || erro "variaveis sem valor no .env: ${faltando[*]}"
 
 # --- 4. application.properties de cada MS -----------------------------------
-# Nao sao versionados (so o .example). Precisam existir ANTES do package: o
-# Maven empacota src/main/resources dentro do jar.
+# Nao sao versionados (so o .example). Precisam existir ANTES do build da
+# imagem: o Dockerfile copia src/ inteiro e empacota este arquivo no jar.
 info "Preparando application.properties"
 for servico in "${SERVICOS_SPRING[@]}"; do
   destino="services/$servico/src/main/resources/application.properties"
@@ -56,9 +56,10 @@ for servico in "${SERVICOS_SPRING[@]}"; do
     cp "$destino.example" "$destino"
     echo "  criado  $servico"
   elif [ "$destino.example" -nt "$destino" ]; then
-    # O Maven empacota este arquivo DENTRO do jar. Manter a copia velha faz o
-    # servico subir sem a config que o time acrescentou ao .example e falhar so
-    # em runtime (ex.: sem spring.rabbitmq.host, cai no localhost e nao conecta).
+    # O build da imagem copia src/ inteiro e empacota este arquivo no jar.
+    # Manter a copia velha faz o servico subir sem a config que o time
+    # acrescentou ao .example e falhar so em runtime (ex.: sem
+    # spring.rabbitmq.host, cai no localhost e nao conecta).
     cp "$destino.example" "$destino"
     echo "  atualizado  $servico (o .example mudou; valores reais vao no .env)"
   else
@@ -66,24 +67,10 @@ for servico in "${SERVICOS_SPRING[@]}"; do
   fi
 done
 
-# --- 5. jars ----------------------------------------------------------------
-# Os Dockerfiles fazem COPY target/*.jar: sem o package antes, o build da imagem falha.
-if [ "$PULAR_BUILD" = "1" ]; then
-  info "PULAR_BUILD=1, reaproveitando os jars existentes"
-else
-  info "Gerando os jars (pode demorar na primeira vez)"
-  for servico in "${SERVICOS_SPRING[@]}"; do
-    echo "  empacotando $servico"
-    (cd "services/$servico" && ./mvnw -B -ntp -q clean package -DskipTests)
-  done
-fi
-
-for servico in "${SERVICOS_SPRING[@]}"; do
-  compgen -G "services/$servico/target/*.jar" >/dev/null || erro "jar nao gerado para $servico"
-done
-
-# --- 6. imagens e containers ------------------------------------------------
-info "Construindo as imagens"
+# --- 5. imagens e containers ------------------------------------------------
+# O jar de cada MS e gerado na primeira etapa do Dockerfile; o cache de camadas
+# do Docker so refaz o que mudou, entao nao ha build local a reaproveitar.
+info "Construindo as imagens (demora na primeira vez)"
 docker compose build
 
 info "Subindo a frota"
