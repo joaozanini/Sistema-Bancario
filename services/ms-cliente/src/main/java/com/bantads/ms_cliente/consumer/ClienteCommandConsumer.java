@@ -129,6 +129,9 @@ public class ClienteCommandConsumer {
 
         // 1. SAGA Remover Gerente (R15): Obter dados dos clientes transferidos
         if (tipoNorm.contains("clientes-transferidos")
+                // o Orquestrador publica "cliente.obter-dados" no R13 e no R15, sempre
+                // com uma lista em "cpfs" — sem esta linha as duas SAGAs compensam
+                || tipoNorm.contains("obter-dados")
                 || tipoNorm.contains("obter-clientes")
                 || tipoNorm.contains("buscar-clientes")
                 || tipoNorm.contains("dados-clientes")
