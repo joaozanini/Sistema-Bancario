@@ -115,9 +115,11 @@ public class ContaCommandConsumer {
             List<String> gerentes = extrairListaGerentes(payload);
             String gerenteEscolhido = contaService.identificarGerenteComMenosClientes(gerentes);
 
+            // Nao devolver o gerente sob a chave "cpf": o Orquestrador mescla a resposta
+            // no estado da SAGA, e isso sobrescreveria o CPF do cliente que os passos
+            // seguintes usam (cliente.criar-cliente, auth.criar-usuario, conta.criar-conta).
             Map<String, Object> respostaPayload = new HashMap<>();
             respostaPayload.put("cpfGerente", gerenteEscolhido);
-            respostaPayload.put("cpf", gerenteEscolhido);
             respostaPayload.put("gerenteCpf", gerenteEscolhido);
 
             return RespostaSagaDTO.sucesso(sagaId, tipo, respostaPayload);
