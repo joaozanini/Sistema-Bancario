@@ -2,7 +2,9 @@
 # Sobe a frota inteira do BANTADS: prepara a config local, constroi as imagens e
 # levanta o docker-compose. Nao exige Java nem Maven na maquina — os Dockerfiles
 # dos MSs sao multi-stage e geram o jar dentro da imagem. Idempotente: rodar de
-# novo nao estraga nada e so refaz o que mudou.
+# novo nao estraga nada. O build reaproveita o cache e bancos/broker seguem no ar
+# com os dados; os servicos de aplicacao (sem estado) sao recriados, porque o
+# compose recria todo servico que tem build.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -73,10 +75,9 @@ done
 info "Construindo as imagens (demora na primeira vez)"
 docker compose build
 
-info "Subindo a frota"
-docker compose up -d
-
-info "Aguardando os healthchecks"
+# --wait so retorna com todos os healthchecks verdes e falha se algum servico nao subir
+info "Subindo a frota e aguardando os healthchecks"
+docker compose up -d --wait
 docker compose ps
 
 cat <<'FIM'
