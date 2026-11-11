@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../../core/services/auth';
@@ -17,17 +17,20 @@ export class Login {
 
   email = '';
   senha = '';
-  erro = '';
-  carregando = false;
+  // signals, e nao campos comuns: o app e zoneless, entao uma atribuicao dentro
+  // do callback do subscribe nao agendaria a deteccao de mudancas e a tela ficaria
+  // presa em "Entrando..." mesmo depois do erro chegar
+  readonly erro = signal('');
+  readonly carregando = signal(false);
 
   entrar() {
     if (!this.email || !this.senha) {
-      this.erro = 'Preencha e-mail e senha.';
+      this.erro.set('Preencha e-mail e senha.');
       return;
     }
 
-    this.erro = '';
-    this.carregando = true;
+    this.erro.set('');
+    this.carregando.set(true);
 
     this.auth.login(this.email, this.senha).subscribe({
             next: (resposta) => {
@@ -37,8 +40,8 @@ export class Login {
         this.redirecionar(resposta.tipo);
       },
       error: (err: HttpErrorResponse) => {
-        this.erro = this.mensagemDeErro(err);
-        this.carregando = false;
+        this.erro.set(this.mensagemDeErro(err));
+        this.carregando.set(false);
       },
     });
   }
@@ -51,8 +54,8 @@ export class Login {
       return;
     }
 
-    this.erro = 'Perfil de usuário inválido.';
-    this.carregando = false;
+    this.erro.set('Perfil de usuário inválido.');
+    this.carregando.set(false);
   }
 
   private mensagemDeErro(err: HttpErrorResponse): string {
