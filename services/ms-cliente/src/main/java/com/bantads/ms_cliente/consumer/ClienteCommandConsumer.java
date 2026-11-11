@@ -192,7 +192,7 @@ public class ClienteCommandConsumer {
         return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
     }
 
-    // o orquestrador manda PENDENTE (falha tecnica) ou NAO_APROVADA com motivo (login duplicado)
+    // o orquestrador manda PENDENTE (falha tecnica) ou NAO_APROVADO com motivo (login duplicado)
     private RespostaSagaDTO compensarAprovacaoSolicitacao(String sagaId, String tipo, Map<String, Object> payload) {
         String cpf = extrairString(payload, "cpf", "cpfCliente");
         String statusSolicitacao = extrairString(payload, "statusSolicitacao", "status");

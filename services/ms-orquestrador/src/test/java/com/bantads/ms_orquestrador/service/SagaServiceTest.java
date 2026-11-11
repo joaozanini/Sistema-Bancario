@@ -277,7 +277,7 @@ class SagaServiceTest {
         assertThat(mensagem("cliente.aprovar-solicitacao.compensar").payload())
                 .containsExactlyInAnyOrderEntriesOf(Map.of(
                         "cpf", CPF,
-                        "statusSolicitacao", "NAO_APROVADA",
+                        "statusSolicitacao", "NAO_APROVADO",
                         "motivo", "E-mail já cadastrado"));
 
         ArgumentCaptor<Job> job = ArgumentCaptor.forClass(Job.class);
