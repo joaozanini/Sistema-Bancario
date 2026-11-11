@@ -1,38 +1,54 @@
-const sagaService = require('../services/saga.service');
-const gerenteService = require('../services/gerente.service');
-const gerentesService = require('../services/gerentes.service');
+const sagaService = require("../services/saga.service");
+const gerenteService = require("../services/gerente.service");
+const gerentesService = require("../services/gerentes.service");
 
 // a suíte de testes lê a lista dentro de { gerentes: [...] }
 async function listar(req, res) {
   try {
     return res.json({ gerentes: await gerentesService.listarTodos() });
   } catch (err) {
-    console.error('Falha ao listar gerentes (API Composition):', err.message);
-    return res.status(502).json({ message: 'Serviço de gerentes indisponível.' });
+    console.error("Falha ao listar gerentes (API Composition):", err.message);
+    return res
+      .status(502)
+      .json({ message: "Serviço de gerentes indisponível." });
   }
 }
 
-const TIPO_INSERIR_GERENTE = 'inserir-gerente';
-const TIPO_REMOVER_GERENTE = 'remover-gerente';
-const DOMINIO = 'gerentes';
-const CAMPOS_OBRIGATORIOS = ['cpf', 'nome', 'email', 'senha'];
+const TIPO_INSERIR_GERENTE = "inserir-gerente";
+const TIPO_REMOVER_GERENTE = "remover-gerente";
+const DOMINIO = "gerentes";
+const CAMPOS_OBRIGATORIOS = ["cpf", "nome", "email", "senha"];
 
 // R13: a senha segue no payload da SAGA e o Orquestrador a mantém só em memória
 // até o passo do MS Auth
 async function inserir(req, res) {
   const { cpf, nome, email, telefone, senha } = req.body || {};
 
-  const faltando = CAMPOS_OBRIGATORIOS.filter((campo) => !String(req.body?.[campo] ?? '').trim());
+  const faltando = CAMPOS_OBRIGATORIOS.filter(
+    (campo) => !String(req.body?.[campo] ?? "").trim(),
+  );
   if (faltando.length > 0) {
-    return res.status(400).json({ message: `Campos obrigatórios: ${faltando.join(', ')}.` });
+    return res
+      .status(400)
+      .json({ message: `Campos obrigatórios: ${faltando.join(", ")}.` });
   }
 
   try {
-    const jobId = await sagaService.iniciar(TIPO_INSERIR_GERENTE, DOMINIO, { cpf, nome, email, telefone, senha });
+    const jobId = await sagaService.iniciar(TIPO_INSERIR_GERENTE, DOMINIO, {
+      cpf,
+      nome,
+      email,
+      telefone,
+      senha,
+    });
+    // R13 grava o gerente: o enunciado (5.5) pede invalidar o cadastro em cache
+    await gerenteService.invalidar(cpf);
     return res.status(202).json({ jobId });
   } catch (err) {
-    console.error('Falha ao iniciar a SAGA de inserção:', err.message);
-    return res.status(502).json({ message: 'Não foi possível iniciar a inserção.' });
+    console.error("Falha ao iniciar a SAGA de inserção:", err.message);
+    return res
+      .status(502)
+      .json({ message: "Não foi possível iniciar a inserção." });
   }
 }
 
@@ -42,18 +58,31 @@ async function remover(req, res) {
   const { cpf } = req.params;
 
   if (req.user.cpf === cpf) {
-    return res.status(403).json({ message: 'Um gerente não pode remover a si mesmo.' });
+    return res
+      .status(403)
+      .json({ message: "Um gerente não pode remover a si mesmo." });
   }
 
   try {
-    const jobId = await sagaService.iniciar(TIPO_REMOVER_GERENTE, DOMINIO, { cpf });
+    const jobId = await sagaService.iniciar(TIPO_REMOVER_GERENTE, DOMINIO, {
+      cpf,
+    });
     // R15 inativa o gerente: o cadastro em cache deixa de valer
     await gerenteService.invalidar(cpf);
     return res.status(202).json({ jobId });
   } catch (err) {
-    console.error('Falha ao iniciar a SAGA de remoção:', err.message);
-    return res.status(502).json({ message: 'Não foi possível iniciar a remoção.' });
+    console.error("Falha ao iniciar a SAGA de remoção:", err.message);
+    return res
+      .status(502)
+      .json({ message: "Não foi possível iniciar a remoção." });
   }
 }
 
-module.exports = { listar, inserir, remover, TIPO_INSERIR_GERENTE, TIPO_REMOVER_GERENTE, DOMINIO };
+module.exports = {
+  listar,
+  inserir,
+  remover,
+  TIPO_INSERIR_GERENTE,
+  TIPO_REMOVER_GERENTE,
+  DOMINIO,
+};
