@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const sagaService = require('../services/saga.service');
 const redis = require('../config/redis');
-const { listar, inserir, remover, TIPO_INSERIR_GERENTE, TIPO_REMOVER_GERENTE, DOMINIO } = require('./gerentes.controller');
+const { listar, inserir, remover, TIPO_INSERIR_GERENTE, TIPO_REMOVER_GERENTE, DOMINIO, buscar } = require('./gerentes.controller');
 
 const CPF_LOGADO = '98574307084';
 const CPF_ALVO = '64065268052';
@@ -205,5 +205,53 @@ test('listar responde 502 quando um microsserviço falha', async () => {
     assert.equal(res.codigo, 502);
   } finally {
     gerentesService.listarTodos = original;
+  }
+});
+
+test('buscar devolve o gerente do MS Gerente', async () => {
+  const gerenteService = require('../services/gerente.service');
+  const original = gerenteService.buscar;
+  const gerente = { cpf: CPF_ALVO, nome: 'Godophredo', email: 'ger2@bantads.com.br', ativo: true };
+  gerenteService.buscar = async () => gerente;
+
+  try {
+    const res = resposta();
+    await buscar({ params: { cpf: CPF_ALVO } }, res);
+    assert.equal(res.codigo, null);
+    assert.deepEqual(res.corpo, gerente);
+  } finally {
+    gerenteService.buscar = original;
+  }
+});
+
+test('buscar gerente inexistente responde 404', async () => {
+  const gerenteService = require('../services/gerente.service');
+  const original = gerenteService.buscar;
+  gerenteService.buscar = async () => {
+    throw new gerenteService.GerenteNaoEncontradoError();
+  };
+
+  try {
+    const res = resposta();
+    await buscar({ params: { cpf: '00000000000' } }, res);
+    assert.equal(res.codigo, 404);
+  } finally {
+    gerenteService.buscar = original;
+  }
+});
+
+test('buscar com o MS fora do ar responde 502', async () => {
+  const gerenteService = require('../services/gerente.service');
+  const original = gerenteService.buscar;
+  gerenteService.buscar = async () => {
+    throw new Error('MS Gerente respondeu 500');
+  };
+
+  try {
+    const res = resposta();
+    await buscar({ params: { cpf: CPF_ALVO } }, res);
+    assert.equal(res.codigo, 502);
+  } finally {
+    gerenteService.buscar = original;
   }
 });

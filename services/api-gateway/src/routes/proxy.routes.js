@@ -3,7 +3,7 @@ const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware
 const { contaServiceUrl, gerenteServiceUrl } = require('../config/services');
 const { verifyJwtAndSession, injectUserHeaders, exigirTipo } = require('../middlewares/auth.middleware');
 const { enriquecerCpfDestino, enriquecerNomes } = require('../middlewares/transferencia.middleware');
-const { listar, inserir, remover } = require('../controllers/gerentes.controller');
+const { listar, inserir, remover, buscar: buscarGerente } = require('../controllers/gerentes.controller');
 const gerenteService = require('../services/gerente.service');
 const { interceptarRespostaDoProxy } = require('../middlewares/links.middleware');
 
@@ -53,6 +53,9 @@ router.get('/gerentes', verifyJwtAndSession, exigirTipo('GERENTE'), listar);
 
 // R13 é SAGA: publica em saga.cmd e responde 202
 router.post('/gerentes', verifyJwtAndSession, exigirTipo('GERENTE'), inserir);
+
+// R14: sem esta rota a tela de edicao recebe 404 e nao carrega o gerente
+router.get('/gerentes/:cpf', verifyJwtAndSession, exigirTipo('GERENTE'), buscarGerente);
 
 router.put('/gerentes/:cpf', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, gerenteProxy);
 
