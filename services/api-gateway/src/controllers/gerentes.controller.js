@@ -14,6 +14,24 @@ async function listar(req, res) {
   }
 }
 
+// R14: a tela de edicao carrega o gerente por aqui antes de enviar o PUT.
+// Passa pelo cache-aside, como a composicao do login.
+async function buscar(req, res) {
+  const { cpf } = req.params;
+
+  try {
+    return res.json(await gerenteService.buscar(cpf));
+  } catch (err) {
+    if (err instanceof gerenteService.GerenteNaoEncontradoError) {
+      return res.status(404).json({ message: "Gerente não encontrado." });
+    }
+    console.error("Falha ao consultar gerente no MS Gerente:", err.message);
+    return res
+      .status(502)
+      .json({ message: "Serviço de gerentes indisponível." });
+  }
+}
+
 const TIPO_INSERIR_GERENTE = "inserir-gerente";
 const TIPO_REMOVER_GERENTE = "remover-gerente";
 const DOMINIO = "gerentes";
@@ -80,6 +98,7 @@ async function remover(req, res) {
 
 module.exports = {
   listar,
+  buscar,
   inserir,
   remover,
   TIPO_INSERIR_GERENTE,
