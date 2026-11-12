@@ -41,7 +41,11 @@ public class GerenteService {
     public void inativar(String cpf) {
         Gerente gerente = repository.findById(cpf)
                 .orElseThrow(() -> new GerenteNaoEncontradoException("Gerente não encontrado."));
-        if (gerente.isAtivo() && repository.countByAtivoTrue() <= 1) {
+        // gerente ja removido nao e removido de novo: a compensacao reativaria quem a SAGA nao inativou
+        if (!gerente.isAtivo()) {
+            throw new GerenteNaoEncontradoException("Gerente não encontrado.");
+        }
+        if (repository.countByAtivoTrue() <= 1) {
             throw new UltimoGerenteAtivoException("Não é permitido remover o último gerente ativo do banco.");
         }
         gerente.setAtivo(false);

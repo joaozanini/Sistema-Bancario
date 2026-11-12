@@ -557,6 +557,20 @@ class ContaServiceTest {
     }
 
     @Test
+    @DisplayName("Cliente não consulta a conta de outro cliente pelo número")
+    void deveNegarContaAlheiaParaCliente() {
+        when(contaQueryRepository.findById("1291")).thenReturn(Optional.empty());
+        when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of(
+                criarEvento("1291", "Criado", "{\"cpfCliente\":\"12912861012\",\"gerenteCpf\":\"98574307084\"}", 1)));
+
+        assertThrows(AcessoNegadoException.class,
+                () -> service.buscarContaPorNumero("1291", "09506382000", "CLIENTE"));
+        assertEquals("1291", service.buscarContaPorNumero("1291", "12912861012", "CLIENTE").getNumeroConta());
+        assertEquals("1291", service.buscarContaPorNumero("1291", "98574307084", "GERENTE").getNumeroConta());
+        assertEquals("1291", service.buscarContaPorNumero("1291", null, null).getNumeroConta());
+    }
+
+    @Test
     @DisplayName("Deve buscar conta por número e retornar DTO com HATEOAS")
     void deveBuscarContaPorNumero() {
         String numeroConta = "1291";

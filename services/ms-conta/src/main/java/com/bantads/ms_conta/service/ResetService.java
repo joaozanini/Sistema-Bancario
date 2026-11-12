@@ -42,6 +42,14 @@ public class ResetService {
         this.objectMapper = objectMapper;
     }
 
+    // Subida com volume novo: sem isso as contas so existiriam depois do primeiro /reboot
+    @Transactional
+    public void semearSeVazio() {
+        if (repository.count() == 0) {
+            reset();
+        }
+    }
+
     // Contas e movimentacoes pre-cadastradas (enunciado, secao 4): o replay dos eventos fecha os saldos da tabela
     @Transactional
     public void reset() {

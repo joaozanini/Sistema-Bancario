@@ -787,6 +787,17 @@ public class ContaService {
         return montarContaDTO(numeroConta, estado.getCpfCliente(), estado.getGerenteCpf(), estado.getSaldo());
     }
 
+    // Cliente so consulta a propria conta; gerente e a chamada interna do Gateway (sem identidade) consultam qualquer uma
+    @Transactional(readOnly = true)
+    public ContaDTO buscarContaPorNumero(String numeroConta, String xUserCpf, String xUserTipo) {
+        ContaDTO conta = buscarContaPorNumero(numeroConta);
+        boolean cliente = xUserTipo != null && "CLIENTE".equalsIgnoreCase(xUserTipo.trim());
+        if (cliente && (xUserCpf == null || !xUserCpf.trim().equals(conta.getCpfCliente()))) {
+            throw new AcessoNegadoException("Usuário não autorizado a consultar esta conta.");
+        }
+        return conta;
+    }
+
     @Transactional
     public ContaDTO buscarContaPorCpf(String xUserCpf) {
         if (xUserCpf == null || xUserCpf.trim().isEmpty()) {

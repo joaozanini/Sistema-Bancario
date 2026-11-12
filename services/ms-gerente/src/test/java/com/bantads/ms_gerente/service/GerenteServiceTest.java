@@ -130,4 +130,17 @@ class GerenteServiceTest {
         gerente.setTelefone("41999990001");
         return gerente;
     }
+
+    @Test
+    @DisplayName("Não deve inativar de novo um gerente já inativo")
+    void deveRecusarInativacaoDeGerenteInativo() {
+        Gerente gerente = gerenteExistente();
+        gerente.setAtivo(false);
+        when(repository.findById(CPF)).thenReturn(Optional.of(gerente));
+
+        assertThatThrownBy(() -> service.inativar(CPF))
+                .isInstanceOf(GerenteNaoEncontradoException.class);
+
+        verify(repository, never()).save(any());
+    }
 }

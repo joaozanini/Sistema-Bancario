@@ -1,0 +1,7 @@
+ALTER TABLE conta_query
+    ALTER COLUMN saldo TYPE NUMERIC(19, 4),
+    ALTER COLUMN limite TYPE NUMERIC(19, 4),
+    ALTER COLUMN salario TYPE NUMERIC(19, 4);
+
+ALTER TABLE movimentacao_query
+    ALTER COLUMN valor TYPE NUMERIC(19, 4);
