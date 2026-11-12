@@ -28,7 +28,7 @@ public class MovimentacaoQuery {
     @Column(nullable = false, length = 20)
     private String natureza;
 
-    @Column(nullable = false, precision = 19, scale = 2)
+    @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal valor;
 
     @Column(name = "cpf_origem", length = 20)

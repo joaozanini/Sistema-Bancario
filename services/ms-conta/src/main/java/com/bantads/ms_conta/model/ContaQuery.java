@@ -22,13 +22,13 @@ public class ContaQuery {
     @Column(name = "gerente_cpf", nullable = false, length = 20)
     private String gerenteCpf;
 
-    @Column(nullable = false, precision = 19, scale = 2)
+    @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal saldo = BigDecimal.ZERO;
 
-    @Column(nullable = false, precision = 19, scale = 2)
+    @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal limite = BigDecimal.ZERO;
 
-    @Column(nullable = false, precision = 19, scale = 2)
+    @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal salario = BigDecimal.ZERO;
 
     @Column(name = "data_criacao", nullable = false)

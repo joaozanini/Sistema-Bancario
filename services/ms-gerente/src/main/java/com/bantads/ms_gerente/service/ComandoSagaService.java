@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import com.bantads.ms_gerente.dto.GerenteDTO;
 import com.bantads.ms_gerente.dto.MensagemSaga;
+import com.bantads.ms_gerente.dto.StatusResposta;
 import com.bantads.ms_gerente.exception.CpfJaCadastradoException;
 import com.bantads.ms_gerente.exception.EmailJaCadastradoException;
 import com.bantads.ms_gerente.exception.GerenteNaoEncontradoException;
@@ -62,9 +63,9 @@ public class ComandoSagaService {
 
         return switch (comando.tipo()) {
             case LISTAR_ATIVOS -> Optional.of(listarAtivos(comando));
-            case INSERIR -> Optional.of(umaVez(comando, this::inserir));
+            case INSERIR -> Optional.of(umaVez(comando, c -> seNaoCompensado(c, INSERIR_COMPENSAR, this::inserir)));
             case INSERIR_COMPENSAR -> Optional.of(umaVez(comando, this::inserirCompensar));
-            case INATIVAR -> Optional.of(umaVez(comando, this::inativar));
+            case INATIVAR -> Optional.of(umaVez(comando, c -> seNaoCompensado(c, INATIVAR_COMPENSAR, this::inativar)));
             case INATIVAR_COMPENSAR -> Optional.of(umaVez(comando, this::inativarCompensar));
             default -> Optional.of(MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(),
                     "Tipo de comando nao reconhecido pelo MS Gerente: " + comando.tipo()));
@@ -95,6 +96,25 @@ public class ComandoSagaService {
         return resposta;
     }
 
+    // comando que chega depois da propria compensacao (passo que estourou o timeout) nao pode mais ser executado
+    private MensagemSaga seNaoCompensado(MensagemSaga comando, String tipoCompensacao,
+            Function<MensagemSaga, MensagemSaga> passo) {
+        if (idempotenciaRepository.findBySagaIdAndTipo(comando.sagaId(), tipoCompensacao).isPresent()) {
+            log.warn("[{}] comando ignorado, SAGA ja compensada: sagaId={}", comando.tipo(), comando.sagaId());
+            return MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(), "SAGA já compensada");
+        }
+        return passo.apply(comando);
+    }
+
+    // a compensacao so desfaz o que esta SAGA fez: o timeout compensa tambem o passo que nao respondeu,
+    // e ele pode ter falhado (CPF repetido) ou nem ter sido executado
+    private boolean passoConcluido(String sagaId, String tipo) {
+        return idempotenciaRepository.findBySagaIdAndTipo(sagaId, tipo)
+                .map(registro -> jsonMapper.readValue(registro.getResposta(), MensagemSaga.class))
+                .filter(resposta -> resposta.status() == StatusResposta.SUCESSO)
+                .isPresent();
+    }
+
     // recebe { cpf, nome, email, telefone } e responde { cpf }; CPF ou e-mail repetido e FALHA (R13)
     private MensagemSaga inserir(MensagemSaga comando) {
         Gerente gerente = new Gerente();
@@ -115,8 +135,12 @@ public class ComandoSagaService {
     // recebe { cpf } e remove o gerente
     private MensagemSaga inserirCompensar(MensagemSaga comando) {
         String cpf = campo(comando, "cpf");
-        gerenteService.remover(cpf);
-        log.info("[{}] gerente removido: cpf={} sagaId={}", comando.tipo(), cpf, comando.sagaId());
+        if (passoConcluido(comando.sagaId(), INSERIR)) {
+            gerenteService.remover(cpf);
+            log.info("[{}] gerente removido: cpf={} sagaId={}", comando.tipo(), cpf, comando.sagaId());
+        } else {
+            log.warn("[{}] nada a desfazer, a SAGA nao inseriu o gerente: cpf={} sagaId={}", comando.tipo(), cpf, comando.sagaId());
+        }
         return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of());
     }
 
@@ -136,8 +160,12 @@ public class ComandoSagaService {
     // recebe { cpf } e reativa o gerente
     private MensagemSaga inativarCompensar(MensagemSaga comando) {
         String cpf = campo(comando, "cpf");
-        gerenteService.reativar(cpf);
-        log.info("[{}] gerente reativado: cpf={} sagaId={}", comando.tipo(), cpf, comando.sagaId());
+        if (passoConcluido(comando.sagaId(), INATIVAR)) {
+            gerenteService.reativar(cpf);
+            log.info("[{}] gerente reativado: cpf={} sagaId={}", comando.tipo(), cpf, comando.sagaId());
+        } else {
+            log.warn("[{}] nada a desfazer, a SAGA nao inativou o gerente: cpf={} sagaId={}", comando.tipo(), cpf, comando.sagaId());
+        }
         return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of());
     }
 

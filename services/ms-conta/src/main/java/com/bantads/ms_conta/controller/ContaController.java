@@ -90,8 +90,12 @@ public class ContaController {
     }
 
     @GetMapping("/{numero}")
-    public ResponseEntity<ContaDTO> buscarContaPorNumero(@PathVariable("numero") String numeroConta) {
-        ContaDTO dto = service.buscarContaPorNumero(numeroConta);
+    public ResponseEntity<ContaDTO> buscarContaPorNumero(
+            @PathVariable("numero") String numeroConta,
+            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf,
+            @RequestHeader(value = "X-User-Tipo", required = false) String xUserTipo
+    ) {
+        ContaDTO dto = service.buscarContaPorNumero(numeroConta, xUserCpf, xUserTipo);
         return ResponseEntity.ok(dto);
     }
 }

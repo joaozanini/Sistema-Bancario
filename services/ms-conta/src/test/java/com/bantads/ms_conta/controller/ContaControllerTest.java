@@ -259,14 +259,29 @@ class ContaControllerTest {
         ContaDTO dto = new ContaDTO("1291", "12912861012", "98574307084");
         dto.addLink("self", "http://localhost:8080/contas/1291");
 
-        when(service.buscarContaPorNumero("1291")).thenReturn(dto);
+        when(service.buscarContaPorNumero("1291", "12912861012", "CLIENTE")).thenReturn(dto);
 
-        mockMvc.perform(get("/contas/1291"))
+        mockMvc.perform(get("/contas/1291")
+                        .header("X-User-CPF", "12912861012")
+                        .header("X-User-Tipo", "CLIENTE"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.numeroConta").value("1291"))
                 .andExpect(jsonPath("$.cpfCliente").value("12912861012"))
                 .andExpect(jsonPath("$.gerenteCpf").value("98574307084"))
                 .andExpect(jsonPath("$._links.self.href").exists());
+    }
+
+    @Test
+    @DisplayName("Deve retornar 403 quando o cliente consulta a conta de outro cliente")
+    void deveRetornar403AoBuscarContaAlheia() throws Exception {
+        when(service.buscarContaPorNumero("1291", "09506382000", "CLIENTE"))
+                .thenThrow(new AcessoNegadoException("Usuário não autorizado a consultar esta conta."));
+
+        mockMvc.perform(get("/contas/1291")
+                        .header("X-User-CPF", "09506382000")
+                        .header("X-User-Tipo", "CLIENTE"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.erro").value("Usuário não autorizado a consultar esta conta."));
     }
 
     @Test
