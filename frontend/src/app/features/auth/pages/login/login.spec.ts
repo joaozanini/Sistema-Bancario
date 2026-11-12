@@ -33,19 +33,19 @@ describe('Login', () => {
   it('mostra a mensagem do Gateway no 401', () => {
     falharCom(new HttpErrorResponse({ status: 401, error: { auth: false, message: 'Login inválido!' } }));
 
-    expect(component.erro).toBe('Login inválido!');
-    expect(component.carregando).toBe(false);
+    expect(component.erro()).toBe('Login inválido!');
+    expect(component.carregando()).toBe(false);
   });
 
   it('avisa quando o servidor está fora', () => {
     falharCom(new HttpErrorResponse({ status: 0 }));
 
-    expect(component.erro).toBe('Não foi possível conectar ao servidor. Tente novamente.');
+    expect(component.erro()).toBe('Não foi possível conectar ao servidor. Tente novamente.');
   });
 
   it('usa a mensagem genérica nos outros erros', () => {
     falharCom(new HttpErrorResponse({ status: 502 }));
 
-    expect(component.erro).toBe('Não foi possível realizar o login.');
+    expect(component.erro()).toBe('Não foi possível realizar o login.');
   });
 });

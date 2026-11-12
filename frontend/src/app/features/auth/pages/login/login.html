@@ -32,12 +32,12 @@
         >
       </label>
 
-      @if (erro) {
-        <p class="erro" role="alert">{{ erro }}</p>
+      @if (erro()) {
+        <p class="erro" role="alert">{{ erro() }}</p>
       }
 
-      <button type="submit" [disabled]="carregando">
-        {{ carregando ? 'Entrando...' : 'Entrar' }}
+      <button type="submit" [disabled]="carregando()">
+        {{ carregando() ? 'Entrando...' : 'Entrar' }}
       </button>
     </form>
 
