@@ -794,6 +794,7 @@ class ContaServiceTest {
 
         when(contaQueryRepository.findById(numeroConta)).thenReturn(Optional.of(contaSalva));
         when(movimentacaoQueryRepository.existsById("evt-2-1291")).thenReturn(false);
+        simularUpdateDaProjecao(contaSalva);
 
         EventoConta evtDeposito = criarEventoComData(
                 numeroConta,
@@ -810,7 +811,11 @@ class ContaServiceTest {
         assertEquals("DEPOSITO", movCaptor.getValue().getTipo());
         assertEquals("ENTRADA", movCaptor.getValue().getNatureza());
         assertEquals(new BigDecimal("500.00"), movCaptor.getValue().getValor());
+        // o saldo sai pelo UPDATE condicionado à versão anterior, não por save da conta lida
+        verify(contaQueryRepository).aplicarVersao(numeroConta, 1, 2, new BigDecimal("500.00"));
+        verify(contaQueryRepository, times(1)).save(any());
         assertEquals(new BigDecimal("500.00"), contaSalva.getSaldo());
+        assertEquals(2, contaSalva.getUltimaVersao());
     }
 
     // ------------------------------- casos de borda do Event Store -------------------------------
@@ -824,6 +829,20 @@ class ContaServiceTest {
         conta.setDataCriacao(LocalDateTime.of(2026, 10, 1, 9, 0));
         conta.setUltimaVersao(ultimaVersao);
         return conta;
+    }
+
+    // Faz o mock responder como o banco: o UPDATE só vale se a conta estiver na versão anterior
+    private void simularUpdateDaProjecao(ContaQuery conta) {
+        when(contaQueryRepository.aplicarVersao(eq(conta.getNumeroConta()), anyInt(), anyInt(), any()))
+                .thenAnswer(chamada -> {
+                    int versaoAnterior = chamada.getArgument(1);
+                    if (conta.getUltimaVersao() != versaoAnterior) {
+                        return 0;
+                    }
+                    conta.setSaldo(conta.getSaldo().add(chamada.getArgument(3)));
+                    conta.setUltimaVersao(chamada.getArgument(2));
+                    return 1;
+                });
     }
 
     @Test
@@ -956,7 +975,36 @@ class ContaServiceTest {
 
         verify(movimentacaoQueryRepository, never()).save(any());
         verify(contaQueryRepository, never()).save(any());
+        verify(contaQueryRepository, never()).aplicarVersao(any(), anyInt(), anyInt(), any());
         assertEquals(new BigDecimal("500.00"), conta.getSaldo());
+    }
+
+    @Test
+    @DisplayName("Projeção não regrava o saldo quando outra transação já aplicou a mesma versão")
+    void naoDeveRegravarSaldoQuandoAVersaoJaFoiAplicadaPorOutraTransacao() {
+        // esta transação leu a conta na v1; enquanto isso a outra projetou a v2 (depósito de 150) e confirmou
+        ContaQuery contaLidaAntes = contaProjetada("1291", "12912861012", "800.00", 1);
+        when(contaQueryRepository.findById("1291")).thenReturn(Optional.of(contaLidaAntes));
+        when(contaQueryRepository.aplicarVersao("1291", 1, 2, new BigDecimal("150.00"))).thenReturn(0);
+
+        service.projetarEventoNoLadoQuery(criarEvento("1291", "Depósito", "{\"valor\":\"150.00\"}", 2));
+
+        // nada da conta lida antes volta para o banco: o saldo de 950.00 gravado pela outra transação fica
+        verify(contaQueryRepository, never()).save(any());
+        verify(movimentacaoQueryRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Projeção da troca de gerente só vale para a conta que ainda está na versão anterior (R13/R15)")
+    void deveProjetarTrocaDeGerentePeloUpdateCondicional() {
+        ContaQuery conta = contaProjetada("1291", "12912861012", "800.00", 4);
+        when(contaQueryRepository.findById("1291")).thenReturn(Optional.of(conta));
+
+        service.projetarEventoNoLadoQuery(
+                criarEvento("1291", "GerenteAlterado", "{\"gerenteCpf\":\"64065268052\"}", 5));
+
+        verify(contaQueryRepository).aplicarTrocaDeGerente("1291", 4, 5, "64065268052");
+        verify(contaQueryRepository, never()).save(any());
     }
 
     @Test
@@ -964,6 +1012,7 @@ class ContaServiceTest {
     void deveRecuperarLacunaDeVersaoPeloEventStore() {
         ContaQuery conta = contaProjetada("1291", "12912861012", "100.00", 1);
         when(contaQueryRepository.findById("1291")).thenReturn(Optional.of(conta));
+        simularUpdateDaProjecao(conta);
         EventoConta v2 = criarEvento("1291", "Depósito", "{\"valor\":\"50.00\"}", 2);
         EventoConta v3 = criarEvento("1291", "Saque", "{\"valor\":\"30.00\"}", 3);
         when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of(

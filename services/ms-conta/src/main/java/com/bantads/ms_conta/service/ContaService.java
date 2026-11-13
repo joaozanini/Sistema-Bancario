@@ -1048,36 +1048,37 @@ public class ContaService {
         }
         ContaQuery conta = contaOpt.get();
 
+        // A fila ms.conta.events e a sincronização feita nas consultas podem projetar a mesma versão ao mesmo
+        // tempo. Ler a conta, somar e salvar deixava a segunda transação regravar o saldo que ela tinha lido
+        // antes da primeira. Por isso a versão é aplicada num UPDATE que só vale para quem encontra a conta na
+        // versão anterior; quem chega depois não altera nada e sai
+        int versaoAnterior = evento.getVersao() - 1;
+
         if ("GERENTEALTERADO".equals(tipoNorm)) {
-            if (payload.has("gerenteCpf")) {
-                conta.setGerenteCpf(payload.get("gerenteCpf").asText());
-            } else if (payload.has("cpfGerente")) {
-                conta.setGerenteCpf(payload.get("cpfGerente").asText());
+            String gerenteCpf = payload.has("gerenteCpf") ? payload.get("gerenteCpf").asText()
+                    : (payload.has("cpfGerente") ? payload.get("cpfGerente").asText() : null);
+            if (gerenteCpf == null) {
+                contaQueryRepository.aplicarVersao(numeroConta, versaoAnterior, evento.getVersao(), BigDecimal.ZERO);
+            } else {
+                contaQueryRepository.aplicarTrocaDeGerente(numeroConta, versaoAnterior, evento.getVersao(), gerenteCpf);
             }
-            conta.setUltimaVersao(evento.getVersao());
-            contaQueryRepository.save(conta);
             return;
         }
 
-        MovimentacaoQuery mov = movimentacaoQueryRepository.existsById(evento.getId())
-                ? null
-                : construirMovimentacaoQuery(evento, conta.getCpfCliente());
-        if (mov == null) {
-            // Movimentação já gravada ou evento sem efeito no saldo: só avança a versão, para não abrir lacuna
-            conta.setUltimaVersao(evento.getVersao());
-            contaQueryRepository.save(conta);
-            return;
+        // Evento sem efeito no saldo: só avança a versão, para não abrir lacuna
+        MovimentacaoQuery mov = construirMovimentacaoQuery(evento, conta.getCpfCliente());
+        BigDecimal variacao = BigDecimal.ZERO;
+        if (mov != null) {
+            variacao = "ENTRADA".equals(mov.getNatureza()) ? mov.getValor() : mov.getValor().negate();
         }
 
-        movimentacaoQueryRepository.save(mov);
-
-        if ("ENTRADA".equals(mov.getNatureza())) {
-            conta.setSaldo(conta.getSaldo().add(mov.getValor()).setScale(2, RoundingMode.HALF_UP));
-        } else {
-            conta.setSaldo(conta.getSaldo().subtract(mov.getValor()).setScale(2, RoundingMode.HALF_UP));
+        int contasAtualizadas = contaQueryRepository.aplicarVersao(numeroConta, versaoAnterior, evento.getVersao(), variacao);
+        if (contasAtualizadas == 0) {
+            return; // outra transação já projetou esta versão, com a movimentação e o saldo
         }
-        conta.setUltimaVersao(evento.getVersao());
-        contaQueryRepository.save(conta);
+        if (mov != null && !movimentacaoQueryRepository.existsById(evento.getId())) {
+            movimentacaoQueryRepository.save(mov);
+        }
     }
 
     private void sincronizarLadoQuerySeNecessario(String numeroConta) {
