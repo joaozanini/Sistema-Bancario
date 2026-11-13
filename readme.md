@@ -21,6 +21,10 @@ Sistema de Internet Banking desenvolvido para a disciplina DS152 — Desenvolvim
 | PL — Plataforma & SAGA | Gabriel Silva Costa, Danniel Eduardo Dorox |
 | FE — Frontend | Reinaldo Antonio Castellano Neto, Murilo da Silva Santos |
 
+## Suposições
+
+O que o enunciado não define e a equipe precisou decidir está em [docs/suposicoes.pdf](docs/suposicoes.pdf) (fonte em `docs/suposicoes.md`).
+
 ## Configuração
 
 Copie `.env.example` para `.env` e preencha as variáveis locais (senha de app do Gmail, chave secreta do JWT etc.). **Nunca** commitar o `.env` com os valores reais.
