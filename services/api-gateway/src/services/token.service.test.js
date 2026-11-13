@@ -19,3 +19,18 @@ test('rejeita token adulterado', () => {
 
   assert.throws(() => verifyToken(adulterado));
 });
+
+test('sem JWT_SECRET o módulo não carrega (não existe chave reserva no código)', () => {
+  const caminho = require.resolve('./token.service');
+  const moduloEmCache = require.cache[caminho];
+  const chave = process.env.JWT_SECRET;
+  delete require.cache[caminho];
+  delete process.env.JWT_SECRET;
+
+  try {
+    assert.throws(() => require('./token.service'), /JWT_SECRET não definido/);
+  } finally {
+    process.env.JWT_SECRET = chave;
+    require.cache[caminho] = moduloEmCache;
+  }
+});

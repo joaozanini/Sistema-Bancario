@@ -133,6 +133,45 @@ class GerenteServiceTest {
     }
 
     @Test
+    @DisplayName("Deve recusar com erro de validação nome, e-mail ou telefone maiores que a coluna (R13)")
+    void deveRecusarInsercaoComCampoMaiorQueAColuna() {
+        Gerente nomeLongo = gerenteNovo("G".repeat(101), "novo@bantads.com.br", "41999990000");
+        Gerente emailLongo = gerenteNovo("Gerente Novo", "g".repeat(90) + "@bantads.com.br", "41999990000");
+        Gerente telefoneLongo = gerenteNovo("Gerente Novo", "novo@bantads.com.br", "4".repeat(21));
+
+        assertThatThrownBy(() -> service.inserir(nomeLongo))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Nome deve ter no máximo 100 caracteres.");
+        assertThatThrownBy(() -> service.inserir(emailLongo))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("E-mail deve ter no máximo 100 caracteres.");
+        assertThatThrownBy(() -> service.inserir(telefoneLongo))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Telefone deve ter no máximo 20 caracteres.");
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve recusar a atualização com nome ou telefone maiores que a coluna (R14)")
+    void deveRecusarAtualizacaoComCampoMaiorQueAColuna() {
+        when(repository.findById(CPF)).thenReturn(Optional.of(gerenteExistente()));
+
+        assertThatThrownBy(() -> service.atualizar(CPF, new AtualizacaoGerenteDTO("G".repeat(101), "41988887777")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Nome deve ter no máximo 100 caracteres.");
+        assertThatThrownBy(() -> service.atualizar(CPF, new AtualizacaoGerenteDTO("Geniéve", "4".repeat(21))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Telefone deve ter no máximo 20 caracteres.");
+
+        verify(repository, never()).save(any());
+    }
+
+    private Gerente gerenteNovo(String nome, String email, String telefone) {
+        Gerente novo = new Gerente();
+        novo.setCpf("11144477735");
+        novo.setNome(nome);
+        novo.setEmail(email);
+        novo.setTelefone(telefone);
+        return novo;
+    }
+
+    @Test
     @DisplayName("Deve recusar inserção quando CPF já está cadastrado no MS Gerente")
     void deveRecusarInsercaoQuandoCpfDuplicado() {
         Gerente novo = new Gerente();

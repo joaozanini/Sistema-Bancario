@@ -1,22 +1,13 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { map, Observable } from 'rxjs';
-
-export const URL_VIACEP = 'https://viacep.com.br/ws';
+import { catchError, map, Observable, throwError } from 'rxjs';
+import { environment } from '../../../../environments/environment';
 
 export interface Endereco {
   logradouro: string;
   complemento: string;
   cidade: string;
   uf: string;
-}
-
-interface RespostaViaCep {
-  logradouro?: string;
-  complemento?: string;
-  localidade?: string;
-  uf?: string;
-  erro?: boolean | string;
 }
 
 export class CepNaoEncontradoError extends Error {
@@ -31,21 +22,21 @@ export class CepNaoEncontradoError extends Error {
 export class CepService {
   private http = inject(HttpClient);
 
+  // A consulta passa pelo API Gateway (GET /cep/{cep}), que é quem fala com o ViaCEP:
+  // o front só conversa com o Gateway
   buscar(cep: string): Observable<Endereco> {
     const digitos = cep.replace(/\D/g, '');
 
-    return this.http.get<RespostaViaCep>(`${URL_VIACEP}/${digitos}/json/`).pipe(
-      map((resposta) => {
-        if (resposta.erro) {
-          throw new CepNaoEncontradoError();
-        }
-        return {
-          logradouro: resposta.logradouro ?? '',
-          complemento: resposta.complemento ?? '',
-          cidade: resposta.localidade ?? '',
-          uf: resposta.uf ?? '',
-        };
-      }),
+    return this.http.get<Partial<Endereco>>(`${environment.apiUrl}/cep/${digitos}`).pipe(
+      map((resposta) => ({
+        logradouro: resposta.logradouro ?? '',
+        complemento: resposta.complemento ?? '',
+        cidade: resposta.cidade ?? '',
+        uf: resposta.uf ?? '',
+      })),
+      catchError((erro: HttpErrorResponse) =>
+        throwError(() => (erro.status === 404 ? new CepNaoEncontradoError() : erro)),
+      ),
     );
   }
 }
