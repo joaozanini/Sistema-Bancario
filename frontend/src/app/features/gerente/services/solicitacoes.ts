@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, map, Observable, of, switchMap, throwError } from 'rxjs';
 
 import { JobAceito, JobsService } from '../../../core/services/jobs';
-import { Solicitacao, SolicitacaoDto } from '../models/solicitacao.model';
+import { Solicitacao, SolicitacoesListDto } from '../models/solicitacao.model';
 import { ordenarSolicitacoes, paraSolicitacao } from '../utils/solicitacoes';
 import { environment } from '../../../../environments/environment';
 
@@ -24,13 +24,13 @@ export class SolicitacoesService {
 
   listar(): Observable<Solicitacao[]> {
     return this.http
-      .get<SolicitacaoDto[]>(this.solicitacoesUrl)
-      .pipe(map((dtos) => dtos.map(paraSolicitacao).sort(ordenarSolicitacoes)));
+      .get<SolicitacoesListDto>(this.solicitacoesUrl)
+      .pipe(map(({ solicitacoes }) => solicitacoes.map(paraSolicitacao).sort(ordenarSolicitacoes)));
   }
 
   aprovar(cpf: string): Observable<string> {
     return this.http
-      .post<JobAceito>(`${this.solicitacoesUrl}/${cpf}/aprovar`, {}, { observe: 'response' })
+      .post<JobAceito>(`${this.solicitacoesUrl}/${cpf}/aprovacao`, {}, { observe: 'response' })
       .pipe(
         switchMap((resposta) => {
           const jobId = resposta.body?.jobId;
@@ -58,9 +58,9 @@ export class SolicitacoesService {
       );
   }
 
-  recusar(id: string, motivo: string): Observable<void> {
+  recusar(cpf: string, motivo: string): Observable<void> {
     return this.http
-      .post<unknown>(`${this.solicitacoesUrl}/${id}/rejeitar`, { motivo })
+      .post<unknown>(`${this.solicitacoesUrl}/${cpf}/rejeicao`, { motivo })
       .pipe(map(() => undefined));
   }
 }

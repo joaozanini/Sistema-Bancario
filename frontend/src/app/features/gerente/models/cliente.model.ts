@@ -3,16 +3,20 @@ import Decimal from 'decimal.js';
 export interface ClienteDto {
   cpf: string;
   nome: string;
-  cidade: string;
-  uf: string;
+  cidade: string | null;
+  estado: string | null;
   saldo: string;
+}
+
+export interface ClientesListDto {
+  clientes: ClienteDto[];
 }
 
 export interface Cliente {
   cpf: string;
   nome: string;
-  cidade: string;
-  uf: string;
+  cidade: string | null;
+  estado: string | null;
   saldo: Decimal;
 }
 
@@ -25,6 +29,11 @@ export interface LinhaRelatorioDto {
   saldo: string;
   cpfGerente: string | null;
   nomeGerente: string | null;
+}
+
+// Resultado inline do job do relatório (GET /jobs/{jobId}/result)
+export interface RelatorioClientesDto {
+  clientes: LinhaRelatorioDto[];
 }
 
 export interface LinhaRelatorio {

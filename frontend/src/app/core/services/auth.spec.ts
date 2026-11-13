@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth';
 
-const LOGOUT_URL = `${environment.apiUrl}/auth/logout`;
+const LOGOUT_URL = `${environment.apiUrl}/logout`;
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -34,7 +34,8 @@ describe('AuthService', () => {
 
     const req = http.expectOne(LOGOUT_URL);
     expect(req.request.method).toBe('POST');
-    req.flush({ auth: false });
+    // o Gateway responde 204, sem corpo
+    req.flush(null, { status: 204, statusText: 'No Content' });
 
     expect(concluiu).toBe(true);
     expect(service.obterToken()).toBeNull();

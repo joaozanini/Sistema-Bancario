@@ -8,7 +8,8 @@ import { Job, JobsService } from '../../../core/services/jobs';
 import { SolicitacoesService } from './solicitacoes';
 
 const CPF = '12912861012';
-const URL_APROVAR = `${environment.apiUrl}/solicitacoes/${CPF}/aprovar`;
+const URL_SOLICITACOES = `${environment.apiUrl}/solicitacoes`;
+const URL_APROVAR = `${URL_SOLICITACOES}/${CPF}/aprovacao`;
 
 function job(parcial: Partial<Job>): Job {
   return {
@@ -51,6 +52,42 @@ describe('SolicitacoesService', () => {
     });
     return saida;
   }
+
+  it('lista as solicitações que vêm dentro de { solicitacoes }, pendentes primeiro', () => {
+    let lista: { cpf: string; status: string; motivo: string | null }[] = [];
+    service.listar().subscribe((solicitacoes) => (lista = solicitacoes));
+
+    http.expectOne(URL_SOLICITACOES).flush({
+      solicitacoes: [
+        {
+          cpf: '11111111111',
+          nome: 'Beltrano',
+          salario: '800.00',
+          status: 'NAO_APROVADA',
+          motivo: 'renda insuficiente',
+          dataHoraProcessamento: '2026-10-10T10:00:00',
+        },
+        { cpf: CPF, nome: 'Catharyna', salario: '10000.00', status: 'PENDENTE', motivo: null },
+      ],
+      _links: { self: { href: URL_SOLICITACOES } },
+    });
+
+    expect(lista.map((s) => s.cpf)).toEqual([CPF, '11111111111']);
+    expect(lista[1].status).toBe('NAO_APROVADO');
+    expect(lista[1].motivo).toBe('renda insuficiente');
+  });
+
+  it('recusa pelo CPF, enviando o motivo', () => {
+    let concluiu = false;
+    service.recusar(CPF, 'renda insuficiente').subscribe(() => (concluiu = true));
+
+    const req = http.expectOne(`${URL_SOLICITACOES}/${CPF}/rejeicao`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ motivo: 'renda insuficiente' });
+    req.flush({ cpf: CPF, status: 'NAO_APROVADA', motivo: 'renda insuficiente' });
+
+    expect(concluiu).toBe(true);
+  });
 
   it('aprova pelo CPF, faz polling do job e busca o cliente criado', () => {
     const saida = aprovar();

@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
 import { CpfPipe } from '../../../../shared/pipes/cpf.pipe';
+import { mensagemDaApi } from '../../../../shared/utils/erro-api.util';
 import { GerenteDto } from '../../models/gerente.model';
 import { GerentesService } from '../../services/gerentes';
 
@@ -91,8 +92,8 @@ export class EditarGerente implements OnInit {
       return 'Não foi possível conectar ao servidor. Tente novamente.';
     }
     if (err.status === 404) {
-      return err.error?.erro || 'Gerente não encontrado.';
+      return mensagemDaApi(err, 'Gerente não encontrado.');
     }
-    return err.error?.erro || err.error?.message || padrao;
+    return mensagemDaApi(err, padrao);
   }
 }

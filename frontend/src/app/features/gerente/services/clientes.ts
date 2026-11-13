@@ -4,7 +4,13 @@ import { map, Observable, of, switchMap, throwError } from 'rxjs';
 
 import { JobAceito, JobsService } from '../../../core/services/jobs';
 import { MoneyDecimal } from '../../../shared/utils/money.util';
-import { Cliente, ClienteDto, LinhaRelatorio, LinhaRelatorioDto } from '../models/cliente.model';
+import {
+  Cliente,
+  ClientesListDto,
+  LinhaRelatorio,
+  LinhaRelatorioDto,
+  RelatorioClientesDto,
+} from '../models/cliente.model';
 import { environment } from '../../../../environments/environment';
 
 export const URL_RELATORIO = `${environment.apiUrl}/relatorios/clientes`;
@@ -19,9 +25,9 @@ export class ClientesService {
   private readonly clientesUrl = `${environment.apiUrl}/clientes`;
 
   listar(): Observable<Cliente[]> {
-    return this.http.get<ClienteDto[]>(this.clientesUrl).pipe(
-      map((dtos) =>
-        dtos
+    return this.http.get<ClientesListDto>(this.clientesUrl).pipe(
+      map(({ clientes }) =>
+        clientes
           .map((dto) => ({ ...dto, saldo: new MoneyDecimal(dto.saldo || '0') }))
           .sort(porNome),
       ),
@@ -30,12 +36,13 @@ export class ClientesService {
 
   gerarRelatorio(): Observable<LinhaRelatorio[]> {
     return this.http
-      .get<LinhaRelatorioDto[] | JobAceito>(URL_RELATORIO, { observe: 'response' })
+      .get<RelatorioClientesDto | JobAceito>(URL_RELATORIO, { observe: 'response' })
       .pipe(
         switchMap((resposta) => {
           const corpo = resposta.body;
           if (resposta.status !== 202) {
-            return of(Array.isArray(corpo) ? corpo : []);
+            // resposta síncrona (200): o relatório já vem no corpo, no mesmo formato do resultado do job
+            return of(linhasDoRelatorio(corpo as RelatorioClientesDto | null));
           }
 
           const jobId = (corpo as JobAceito | null)?.jobId;
@@ -47,13 +54,17 @@ export class ClientesService {
             switchMap((job) =>
               job.status === 'FALHA'
                 ? throwError(() => new Error(job.erro || 'Não foi possível gerar o relatório.'))
-                : this.jobsService.resultado<LinhaRelatorioDto[]>(jobId),
+                : this.jobsService.resultado<RelatorioClientesDto>(jobId).pipe(map(linhasDoRelatorio)),
             ),
           );
         }),
         map((linhas) => linhas.map(paraLinhaRelatorio).sort(porNome)),
       );
   }
+}
+
+function linhasDoRelatorio(resultado: RelatorioClientesDto | null): LinhaRelatorioDto[] {
+  return Array.isArray(resultado?.clientes) ? resultado.clientes : [];
 }
 
 function paraLinhaRelatorio(dto: LinhaRelatorioDto): LinhaRelatorio {

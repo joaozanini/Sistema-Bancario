@@ -14,7 +14,9 @@ export function filtrarClientes(clientes: Cliente[], busca: string): Cliente[] {
     return clientes;
   }
 
-  const digitos = busca.replace(/\D/g, '');
+  // O CPF só entra na comparação quando o termo é feito de dígitos e pontuação de CPF:
+  // em "Cliente Novo 1" o dígito faz parte do nome e casaria com todo CPF que tivesse "1"
+  const digitos = /^[\d.\-\s]+$/.test(busca.trim()) ? busca.replace(/\D/g, '') : '';
   return clientes.filter(
     (c) => normalizar(c.nome).includes(termo) || (digitos !== '' && c.cpf.includes(digitos)),
   );

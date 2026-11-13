@@ -46,13 +46,14 @@ export function paraSolicitacao(dto: SolicitacaoDto): Solicitacao {
   const status = normalizarStatus(dto.status);
 
   return {
-    id: dto.id,
+    // cada CPF tem no máximo uma solicitação, então ele identifica a linha da tabela
+    id: dto.cpf,
     cpf: dto.cpf,
     nome: dto.nome,
     salario: new MoneyDecimal(dto.salario || '0'),
     status,
-    motivo: status === 'NAO_APROVADO' ? dto.motivoRejeicao?.trim() || null : null,
-    dataHora: status === 'PENDENTE' ? null : parseAppDateTime(dto.dataAprovacaoRejeicao),
+    motivo: status === 'NAO_APROVADO' ? dto.motivo?.trim() || null : null,
+    dataHora: status === 'PENDENTE' ? null : parseAppDateTime(dto.dataHoraProcessamento),
   };
 }
 

@@ -5,6 +5,7 @@ import { FormsModule, NgForm } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
+import { mensagemDaApi } from '../../../../shared/utils/erro-api.util';
 import { GerentesService } from '../../services/gerentes';
 
 @Component({
@@ -67,6 +68,6 @@ export class NovoGerente {
     if (err.status === 0) {
       return 'Não foi possível conectar ao servidor. Tente novamente.';
     }
-    return err.error?.message || err.error?.erro || 'Não foi possível inserir o gerente.';
+    return mensagemDaApi(err, 'Não foi possível inserir o gerente.');
   }
 }

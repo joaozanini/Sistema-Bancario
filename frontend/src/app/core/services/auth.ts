@@ -24,8 +24,8 @@ export interface LoginResponse {
 export class AuthService {
   private http = inject(HttpClient);
 
-  private readonly loginUrl = `${environment.apiUrl}/auth/login`;
-  private readonly logoutUrl = `${environment.apiUrl}/auth/logout`;
+  private readonly loginUrl = `${environment.apiUrl}/login`;
+  private readonly logoutUrl = `${environment.apiUrl}/logout`;
 
   login(email: string, senha: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(this.loginUrl, { email, senha });

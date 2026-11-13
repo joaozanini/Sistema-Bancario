@@ -130,7 +130,7 @@ export class Home implements OnInit {
     this.processandoId.set(solicitacao.id);
 
     this.solicitacoesService
-      .recusar(solicitacao.id, motivo)
+      .recusar(solicitacao.cpf, motivo)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {

@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 
 import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
 import { Logo } from '../../../../shared/components/logo/logo';
+import { mensagemDaApi } from '../../../../shared/utils/erro-api.util';
 import { MoneyDecimal } from '../../../../shared/utils/money.util';
 import { AutocadastroService } from '../../services/autocadastro';
 
@@ -80,6 +81,11 @@ export class Register {
   }
 
   private mensagemDeErro(err: HttpErrorResponse): string {
+    // a API devolve o motivo em "mensagem" (ex.: CPF que já possui solicitação)
+    const mensagem = mensagemDaApi(err, '');
+    if (mensagem) {
+      return mensagem;
+    }
     if (err.status === 0) {
       return 'Não foi possível conectar ao servidor. Tente novamente.';
     }

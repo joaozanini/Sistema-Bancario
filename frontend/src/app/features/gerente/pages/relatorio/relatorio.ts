@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { BrlCurrencyPipe } from '../../../../shared/pipes/brl-currency.pipe';
 import { CpfPipe } from '../../../../shared/pipes/cpf.pipe';
+import { mensagemDaApi } from '../../../../shared/utils/erro-api.util';
 import { LinhaRelatorio } from '../../models/cliente.model';
 import { ClientesService } from '../../services/clientes';
 
@@ -57,6 +58,6 @@ export class Relatorio implements OnInit {
     if (err.status === 0) {
       return 'Não foi possível conectar ao servidor. Tente novamente.';
     }
-    return err.error?.message || 'Não foi possível gerar o relatório.';
+    return mensagemDaApi(err, 'Não foi possível gerar o relatório.');
   }
 }

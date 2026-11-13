@@ -72,7 +72,13 @@ describe('EditarGerente', () => {
 
   it('mostra o erro devolvido pelo back', () => {
     gerentesService.atualizar.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 400, error: { erro: 'Nome é obrigatório.' } })),
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: { status: 400, erro: 'Bad Request', mensagem: 'Nome é obrigatório.' },
+          }),
+      ),
     );
 
     fixture.nativeElement.querySelector('form').dispatchEvent(new Event('submit'));
