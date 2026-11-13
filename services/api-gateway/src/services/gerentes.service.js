@@ -3,8 +3,8 @@ const gerenteService = require('./gerente.service');
 
 function contarClientesPorGerente(contas) {
   const contagem = new Map();
-  for (const { gerenteCpf } of contas) {
-    contagem.set(gerenteCpf, (contagem.get(gerenteCpf) ?? 0) + 1);
+  for (const { cpfGerente } of contas) {
+    contagem.set(cpfGerente, (contagem.get(cpfGerente) ?? 0) + 1);
   }
   return contagem;
 }

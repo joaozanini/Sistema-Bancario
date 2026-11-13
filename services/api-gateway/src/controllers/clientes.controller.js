@@ -1,12 +1,15 @@
 const clientesService = require('../services/clientes.service');
 const clienteService = require('../services/cliente.service');
+const { responderErro } = require('../services/erro.service');
 
+// R11: a lista vai dentro de { clientes }, com os _links da própria listagem
 async function listar(req, res) {
   try {
-    return res.json(await clientesService.listarTodos());
+    const clientes = await clientesService.listarTodos(req.query.busca);
+    return res.json({ clientes, _links: { self: { href: '/clientes' } } });
   } catch (err) {
     console.error('Falha ao consultar clientes (API Composition):', err.message);
-    return res.status(502).json({ message: 'Serviço de clientes indisponível.' });
+    return responderErro(res, 502, 'Serviço de clientes indisponível.');
   }
 }
 
@@ -14,17 +17,17 @@ async function listar(req, res) {
 async function buscar(req, res) {
   const { cpf } = req.params;
   if (String(req.user.tipo).toUpperCase() !== 'GERENTE' && req.user.cpf !== cpf) {
-    return res.status(403).json({ message: 'Acesso negado.' });
+    return responderErro(res, 403, 'Acesso negado: o cadastro é de outro cliente.');
   }
 
   try {
     return res.json(await clienteService.buscar(cpf));
   } catch (err) {
     if (err instanceof clienteService.ClienteNaoEncontradoError) {
-      return res.status(404).json({ message: 'Cliente não encontrado.' });
+      return responderErro(res, 404, 'Cliente não encontrado.');
     }
     console.error('Falha ao consultar cliente no MS Cliente:', err.message);
-    return res.status(502).json({ message: 'Serviço de clientes indisponível.' });
+    return responderErro(res, 502, 'Serviço de clientes indisponível.');
   }
 }
 

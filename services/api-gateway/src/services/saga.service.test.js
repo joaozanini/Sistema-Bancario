@@ -13,6 +13,7 @@ function comDublos({ aoPublicar } = {}) {
 
   jobService.criar = async (jobId, dominio) => {
     eventos.push({ tipo: 'job', jobId, dominio });
+    return { jobId, status: 'PENDENTE', resultType: null, dominio, resourceId: null, erro: null };
   };
   rabbit.publicar = async (fila, mensagem) => {
     eventos.push({ tipo: 'publicacao', fila, mensagem });
@@ -31,7 +32,7 @@ function comDublos({ aoPublicar } = {}) {
 test('publica em saga.cmd no formato do enunciado', async () => {
   const d = comDublos();
   try {
-    const sagaId = await sagaService.iniciar('cliente.aprovar', 'clientes', { cpf: '12912861012' });
+    const { jobId: sagaId } = await sagaService.iniciar('cliente.aprovar', 'clientes', { cpf: '12912861012' });
     const { fila, mensagem } = d.eventos.find((e) => e.tipo === 'publicacao');
 
     assert.equal(fila, 'saga.cmd');
@@ -65,12 +66,16 @@ test('timestamp é o horário local, como o do Orquestrador', async () => {
 test('jobId e sagaId são o mesmo uuid', async () => {
   const d = comDublos();
   try {
-    const sagaId = await sagaService.iniciar('gerente.inserir', 'gerentes', {});
+    const devolvido = await sagaService.iniciar('gerente.inserir', 'gerentes', {});
     const job = d.eventos.find((e) => e.tipo === 'job');
+    const { mensagem } = d.eventos.find((e) => e.tipo === 'publicacao');
 
-    assert.equal(job.jobId, sagaId);
+    assert.equal(job.jobId, mensagem.sagaId);
     assert.equal(job.dominio, 'gerentes');
-    assert.match(sagaId, /^[0-9a-f-]{36}$/);
+    assert.match(mensagem.sagaId, /^[0-9a-f-]{36}$/);
+    // quem chama recebe o job PENDENTE, que vira o corpo do 202
+    assert.equal(devolvido.jobId, mensagem.sagaId);
+    assert.equal(devolvido.status, 'PENDENTE');
   } finally {
     d.restaurar();
   }

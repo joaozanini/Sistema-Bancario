@@ -8,6 +8,7 @@ const redis = require('../config/redis');
 const clientesService = require('../services/clientes.service');
 const contaService = require('../services/conta.service');
 const gerenteService = require('../services/gerente.service');
+const { corpoErro, responderErro } = require('../services/erro.service');
 
 const SERVICOS = [
   { nome: 'cliente', url: clienteServiceUrl },
@@ -62,9 +63,9 @@ async function reboot(req, res) {
 
   if (falhas.length > 0) {
     console.error('Reboot falhou:', falhas.map((f) => `${f.nome}: ${f.motivo}`).join('; '));
+    // além do erro padrão, diz qual serviço falhou: é o que se quer saber na hora da correção
     return res.status(502).json({
-      status: 'erro',
-      message: 'Não foi possível recriar o seed em todos os serviços.',
+      ...corpoErro(502, 'Não foi possível recriar o seed em todos os serviços.'),
       servicos: Object.fromEntries(resultados.map((r) => [r.nome, r.ok ? 'ok' : r.motivo])),
     });
   }
@@ -73,7 +74,7 @@ async function reboot(req, res) {
     await limparRedis();
   } catch (err) {
     console.error('Reboot falhou ao limpar o Redis:', err.message);
-    return res.status(503).json({ status: 'erro', message: 'Sessão indisponível.' });
+    return responderErro(res, 503, 'Sessão indisponível.');
   }
 
   let contagens;
@@ -82,7 +83,7 @@ async function reboot(req, res) {
   } catch (err) {
     // O seed foi recriado; só a contagem falhou. Devolver 200 esconderia isso.
     console.error('Reboot recriou o seed mas falhou ao contar:', err.message);
-    return res.status(502).json({ status: 'erro', message: 'Seed recriado, mas a contagem falhou.' });
+    return responderErro(res, 502, 'Seed recriado, mas a contagem falhou.');
   }
 
   return res.json({ status: 'ok', ...contagens });

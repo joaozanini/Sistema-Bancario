@@ -7,9 +7,9 @@ const gerenteService = require('./gerente.service');
 const relatorioService = require('./relatorio.service');
 
 const CONTA = {
-  numeroConta: '1234',
+  numero: '1234',
   cpfCliente: '12912861012',
-  gerenteCpf: '98574307084',
+  cpfGerente: '98574307084',
   saldo: '1500.0000',
 };
 
@@ -19,8 +19,7 @@ const CLIENTE = {
   email: 'catharyna@bantads.com.br',
   salario: '10000.00',
   telefone: '41999999999',
-  cidade: 'Curitiba',
-  uf: 'PR',
+  endereco: { cidade: 'Curitiba', uf: 'PR' },
 };
 
 function comDublos({ contas = [CONTA], clientes = {}, gerentes = {} } = {}) {
@@ -83,7 +82,7 @@ test('compoe os oito campos do R16 a partir dos tres servicos', async () => {
 });
 
 test('ordena crescente por nome do cliente, respeitando acento', async () => {
-  const contas = ['1', '2', '3'].map((n) => ({ ...CONTA, numeroConta: n, cpfCliente: n }));
+  const contas = ['1', '2', '3'].map((n) => ({ ...CONTA, numero: n, cpfCliente: n }));
   const d = comDublos({
     contas,
     clientes: {
@@ -113,7 +112,7 @@ test('salario e saldo trafegam como string (nunca float)', async () => {
 });
 
 test('conta sem gerente nao derruba o relatorio', async () => {
-  const d = comDublos({ contas: [{ ...CONTA, gerenteCpf: null }] });
+  const d = comDublos({ contas: [{ ...CONTA, cpfGerente: null }] });
   try {
     const [linha] = await relatorioService.gerar();
 

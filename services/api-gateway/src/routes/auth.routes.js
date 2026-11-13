@@ -4,7 +4,7 @@ const { verifyJwtAndSession } = require("../middlewares/auth.middleware");
 
 const router = Router();
 
-router.post(["/login", "/auth/login"], login);
-router.post(["/logout", "/auth/logout"], verifyJwtAndSession, logout);
+router.post("/login", login);
+router.post("/logout", verifyJwtAndSession, logout);
 
 module.exports = router;

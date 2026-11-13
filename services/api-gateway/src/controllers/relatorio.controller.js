@@ -1,6 +1,8 @@
 const { randomUUID } = require('node:crypto');
 const jobService = require('../services/job.service');
 const relatorioService = require('../services/relatorio.service');
+const { responderErro } = require('../services/erro.service');
+const { responderJobAceito } = require('./jobs.controller');
 
 const DOMINIO = 'relatorios';
 
@@ -9,16 +11,17 @@ const DOMINIO = 'relatorios';
 async function gerar(req, res) {
   const jobId = randomUUID();
 
+  let job;
   try {
-    await jobService.criar(jobId, DOMINIO);
+    job = await jobService.criar(jobId, DOMINIO);
   } catch (err) {
     console.error('Falha ao criar o job do relatório:', err.message);
-    return res.status(503).json({ message: 'Serviço de jobs indisponível.' });
+    return responderErro(res, 503, 'Serviço de jobs indisponível.');
   }
 
   // 202 primeiro: a composição percorre todas as contas e não pode prender a
   // resposta. O front acompanha por /jobs/:id/status.
-  res.status(202).json({ jobId });
+  responderJobAceito(res, job);
   comporEmSegundoPlano(jobId);
   return undefined;
 }
@@ -26,7 +29,8 @@ async function gerar(req, res) {
 function comporEmSegundoPlano(jobId) {
   relatorioService
     .gerar()
-    .then((linhas) => jobService.concluirInline(jobId, linhas))
+    // o resultado inline do R16 é um objeto { clientes: [...] }, não a lista solta
+    .then((linhas) => jobService.concluirInline(jobId, { clientes: linhas }))
     .catch(async (err) => {
       console.error('Falha ao gerar o relatório de clientes:', err.message);
       try {

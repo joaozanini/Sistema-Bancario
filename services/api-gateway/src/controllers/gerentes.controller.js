@@ -1,16 +1,17 @@
 const sagaService = require("../services/saga.service");
 const gerenteService = require("../services/gerente.service");
 const gerentesService = require("../services/gerentes.service");
+const { responderErro } = require("../services/erro.service");
+const { responderJobAceito } = require("./jobs.controller");
 
-// a suíte de testes lê a lista dentro de { gerentes: [...] }
+// R12: a lista vai dentro de { gerentes }, com os _links da própria listagem
 async function listar(req, res) {
   try {
-    return res.json({ gerentes: await gerentesService.listarTodos() });
+    const gerentes = await gerentesService.listarTodos();
+    return res.json({ gerentes, _links: { self: { href: "/gerentes" } } });
   } catch (err) {
     console.error("Falha ao listar gerentes (API Composition):", err.message);
-    return res
-      .status(502)
-      .json({ message: "Serviço de gerentes indisponível." });
+    return responderErro(res, 502, "Serviço de gerentes indisponível.");
   }
 }
 
@@ -23,22 +24,21 @@ async function buscar(req, res) {
     return res.json(await gerenteService.buscar(cpf));
   } catch (err) {
     if (err instanceof gerenteService.GerenteNaoEncontradoError) {
-      return res.status(404).json({ message: "Gerente não encontrado." });
+      return responderErro(res, 404, "Gerente não encontrado.");
     }
     console.error("Falha ao consultar gerente no MS Gerente:", err.message);
-    return res
-      .status(502)
-      .json({ message: "Serviço de gerentes indisponível." });
+    return responderErro(res, 502, "Serviço de gerentes indisponível.");
   }
 }
 
 const TIPO_INSERIR_GERENTE = "inserir-gerente";
 const TIPO_REMOVER_GERENTE = "remover-gerente";
 const DOMINIO = "gerentes";
-const CAMPOS_OBRIGATORIOS = ["cpf", "nome", "email", "senha"];
+const CAMPOS_OBRIGATORIOS = ["cpf", "nome", "email", "telefone", "senha"];
 
 // R13: a senha segue no payload da SAGA e o Orquestrador a mantém só em memória
-// até o passo do MS Auth
+// até o passo do MS Auth. Aqui só se confere o formato da requisição (400); e-mail
+// ou CPF já usados são regra de negócio e aparecem depois, como job FALHA.
 async function inserir(req, res) {
   const { cpf, nome, email, telefone, senha } = req.body || {};
 
@@ -46,13 +46,14 @@ async function inserir(req, res) {
     (campo) => !String(req.body?.[campo] ?? "").trim(),
   );
   if (faltando.length > 0) {
-    return res
-      .status(400)
-      .json({ message: `Campos obrigatórios: ${faltando.join(", ")}.` });
+    return responderErro(res, 400, `Campos obrigatórios: ${faltando.join(", ")}.`);
+  }
+  if (!/^\d{11}$/.test(String(cpf))) {
+    return responderErro(res, 400, "CPF deve conter 11 dígitos, sem pontuação.");
   }
 
   try {
-    const jobId = await sagaService.iniciar(TIPO_INSERIR_GERENTE, DOMINIO, {
+    const job = await sagaService.iniciar(TIPO_INSERIR_GERENTE, DOMINIO, {
       cpf,
       nome,
       email,
@@ -61,12 +62,10 @@ async function inserir(req, res) {
     });
     // R13 grava o gerente: o enunciado (5.5) pede invalidar o cadastro em cache
     await gerenteService.invalidar(cpf);
-    return res.status(202).json({ jobId });
+    return responderJobAceito(res, job);
   } catch (err) {
     console.error("Falha ao iniciar a SAGA de inserção:", err.message);
-    return res
-      .status(502)
-      .json({ message: "Não foi possível iniciar a inserção." });
+    return responderErro(res, 502, "Não foi possível iniciar a inserção.");
   }
 }
 
@@ -76,23 +75,19 @@ async function remover(req, res) {
   const { cpf } = req.params;
 
   if (req.user.cpf === cpf) {
-    return res
-      .status(403)
-      .json({ message: "Um gerente não pode remover a si mesmo." });
+    return responderErro(res, 403, "Um gerente não pode remover a si mesmo.");
   }
 
   try {
-    const jobId = await sagaService.iniciar(TIPO_REMOVER_GERENTE, DOMINIO, {
+    const job = await sagaService.iniciar(TIPO_REMOVER_GERENTE, DOMINIO, {
       cpf,
     });
     // R15 inativa o gerente: o cadastro em cache deixa de valer
     await gerenteService.invalidar(cpf);
-    return res.status(202).json({ jobId });
+    return responderJobAceito(res, job);
   } catch (err) {
     console.error("Falha ao iniciar a SAGA de remoção:", err.message);
-    return res
-      .status(502)
-      .json({ message: "Não foi possível iniciar a remoção." });
+    return responderErro(res, 502, "Não foi possível iniciar a remoção.");
   }
 }
 

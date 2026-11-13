@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { listarTodos } = require('./clientes.service');
+const { listarTodos, filtrar } = require('./clientes.service');
 const { ClienteNaoEncontradoError } = require('./cliente.service');
 
 const json = (corpo, status = 200) => ({
@@ -29,8 +29,13 @@ function comMicrosservicos({ contas, clientes = {} }) {
   };
 }
 
-const conta = (cpfCliente, saldo) => ({ numeroConta: cpfCliente.slice(0, 4), cpfCliente, saldo });
-const cliente = (cpf, nome) => ({ cpf, nome, email: `${cpf}@bantads.com.br`, cidade: 'Curitiba', uf: 'PR' });
+const conta = (cpfCliente, saldo) => ({ numero: cpfCliente.slice(0, 4), cpfCliente, saldo });
+const cliente = (cpf, nome) => ({
+  cpf,
+  nome,
+  email: `${cpf}@bantads.com.br`,
+  endereco: { logradouro: 'Rua XV de Novembro', numero: '100', cep: '80020310', cidade: 'Curitiba', uf: 'PR' },
+});
 
 test('junta o saldo da conta aos dados do cliente', async () => {
   const ms = comMicrosservicos({
@@ -40,7 +45,7 @@ test('junta o saldo da conta aos dados do cliente', async () => {
 
   try {
     assert.deepEqual(await listarTodos(), [
-      { cpf: '12912861012', nome: 'Catharyna', cidade: 'Curitiba', uf: 'PR', saldo: '800.00', _links: undefined },
+      { cpf: '12912861012', nome: 'Catharyna', cidade: 'Curitiba', estado: 'PR', saldo: '800.00', _links: undefined },
     ]);
   } finally {
     ms.restaurar();
@@ -106,6 +111,52 @@ test('erro do MS Conta e propagado', async () => {
 
   try {
     await assert.rejects(() => listarTodos(), /MS Conta respondeu 500/);
+  } finally {
+    ms.restaurar();
+  }
+});
+
+const CLIENTES = [
+  { cpf: '12912861012', nome: 'Catharyna' },
+  { cpf: '09506382000', nome: 'Cleuddônio' },
+  { cpf: '76179646090', nome: 'Coândrya' },
+  { cpf: '00000000002', nome: 'Cliente Novo 1' },
+];
+const nomes = (lista) => lista.map((c) => c.nome);
+
+test('busca por parte do nome ignora maiusculas e acentos', () => {
+  assert.deepEqual(nomes(filtrar(CLIENTES, 'cat')), ['Catharyna']);
+  assert.deepEqual(nomes(filtrar(CLIENTES, 'COAN')), ['Coândrya']);
+  assert.deepEqual(nomes(filtrar(CLIENTES, 'ônio')), ['Cleuddônio']);
+});
+
+test('busca por parte do CPF aceita o CPF com pontuacao', () => {
+  assert.deepEqual(nomes(filtrar(CLIENTES, '0950')), ['Cleuddônio']);
+  assert.deepEqual(nomes(filtrar(CLIENTES, '129.128')), ['Catharyna']);
+});
+
+test('digito dentro de um nome nao casa com o CPF dos outros clientes', () => {
+  assert.deepEqual(nomes(filtrar(CLIENTES, 'Cliente Novo 1')), ['Cliente Novo 1']);
+});
+
+test('busca vazia ou ausente devolve todos', () => {
+  assert.equal(filtrar(CLIENTES, '').length, 4);
+  assert.equal(filtrar(CLIENTES, '   ').length, 4);
+  assert.equal(filtrar(CLIENTES, undefined).length, 4);
+});
+
+test('listarTodos aplica a busca e mantem a ordem por nome', async () => {
+  const ms = comMicrosservicos({
+    contas: json([conta('111', '1.00'), conta('222', '2.00'), conta('333', '3.00')]),
+    clientes: {
+      111: cliente('111', 'Catianna'),
+      222: cliente('222', 'Cutardo'),
+      333: cliente('333', 'Catharyna'),
+    },
+  });
+
+  try {
+    assert.deepEqual(nomes(await listarTodos('cat')), ['Catharyna', 'Catianna']);
   } finally {
     ms.restaurar();
   }

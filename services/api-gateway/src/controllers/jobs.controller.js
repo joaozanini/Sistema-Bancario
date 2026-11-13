@@ -1,9 +1,16 @@
 const jobService = require('../services/job.service');
+const { responderErro } = require('../services/erro.service');
+
+// Resposta das operações assíncronas (R9, R13, R15, R16): 202 com o job no corpo e,
+// no Location, o endereço em que o front acompanha o andamento.
+function responderJobAceito(res, job) {
+  return res.status(202).location(`/jobs/${job.jobId}/status`).json(job);
+}
 
 async function buscarOuResponder404(req, res) {
   const job = await jobService.buscar(req.params.id);
   if (!job) {
-    res.status(404).json({ message: 'Job não encontrado ou expirado.' });
+    responderErro(res, 404, 'Job não encontrado ou expirado.');
     return null;
   }
   return job;
@@ -19,7 +26,7 @@ async function status(req, res) {
     return res.json(semResultado);
   } catch (err) {
     console.error('Falha ao consultar job:', err.message);
-    return res.status(503).json({ message: 'Serviço de jobs indisponível.' });
+    return responderErro(res, 503, 'Serviço de jobs indisponível.');
   }
 }
 
@@ -28,16 +35,15 @@ async function resultado(req, res) {
     const job = await buscarOuResponder404(req, res);
     if (!job) return undefined;
 
+    // pendente, com falha ou concluído com resultType "resource": não há resultado inline
     if (job.resultType !== 'inline') {
-      return res.status(409).json({
-        message: 'Este job não tem resultado inline. Consulte /jobs/:id/status.',
-      });
+      return responderErro(res, 409, 'Este job não tem resultado inline. Consulte /jobs/:id/status.');
     }
     return res.json(job.resultado);
   } catch (err) {
     console.error('Falha ao consultar resultado do job:', err.message);
-    return res.status(503).json({ message: 'Serviço de jobs indisponível.' });
+    return responderErro(res, 503, 'Serviço de jobs indisponível.');
   }
 }
 
-module.exports = { status, resultado };
+module.exports = { status, resultado, responderJobAceito };

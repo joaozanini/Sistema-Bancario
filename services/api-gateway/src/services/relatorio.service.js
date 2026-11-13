@@ -17,7 +17,7 @@ async function nomeDoGerente(cpf) {
 async function comporLinha(conta) {
   const [cliente, nomeGerente] = await Promise.all([
     clienteService.buscar(conta.cpfCliente),
-    nomeDoGerente(conta.gerenteCpf),
+    nomeDoGerente(conta.cpfGerente),
   ]);
 
   return {
@@ -25,9 +25,9 @@ async function comporLinha(conta) {
     nome: cliente.nome,
     email: cliente.email,
     salario: cliente.salario,
-    numeroConta: conta.numeroConta,
+    numeroConta: conta.numero,
     saldo: conta.saldo,
-    cpfGerente: conta.gerenteCpf ?? null,
+    cpfGerente: conta.cpfGerente ?? null,
     nomeGerente,
   };
 }

@@ -1,12 +1,11 @@
 const authService = require("../services/auth.service");
+const { responderErro } = require("../services/erro.service");
 
 async function login(req, res) {
   const { senha } = req.body || {};
   const email = req.body?.email ?? req.body?.login;
   if (!email || !senha) {
-    return res
-      .status(400)
-      .json({ auth: false, message: "E-mail e senha são obrigatórios." });
+    return responderErro(res, 400, "E-mail e senha são obrigatórios.");
   }
 
   try {
@@ -17,9 +16,7 @@ async function login(req, res) {
       return res.status(401).json({ auth: false, message: "Login inválido!" });
     }
     console.error("Falha no login (API Composition):", err.message);
-    return res
-      .status(502)
-      .json({ auth: false, message: "Serviço de autenticação indisponível." });
+    return responderErro(res, 502, "Serviço de autenticação indisponível.");
   }
 }
 
@@ -29,12 +26,11 @@ async function logout(req, res) {
 
   try {
     await authService.encerrarSessao(jti, cpf, exp);
-    return res.status(200).json({ auth: false });
+    // 204: a sessão foi encerrada e não há nada a devolver
+    return res.status(204).end();
   } catch (err) {
     console.error("Falha ao encerrar sessão:", err.message);
-    return res
-      .status(503)
-      .json({ auth: false, message: "Sessão indisponível." });
+    return responderErro(res, 503, "Sessão indisponível.");
   }
 }
 

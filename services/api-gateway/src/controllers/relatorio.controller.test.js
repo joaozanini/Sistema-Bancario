@@ -23,6 +23,7 @@ function comDublos({ aoGerar, aoCriar } = {}) {
   jobService.criar = async (jobId, dominio) => {
     eventos.push({ tipo: 'criar', jobId, dominio });
     if (aoCriar) aoCriar();
+    return { jobId, status: 'PENDENTE', resultType: null, dominio, resourceId: null, erro: null };
   };
   jobService.concluirInline = async (jobId, resultado) => {
     eventos.push({ tipo: 'concluir', jobId, resultado });
@@ -55,8 +56,13 @@ function respostaFalsa() {
   return {
     codigo: null,
     corpo: null,
+    cabecalhos: {},
     status(c) {
       this.codigo = c;
+      return this;
+    },
+    location(url) {
+      this.cabecalhos.Location = url;
       return this;
     },
     json(b) {
@@ -74,6 +80,8 @@ test('responde 202 com o jobId antes de compor', async () => {
 
     assert.equal(res.codigo, 202);
     assert.match(res.corpo.jobId, /^[0-9a-f-]{36}$/);
+    assert.equal(res.corpo.status, 'PENDENTE');
+    assert.equal(res.cabecalhos.Location, `/jobs/${res.corpo.jobId}/status`);
 
     const criou = d.eventos.find((e) => e.tipo === 'criar');
     assert.equal(criou.jobId, res.corpo.jobId, 'o job criado tem de ser o jobId devolvido');
@@ -88,7 +96,7 @@ test('responde 202 com o jobId antes de compor', async () => {
   }
 });
 
-test('conclui o job inline com as linhas do relatorio', async () => {
+test('conclui o job inline com as linhas do relatorio dentro de { clientes }', async () => {
   const d = comDublos();
   try {
     const res = respostaFalsa();
@@ -97,7 +105,7 @@ test('conclui o job inline com as linhas do relatorio', async () => {
 
     const fim = d.eventos.find((e) => e.tipo === 'concluir');
     assert.equal(fim.jobId, res.corpo.jobId);
-    assert.deepEqual(fim.resultado, LINHAS);
+    assert.deepEqual(fim.resultado, { clientes: LINHAS });
     assert.equal(d.eventos.some((e) => e.tipo === 'falhar'), false);
   } finally {
     d.restaurar();
@@ -138,6 +146,7 @@ test('redis fora do ar na criacao do job responde 503 e nao compoe', async () =>
     await gerar({}, res);
 
     assert.equal(res.codigo, 503);
+    assert.equal(res.corpo.erro, 'Service Unavailable');
     assert.equal(
       d.eventos.some((e) => e.tipo === 'concluir' || e.tipo === 'falhar'),
       false,

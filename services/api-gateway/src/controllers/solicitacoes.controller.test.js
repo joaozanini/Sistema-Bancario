@@ -8,8 +8,13 @@ function resposta() {
   return {
     codigo: null,
     corpo: null,
+    cabecalhos: {},
     status(c) {
       this.codigo = c;
+      return this;
+    },
+    location(url) {
+      this.cabecalhos.Location = url;
       return this;
     },
     json(c) {
@@ -17,6 +22,11 @@ function resposta() {
       return this;
     },
   };
+}
+
+// o que o saga.service devolve ao criar o job: é o corpo do 202
+function jobPendente(jobId, dominio) {
+  return { jobId, status: 'PENDENTE', resultType: null, dominio, resourceId: null, erro: null };
 }
 
 function comSagaDublada(implementacao) {
@@ -27,14 +37,15 @@ function comSagaDublada(implementacao) {
   };
 }
 
-test('aprovar devolve 202 com o jobId da saga', async () => {
-  const restaurar = comSagaDublada(async () => 'job-123');
+test('aprovar devolve 202 com o job da saga e o Location do polling', async () => {
+  const restaurar = comSagaDublada(async () => jobPendente('job-123', 'clientes'));
   try {
     const res = resposta();
     await aprovar({ params: { cpf: '11122233344' } }, res);
 
     assert.equal(res.codigo, 202);
-    assert.deepEqual(res.corpo, { jobId: 'job-123' });
+    assert.deepEqual(res.corpo, jobPendente('job-123', 'clientes'));
+    assert.equal(res.cabecalhos.Location, '/jobs/job-123/status');
   } finally {
     restaurar();
   }
@@ -44,7 +55,7 @@ test('publica o tipo e o dominio que o orquestrador espera', async () => {
   const recebido = [];
   const restaurar = comSagaDublada(async (tipo, dominio, payload) => {
     recebido.push({ tipo, dominio, payload });
-    return 'job-1';
+    return jobPendente('job-1', 'clientes');
   });
   try {
     await aprovar({ params: { cpf: '11122233344' } }, resposta());
@@ -72,7 +83,8 @@ test('falha ao publicar vira 502 e nao 202', async () => {
     await aprovar({ params: { cpf: '11122233344' } }, res);
 
     assert.equal(res.codigo, 502);
-    assert.ok(res.corpo.message);
+    assert.equal(res.corpo.erro, 'Bad Gateway');
+    assert.ok(res.corpo.mensagem);
   } finally {
     restaurar();
   }
