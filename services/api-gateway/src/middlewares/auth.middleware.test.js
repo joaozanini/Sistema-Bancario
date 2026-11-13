@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { exigirTipo } = require('./auth.middleware');
+const { exigirTipo, descartarIdentidadeDoCliente, injectUserHeaders } = require('./auth.middleware');
 
 function respostaFalsa() {
   return {
@@ -38,5 +38,22 @@ test('responde 403 para usuario de outro tipo', () => {
 
   assert.ok(!passou);
   assert.equal(res.statusCode, 403);
-  assert.deepEqual(res.body, { message: 'Acesso negado.' });
+  // corpo de erro do contrato: { status, erro, mensagem }
+  assert.equal(res.body.status, 403);
+  assert.equal(res.body.erro, 'Forbidden');
+  assert.match(res.body.mensagem, /GERENTE/);
+});
+
+test('identidade enviada pelo cliente e descartada e so a do token chega ao MS', () => {
+  const req = {
+    headers: { 'x-user-cpf': '09506382000', 'x-user-tipo': 'GERENTE', 'x-access-token': 'abc' },
+    user: { cpf: '12912861012', tipo: 'CLIENTE' },
+  };
+
+  descartarIdentidadeDoCliente(req, {}, () => {});
+  assert.deepEqual(req.headers, { 'x-access-token': 'abc' });
+
+  injectUserHeaders(req, {}, () => {});
+  assert.equal(req.headers['x-user-cpf'], '12912861012');
+  assert.equal(req.headers['x-user-tipo'], 'CLIENTE');
 });

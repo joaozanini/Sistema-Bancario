@@ -99,11 +99,11 @@ function identificarTipo(tipoBruto: string): { tipo: TipoMovimentacao; natureza?
 function naturezaTransferencia(dto: MovimentacaoDto, cpfUsuario: string | null): Natureza {
   const cpf = soDigitos(cpfUsuario);
 
-  if (cpf && soDigitos(dto.cpfOrigem) === cpf) {
+  if (cpf && soDigitos(dto.origem?.cpf) === cpf) {
     return 'SAIDA';
   }
 
-  if (cpf && soDigitos(dto.cpfDestino) === cpf) {
+  if (cpf && soDigitos(dto.destino?.cpf) === cpf) {
     return 'ENTRADA';
   }
 
@@ -138,7 +138,7 @@ export function converterMovimentacao(
 
   let contraparte: string | null = null;
   if (identificado.tipo === 'TRANSFERENCIA') {
-    const nome = natureza === 'SAIDA' ? dto.nomeDestino : dto.nomeOrigem;
+    const nome = natureza === 'SAIDA' ? dto.destino?.nome : dto.origem?.nome;
     contraparte = `${natureza === 'SAIDA' ? 'Para' : 'De'} ${nome || 'cliente não informado'}`;
   }
 

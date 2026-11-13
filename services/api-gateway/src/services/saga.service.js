@@ -13,12 +13,13 @@ function timestampAgora() {
 
 // jobId e sagaId são o mesmo UUID (enunciado 5.8): o Orquestrador recebe o sagaId
 // na mensagem e usa ele para atualizar o job no Redis ao terminar a SAGA.
+// Devolve o job recém-criado (PENDENTE), que é o corpo do 202.
 async function iniciar(tipo, dominio, payload) {
   const sagaId = randomUUID();
 
   // o job vem antes da publicação: se fosse depois, o Orquestrador poderia
   // responder antes do job existir e a atualização dele se perderia
-  await jobService.criar(sagaId, dominio);
+  const job = await jobService.criar(sagaId, dominio);
 
   await rabbit.publicar(FILA_SAGA_CMD, {
     sagaId,
@@ -27,7 +28,7 @@ async function iniciar(tipo, dominio, payload) {
     payload,
   });
 
-  return sagaId;
+  return job;
 }
 
 module.exports = { iniciar, FILA_SAGA_CMD };

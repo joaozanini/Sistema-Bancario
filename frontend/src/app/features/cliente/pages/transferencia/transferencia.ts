@@ -8,6 +8,7 @@ import Decimal from 'decimal.js';
 import { MascaraDirective } from '../../../../shared/directives/mascara.directive';
 import { SaldoDisponivel } from '../../../../shared/components/saldo-disponivel/saldo-disponivel';
 import { BrlCurrencyPipe } from '../../../../shared/pipes/brl-currency.pipe';
+import { mensagemDaApi } from '../../../../shared/utils/erro-api.util';
 import { ContaService } from '../../services/conta';
 import { TransferenciaService } from '../../services/transferencia';
 
@@ -197,16 +198,7 @@ export class Transferencia implements OnInit {
       return 'Não foi possível conectar ao servidor. Tente novamente quando a API estiver disponível.';
     }
 
-    const corpo = erro.error as { message?: unknown; error?: unknown } | string | null;
-    let mensagem = '';
-    if (typeof corpo === 'string') {
-      mensagem = corpo;
-    } else if (corpo && typeof corpo.message === 'string') {
-      mensagem = corpo.message;
-    } else if (corpo && typeof corpo.error === 'string') {
-      mensagem = corpo.error;
-    }
-    const textoNormalizado = mensagem
+    const textoNormalizado = mensagemDaApi(erro, '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLocaleLowerCase();

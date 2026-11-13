@@ -263,15 +263,16 @@ class ContaServiceTest {
         request.setNomeOrigem("Catharyna");
         request.setNomeDestino("Cleuddônio");
 
-        TransferenciaResponseDTO response = service.transferir(contaOrigem, request, cpfOrigem);
+        MovimentacaoResponseDTO response = service.transferir(contaOrigem, request, cpfOrigem);
 
         assertNotNull(response);
-        assertEquals(contaOrigem, response.getContaOrigem());
-        assertEquals(contaDestino, response.getContaDestino());
+        assertEquals(contaOrigem, response.getNumeroConta());
+        assertEquals("TRANSFERENCIA", response.getTipo());
+        assertEquals(contaDestino, response.getDestino().numeroConta());
         assertEquals("350.00", response.getValor());
-        assertNotNull(response.get_links());
-        assertTrue(response.get_links().containsKey("self"));
-        assertTrue(response.get_links().containsKey("extrato"));
+        // a resposta aponta para a conta, por onde o front reconsulta o saldo, e para o extrato
+        assertEquals("http://localhost:8080/contas/1291", response.get_links().get("conta").get("href"));
+        assertEquals("http://localhost:8080/contas/1291/extrato", response.get_links().get("extrato").get("href"));
 
         ArgumentCaptor<EventoConta> captor = ArgumentCaptor.forClass(EventoConta.class);
         verify(repository, times(2)).save(captor.capture());
@@ -282,9 +283,8 @@ class ContaServiceTest {
         // Gravados em ordem de número da conta (0950 antes de 1291), para transferências cruzadas não travarem
         EventoConta evtDestino = eventosSalvos.get(0);
         EventoConta evtOrigem = eventosSalvos.get(1);
-        assertEquals("Cleuddônio", response.getDestino().getNome());
-        assertEquals("09506382000", response.getDestino().getCpf());
-        assertEquals(contaOrigem, response.getOrigem().getNumero());
+        assertEquals("Cleuddônio", response.getDestino().nome());
+        assertEquals("09506382000", response.getDestino().cpf());
 
         assertEquals(contaOrigem, evtOrigem.getObjetoId());
         assertEquals("TransferênciaOrigem", evtOrigem.getTipo());
@@ -438,10 +438,10 @@ class ContaServiceTest {
         request.setContaDestino(contaDestino);
         request.setValor("200.00");
 
-        TransferenciaResponseDTO response = service.transferir(contaOrigem, request, cpfOrigem);
+        MovimentacaoResponseDTO response = service.transferir(contaOrigem, request, cpfOrigem);
 
         assertNotNull(response);
-        assertEquals(contaOrigem, response.getContaOrigem());
+        assertEquals(contaOrigem, response.getNumeroConta());
         verify(repository, times(2)).findByObjetoIdOrderByVersaoAsc(contaOrigem);
     }
 
@@ -461,6 +461,9 @@ class ContaServiceTest {
         assertNotNull(res);
         assertEquals("300.00", res.getValor());
         assertEquals("SAQUE", res.getTipo());
+        assertEquals(conta, res.getNumeroConta());
+        assertNull(res.getDestino());
+        assertEquals(List.of("conta", "extrato"), List.copyOf(res.get_links().keySet()));
 
         ArgumentCaptor<EventoConta> captor = ArgumentCaptor.forClass(EventoConta.class);
         verify(repository, times(1)).save(captor.capture());
@@ -565,9 +568,47 @@ class ContaServiceTest {
 
         assertThrows(AcessoNegadoException.class,
                 () -> service.buscarContaPorNumero("1291", "09506382000", "CLIENTE"));
-        assertEquals("1291", service.buscarContaPorNumero("1291", "12912861012", "CLIENTE").getNumeroConta());
-        assertEquals("1291", service.buscarContaPorNumero("1291", "98574307084", "GERENTE").getNumeroConta());
-        assertEquals("1291", service.buscarContaPorNumero("1291", null, null).getNumeroConta());
+        ContaDTO doTitular = service.buscarContaPorNumero("1291", "12912861012", "CLIENTE");
+        assertEquals("1291", doTitular.getNumero());
+        assertTrue(doTitular.get_links().containsKey("deposito"));
+
+        // o gerente consulta, mas não movimenta: os links das operações não vão para ele
+        ContaDTO doGerente = service.buscarContaPorNumero("1291", "98574307084", "GERENTE");
+        assertEquals("1291", doGerente.getNumero());
+        assertEquals(List.of("self", "cliente", "extrato"), List.copyOf(doGerente.get_links().keySet()));
+
+        assertEquals("1291", service.buscarContaPorNumero("1291", null, null).getNumero());
+    }
+
+    @Test
+    @DisplayName("Conta do cliente pelo CPF: o titular e o gerente consultam, outro cliente recebe 403 (R3)")
+    void deveBuscarContaDoClientePeloCpf() {
+        when(contaQueryRepository.findByCpfCliente("12912861012"))
+                .thenReturn(Optional.of(contaProjetada("1291", "12912861012", "800.00", 1)));
+        when(contaQueryRepository.findById("1291"))
+                .thenReturn(Optional.of(contaProjetada("1291", "12912861012", "800.00", 1)));
+        when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of());
+
+        ContaDTO doTitular = service.buscarContaDoCliente("12912861012", "12912861012", "CLIENTE");
+        assertEquals("1291", doTitular.getNumero());
+        assertEquals("800.00", doTitular.getSaldo());
+        assertTrue(doTitular.get_links().containsKey("deposito"));
+
+        ContaDTO doGerente = service.buscarContaDoCliente("12912861012", "98574307084", "GERENTE");
+        assertFalse(doGerente.get_links().containsKey("deposito"));
+
+        assertThrows(AcessoNegadoException.class,
+                () -> service.buscarContaDoCliente("12912861012", "09506382000", "CLIENTE"));
+    }
+
+    @Test
+    @DisplayName("Conta do cliente pelo CPF responde 404 quando o cliente não tem conta (R3)")
+    void deveFalharQuandoClienteNaoTemConta() {
+        when(contaQueryRepository.findByCpfCliente("00000000000")).thenReturn(Optional.empty());
+        when(repository.findByTipoIn(anyList())).thenReturn(List.of());
+
+        assertThrows(ContaNaoEncontradaException.class,
+                () -> service.buscarContaDoCliente("00000000000", "98574307084", "GERENTE"));
     }
 
     @Test
@@ -575,7 +616,9 @@ class ContaServiceTest {
     void deveBuscarContaPorNumero() {
         String numeroConta = "1291";
         List<EventoConta> eventos = List.of(
-                criarEvento(numeroConta, "Criado", "{\"cpfCliente\":\"12912861012\",\"gerenteCpf\":\"98574307084\",\"saldo\":\"800.00\"}", 1)
+                criarEventoComData(numeroConta, "Criado",
+                        "{\"cpfCliente\":\"12912861012\",\"gerenteCpf\":\"98574307084\",\"saldo\":\"800.00\"}", 1,
+                        LocalDateTime.of(2000, 1, 1, 0, 0))
         );
 
         when(contaQueryRepository.findById(numeroConta)).thenReturn(Optional.empty());
@@ -584,12 +627,14 @@ class ContaServiceTest {
         ContaDTO dto = service.buscarContaPorNumero(numeroConta);
 
         assertNotNull(dto);
-        assertEquals(numeroConta, dto.getNumeroConta());
+        assertEquals(numeroConta, dto.getNumero());
         assertEquals("12912861012", dto.getCpfCliente());
-        assertEquals("98574307084", dto.getGerenteCpf());
+        assertEquals("98574307084", dto.getCpfGerente());
+        assertEquals("800.00", dto.getSaldo());
+        assertEquals("2000-01-01", dto.getDataCriacao());
         assertNotNull(dto.get_links());
         assertEquals(
-                List.of("self", "deposito", "saque", "transferencia", "extrato", "cliente"),
+                List.of("self", "cliente", "deposito", "saque", "transferencia", "extrato"),
                 List.copyOf(dto.get_links().keySet()));
         assertEquals("http://localhost:8080/contas/1291", dto.get_links().get("self").get("href"));
         assertEquals("http://localhost:8080/clientes/12912861012", dto.get_links().get("cliente").get("href"));
@@ -633,8 +678,10 @@ class ContaServiceTest {
         movPeriodo2.setTipo("TRANSFERENCIA");
         movPeriodo2.setNatureza("SAIDA");
         movPeriodo2.setValor(new BigDecimal("350.00"));
+        movPeriodo2.setContaOrigem(numeroConta);
         movPeriodo2.setCpfOrigem(cpf);
         movPeriodo2.setNomeOrigem("Catharyna");
+        movPeriodo2.setContaDestino("0950");
         movPeriodo2.setCpfDestino("09506382000");
         movPeriodo2.setNomeDestino("Cleuddônio");
         movPeriodo2.setVersao(4);
@@ -650,23 +697,31 @@ class ContaServiceTest {
                 eq(numeroConta), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(List.of(movPeriodo1, movPeriodo2));
 
-        ExtratoResponseDTO extrato = service.consultarExtrato(numeroConta, "2026-10-01", "2026-10-31", cpf);
+        ExtratoResponseDTO extrato = service.consultarExtrato(numeroConta, "2026-10-01", "2026-10-31", cpf, "CLIENTE");
 
         assertNotNull(extrato);
         assertEquals(numeroConta, extrato.getNumeroConta());
+        assertEquals("2026-10-01", extrato.getDataInicio());
+        assertEquals("2026-10-31", extrato.getDataFim());
         assertEquals("800.00", extrato.getSaldoAbertura());
-        assertEquals("1450.00", extrato.getSaldo());
         assertEquals(2, extrato.getMovimentacoes().size());
 
         ItemExtratoDTO item1 = extrato.getMovimentacoes().get(0);
         assertEquals("DEPOSITO", item1.getTipo());
         assertEquals("1000.00", item1.getValor());
+        assertEquals("2026-10-05T14:30:00", item1.getDataHora());
+        // depósito e saque não têm contraparte
+        assertNull(item1.getOrigem());
+        assertNull(item1.getDestino());
 
         ItemExtratoDTO item2 = extrato.getMovimentacoes().get(1);
         assertEquals("TRANSFERENCIA", item2.getTipo());
         assertEquals("350.00", item2.getValor());
-        assertEquals("Catharyna", item2.getNomeOrigem());
-        assertEquals("Cleuddônio", item2.getNomeDestino());
+        assertEquals("Catharyna", item2.getOrigem().nome());
+        assertEquals(cpf, item2.getOrigem().cpf());
+        assertEquals(numeroConta, item2.getOrigem().numeroConta());
+        assertEquals("Cleuddônio", item2.getDestino().nome());
+        assertEquals("0950", item2.getDestino().numeroConta());
 
         assertNotNull(extrato.get_links());
         assertTrue(extrato.get_links().containsKey("self"));
@@ -687,8 +742,26 @@ class ContaServiceTest {
         when(contaQueryRepository.findById(numeroConta)).thenReturn(Optional.of(cq));
 
         assertThrows(AcessoNegadoException.class, () ->
-                service.consultarExtrato(numeroConta, "2026-10-01", "2026-10-31", "99999999999")
+                service.consultarExtrato(numeroConta, "2026-10-01", "2026-10-31", "99999999999", "CLIENTE")
         );
+        // sem identidade também não passa
+        assertThrows(AcessoNegadoException.class, () ->
+                service.consultarExtrato(numeroConta, "2026-10-01", "2026-10-31", null, null)
+        );
+    }
+
+    @Test
+    @DisplayName("Gerente consulta o extrato de qualquer cliente (R7)")
+    void devePermitirExtratoParaGerente() {
+        String numeroConta = "1291";
+        when(repository.findByObjetoIdOrderByVersaoAsc(numeroConta)).thenReturn(List.of());
+        when(contaQueryRepository.findById(numeroConta))
+                .thenReturn(Optional.of(contaProjetada(numeroConta, "12912861012", "800.00", 1)));
+
+        ExtratoResponseDTO extrato = service.consultarExtrato(numeroConta, "2026-10-01", "2026-10-31", "98574307084", "GERENTE");
+
+        assertEquals("800.00", extrato.getSaldoAbertura());
+        assertEquals(List.of("self", "conta"), List.copyOf(extrato.get_links().keySet()));
     }
 
     @Test
@@ -757,16 +830,19 @@ class ContaServiceTest {
     @DisplayName("Deve rejeitar com 422 extrato de mais de 365 dias e aceitar exatamente 365 (R7)")
     void deveRejeitarExtratoComMaisDe365Dias() {
         assertThrows(RegraNegocioException.class, () ->
-                service.consultarExtrato("1291", "2020-01-01", "2023-01-01", "12912861012"));
+                service.consultarExtrato("1291", "2020-01-01", "2023-01-01", "12912861012", "CLIENTE"));
         assertThrows(RegraNegocioException.class, () ->
-                service.consultarExtrato("1291", "2021-01-01", "2022-01-02", "12912861012"));
+                service.consultarExtrato("1291", "2021-01-01", "2022-01-02", "12912861012", "CLIENTE"));
+        // fim anterior ao início também é regra de negócio (422), não dado malformado
+        assertThrows(RegraNegocioException.class, () ->
+                service.consultarExtrato("1291", "2020-02-01", "2020-01-01", "12912861012", "CLIENTE"));
 
         when(repository.findByObjetoIdOrderByVersaoAsc("1291")).thenReturn(List.of(
                 criarEventoComData("1291", "Criado", "{\"cpfCliente\":\"12912861012\"}", 1, LocalDateTime.of(2019, 1, 1, 0, 0))
         ));
         when(contaQueryRepository.findById("1291")).thenReturn(Optional.of(contaProjetada("1291", "12912861012", "0.00", 1)));
 
-        ExtratoResponseDTO extrato = service.consultarExtrato("1291", "2020-01-01", "2020-12-31", "12912861012");
+        ExtratoResponseDTO extrato = service.consultarExtrato("1291", "2020-01-01", "2020-12-31", "12912861012", "CLIENTE");
         assertNotNull(extrato);
     }
 
@@ -845,7 +921,7 @@ class ContaServiceTest {
                 .doNothing()
                 .when(repository).flush();
 
-        TransferenciaResponseDTO response = service.transferir("1291", new TransferenciaRequestDTO("0950", "10.00"), cpf);
+        MovimentacaoResponseDTO response = service.transferir("1291", new TransferenciaRequestDTO("0950", "10.00"), cpf);
 
         assertNotNull(response);
         verify(repository, times(2)).findByObjetoIdOrderByVersaoAsc("1291");

@@ -73,12 +73,46 @@ test('cliente nao consulta o cadastro de outro cliente', async () => {
   const resposta = await chamar(`/clientes/${CPF_OUTRO_CLIENTE}`, { cpf: CPF_CLIENTE, tipo: 'CLIENTE' });
 
   assert.equal(resposta.status, 403);
+  const corpo = await resposta.json();
+  assert.equal(corpo.status, 403);
+  assert.equal(corpo.erro, 'Forbidden');
+});
+
+test('listagem (R11) vai dentro de { clientes } com os _links e repassa a busca', async () => {
+  const clientesService = require('../services/clientes.service');
+  const original = clientesService.listarTodos;
+  const buscas = [];
+  clientesService.listarTodos = async (busca) => {
+    buscas.push(busca);
+    return [{ cpf: CPF_CLIENTE, nome: 'Catharyna', cidade: 'Curitiba', estado: 'PR', saldo: '800.00' }];
+  };
+
+  try {
+    const resposta = await chamar('/clientes?busca=cat', { cpf: CPF_GERENTE, tipo: 'GERENTE' });
+    const corpo = await resposta.json();
+
+    assert.equal(resposta.status, 200);
+    assert.deepEqual(corpo.clientes, [
+      { cpf: CPF_CLIENTE, nome: 'Catharyna', cidade: 'Curitiba', estado: 'PR', saldo: '800.00' },
+    ]);
+    assert.equal(corpo._links.self.href, `http://localhost:${gateway.address().port}/clientes`);
+    assert.deepEqual(buscas, ['cat']);
+  } finally {
+    clientesService.listarTodos = original;
+  }
+});
+
+test('cliente nao lista os clientes do banco', async () => {
+  const resposta = await chamar('/clientes', { cpf: CPF_CLIENTE, tipo: 'CLIENTE' });
+
+  assert.equal(resposta.status, 403);
 });
 
 test('cpf inexistente devolve 404', async () => {
   const resposta = await chamar('/clientes/00000000000', { cpf: CPF_GERENTE, tipo: 'GERENTE' });
 
   assert.equal(resposta.status, 404);
+  assert.deepEqual(await resposta.json(), { status: 404, erro: 'Not Found', mensagem: 'Cliente não encontrado.' });
 });
 
 test('sem token devolve 401', async () => {

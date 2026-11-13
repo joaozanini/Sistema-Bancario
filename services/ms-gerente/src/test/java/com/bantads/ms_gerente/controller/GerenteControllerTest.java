@@ -4,8 +4,6 @@ import com.bantads.ms_gerente.dto.AtualizacaoGerenteDTO;
 import com.bantads.ms_gerente.dto.GerenteDTO;
 import com.bantads.ms_gerente.exception.GerenteNaoEncontradoException;
 import com.bantads.ms_gerente.exception.GlobalExceptionHandler;
-import com.bantads.ms_gerente.model.Gerente;
-import com.bantads.ms_gerente.repository.GerenteRepository;
 import com.bantads.ms_gerente.service.GerenteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,9 +39,6 @@ class GerenteControllerTest {
     private MockMvc mockMvc;
 
     @Mock
-    private GerenteRepository repository;
-
-    @Mock
     private GerenteService service;
 
     @InjectMocks
@@ -62,44 +57,39 @@ class GerenteControllerTest {
     @Test
     @DisplayName("Deve retornar 200 ao buscar gerente por CPF com _links HATEOAS")
     void deveBuscarGerentePorCpfComLinksHateoas() throws Exception {
-        Gerente gerente = new Gerente();
-        gerente.setCpf(CPF);
-        gerente.setNome("Geniéve");
-        gerente.setEmail(EMAIL);
-        gerente.setTelefone("41999990001");
-        gerente.setAtivo(true);
-
-        when(repository.findById(CPF)).thenReturn(Optional.of(gerente));
+        when(service.buscarPorCpf(CPF))
+                .thenReturn(Optional.of(new GerenteDTO(CPF, "Geniéve", EMAIL, "41999990001", true)));
 
         mockMvc.perform(get("/gerentes/" + CPF))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cpf").value(CPF))
                 .andExpect(jsonPath("$.nome").value("Geniéve"))
                 .andExpect(jsonPath("$.email").value(EMAIL))
+                .andExpect(jsonPath("$.ativo").value(true))
                 .andExpect(jsonPath("$._links.self.href").value("http://localhost:8083/gerentes/" + CPF))
-                .andExpect(jsonPath("$._links.gerentes.href").value("http://localhost:8083/gerentes"))
-                .andExpect(jsonPath("$._links.atualizar.href").value("http://localhost:8083/gerentes/" + CPF))
-                .andExpect(jsonPath("$._links.remover.href").value("http://localhost:8083/gerentes/" + CPF));
+                .andExpect(jsonPath("$._links.atualizacao.href").value("http://localhost:8083/gerentes/" + CPF))
+                .andExpect(jsonPath("$._links.remocao.href").value("http://localhost:8083/gerentes/" + CPF));
+    }
+
+    @Test
+    @DisplayName("Deve retornar 404 ao buscar um gerente que não existe")
+    void deveRetornar404AoBuscarGerenteInexistente() throws Exception {
+        when(service.buscarPorCpf(CPF)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/gerentes/" + CPF))
+                .andExpect(status().isNotFound());
     }
 
     @Test
     @DisplayName("Deve listar gerentes com _links HATEOAS")
     void deveListarGerentesComLinksHateoas() throws Exception {
-        Gerente gerente = new Gerente();
-        gerente.setCpf(CPF);
-        gerente.setNome("Geniéve");
-        gerente.setEmail(EMAIL);
-        gerente.setTelefone("41999990001");
-        gerente.setAtivo(true);
-
-        when(repository.findAll()).thenReturn(List.of(gerente));
+        when(service.listar()).thenReturn(List.of(new GerenteDTO(CPF, "Geniéve", EMAIL, "41999990001", true)));
 
         mockMvc.perform(get("/gerentes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].cpf").value(CPF))
-                .andExpect(jsonPath("$[0]._links.self.href").value("http://localhost:8083/gerentes/" + CPF))
-                .andExpect(jsonPath("$[0]._links.gerentes.href").value("http://localhost:8083/gerentes"));
+                .andExpect(jsonPath("$[0]._links.self.href").value("http://localhost:8083/gerentes/" + CPF));
     }
 
     @Test
@@ -116,9 +106,8 @@ class GerenteControllerTest {
                 .andExpect(jsonPath("$.email").value(EMAIL))
                 .andExpect(jsonPath("$.telefone").value("41988887777"))
                 .andExpect(jsonPath("$._links.self.href").value("http://localhost:8083/gerentes/" + CPF))
-                .andExpect(jsonPath("$._links.gerentes.href").value("http://localhost:8083/gerentes"))
-                .andExpect(jsonPath("$._links.atualizar.href").value("http://localhost:8083/gerentes/" + CPF))
-                .andExpect(jsonPath("$._links.remover.href").value("http://localhost:8083/gerentes/" + CPF));
+                .andExpect(jsonPath("$._links.atualizacao.href").value("http://localhost:8083/gerentes/" + CPF))
+                .andExpect(jsonPath("$._links.remocao.href").value("http://localhost:8083/gerentes/" + CPF));
     }
 
     @Test
@@ -127,7 +116,7 @@ class GerenteControllerTest {
         when(service.atualizar(eq(CPF), any(AtualizacaoGerenteDTO.class)))
                 .thenThrow(new GerenteNaoEncontradoException("Gerente não encontrado."));
 
-        mockMvc.perform(atualizacao(new AtualizacaoGerenteDTO("Geniéve", null)))
+        mockMvc.perform(atualizacao(new AtualizacaoGerenteDTO("Geniéve", "41988887777")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.erro").value("Gerente não encontrado."));
     }
@@ -135,7 +124,7 @@ class GerenteControllerTest {
     @Test
     @DisplayName("Deve retornar 400 quando o nome não é informado")
     void deveRetornar400QuandoNomeEmBranco() throws Exception {
-        mockMvc.perform(atualizacao(new AtualizacaoGerenteDTO(" ", null)))
+        mockMvc.perform(atualizacao(new AtualizacaoGerenteDTO(" ", "41988887777")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.erro").value("Nome é obrigatório."));
 
@@ -143,20 +132,28 @@ class GerenteControllerTest {
     }
 
     @Test
-    @DisplayName("Deve ignorar e-mail e CPF enviados no corpo")
-    void deveIgnorarEmailECpfDoCorpo() throws Exception {
-        when(service.atualizar(CPF, new AtualizacaoGerenteDTO("Geniéve Silva", null)))
-                .thenReturn(new GerenteDTO(CPF, "Geniéve Silva", EMAIL, null, true));
+    @DisplayName("Deve retornar 400 quando o telefone não é informado")
+    void deveRetornar400QuandoTelefoneEmBranco() throws Exception {
+        mockMvc.perform(atualizacao(new AtualizacaoGerenteDTO("Geniéve", null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erro").value("Telefone é obrigatório."));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    @DisplayName("Deve retornar 400 quando o corpo tenta trocar o e-mail, que é imutável (R14)")
+    void deveRetornar400QuandoEmailDiferente() throws Exception {
+        when(service.atualizar(CPF, new AtualizacaoGerenteDTO("Geniéve Silva", "41988887777", "outro@bantads.com.br", null)))
+                .thenThrow(new IllegalArgumentException("O e-mail é o login do gerente e não pode ser alterado."));
 
         mockMvc.perform(put("/gerentes/" + CPF)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                                {"nome": "Geniéve Silva", "email": "outro@bantads.com.br", "cpf": "00000000000"}
+                                {"nome": "Geniéve Silva", "telefone": "41988887777", "email": "outro@bantads.com.br"}
                                 """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cpf").value(CPF))
-                .andExpect(jsonPath("$.email").value(EMAIL))
-                .andExpect(jsonPath("$._links.self.href").exists());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erro").value("O e-mail é o login do gerente e não pode ser alterado."));
     }
 
     private RequestBuilder atualizacao(AtualizacaoGerenteDTO dados) {

@@ -71,10 +71,15 @@
           name="telefone"
           appMascara="telefone"
           [(ngModel)]="telefone"
+          #telefoneInput="ngModel"
           placeholder="(41) 98765-4321"
           autocomplete="off"
           maxlength="15"
+          required
         >
+        @if (telefoneInput.invalid && telefoneInput.touched) {
+          <small class="erro">Informe o telefone.</small>
+        }
       </label>
 
       <label>

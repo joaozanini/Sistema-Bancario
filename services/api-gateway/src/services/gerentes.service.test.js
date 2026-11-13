@@ -34,7 +34,7 @@ const gerente = (cpf, nome, extra = {}) => ({
   ativo: true,
   ...extra,
 });
-const conta = (numeroConta, gerenteCpf) => ({ numeroConta, cpfCliente: `cli${numeroConta}`, gerenteCpf });
+const conta = (numero, cpfGerente) => ({ numero, cpfCliente: `cli${numero}`, cpfGerente });
 
 test('junta a quantidade de clientes aos dados do gerente', async () => {
   const ms = comMicrosservicos({

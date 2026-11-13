@@ -12,8 +12,13 @@ function resposta() {
   return {
     codigo: null,
     corpo: null,
+    cabecalhos: {},
     status(c) {
       this.codigo = c;
+      return this;
+    },
+    location(url) {
+      this.cabecalhos.Location = url;
       return this;
     },
     json(c) {
@@ -21,6 +26,11 @@ function resposta() {
       return this;
     },
   };
+}
+
+// o que o saga.service devolve ao criar o job: é o corpo do 202
+function jobPendente(jobId, dominio) {
+  return { jobId, status: 'PENDENTE', resultType: null, dominio, resourceId: null, erro: null };
 }
 
 function comSagaDublada(implementacao) {
@@ -35,7 +45,7 @@ test('gerente nao pode remover a si mesmo', async () => {
   let publicou = false;
   const restaurar = comSagaDublada(async () => {
     publicou = true;
-    return 'job-1';
+    return jobPendente('job-1', 'gerentes');
   });
 
   try {
@@ -43,20 +53,26 @@ test('gerente nao pode remover a si mesmo', async () => {
     await remover({ params: { cpf: CPF_LOGADO }, user: { cpf: CPF_LOGADO } }, res);
 
     assert.equal(res.codigo, 403);
+    assert.deepEqual(res.corpo, {
+      status: 403,
+      erro: 'Forbidden',
+      mensagem: 'Um gerente não pode remover a si mesmo.',
+    });
     assert.equal(publicou, false, 'a SAGA nao pode nem comecar');
   } finally {
     restaurar();
   }
 });
 
-test('remover outro gerente devolve 202 com o jobId', async () => {
-  const restaurar = comSagaDublada(async () => 'job-123');
+test('remover outro gerente devolve 202 com o job e o Location do polling', async () => {
+  const restaurar = comSagaDublada(async () => jobPendente('job-123', 'gerentes'));
   try {
     const res = resposta();
     await remover({ params: { cpf: CPF_ALVO }, user: { cpf: CPF_LOGADO } }, res);
 
     assert.equal(res.codigo, 202);
-    assert.deepEqual(res.corpo, { jobId: 'job-123' });
+    assert.deepEqual(res.corpo, jobPendente('job-123', 'gerentes'));
+    assert.equal(res.cabecalhos.Location, '/jobs/job-123/status');
   } finally {
     restaurar();
   }
@@ -66,7 +82,7 @@ test('publica o tipo e o dominio da saga de remocao', async () => {
   const recebido = [];
   const restaurar = comSagaDublada(async (tipo, dominio, payload) => {
     recebido.push({ tipo, dominio, payload });
-    return 'job-1';
+    return jobPendente('job-1', 'gerentes');
   });
 
   try {
@@ -108,14 +124,16 @@ const NOVO_GERENTE = {
   senha: 'senhaDoFormulario',
 };
 
-test('inserir devolve 202 com o jobId', async () => {
-  const restaurar = comSagaDublada(async () => 'job-13');
+test('inserir devolve 202 com o job e o Location do polling', async () => {
+  const restaurar = comSagaDublada(async () => jobPendente('job-13', 'gerentes'));
   try {
     const res = resposta();
     await inserir({ body: NOVO_GERENTE, user: { cpf: CPF_LOGADO } }, res);
 
     assert.equal(res.codigo, 202);
-    assert.deepEqual(res.corpo, { jobId: 'job-13' });
+    assert.equal(res.corpo.jobId, 'job-13');
+    assert.equal(res.corpo.status, 'PENDENTE');
+    assert.equal(res.cabecalhos.Location, '/jobs/job-13/status');
   } finally {
     restaurar();
   }
@@ -125,7 +143,7 @@ test('inserir publica a saga com os dados do formulario', async () => {
   const recebido = [];
   const restaurar = comSagaDublada(async (tipo, dominio, payload) => {
     recebido.push({ tipo, dominio, payload });
-    return 'job-1';
+    return jobPendente('job-1', 'gerentes');
   });
   try {
     await inserir({ body: { ...NOVO_GERENTE, extra: 'ignorado' }, user: { cpf: CPF_LOGADO } }, resposta());
@@ -143,7 +161,7 @@ test('inserir sem senha devolve 400 sem publicar', async () => {
   let publicou = false;
   const restaurar = comSagaDublada(async () => {
     publicou = true;
-    return 'job-1';
+    return jobPendente('job-1', 'gerentes');
   });
   try {
     const res = resposta();
@@ -151,7 +169,32 @@ test('inserir sem senha devolve 400 sem publicar', async () => {
     await inserir({ body: semSenha, user: { cpf: CPF_LOGADO } }, res);
 
     assert.equal(res.codigo, 400);
-    assert.match(res.corpo.message, /senha/);
+    assert.equal(res.corpo.status, 400);
+    assert.equal(res.corpo.erro, 'Bad Request');
+    assert.match(res.corpo.mensagem, /senha/);
+    assert.equal(publicou, false);
+  } finally {
+    restaurar();
+  }
+});
+
+test('inserir sem telefone ou com CPF fora do formato devolve 400 sem publicar', async () => {
+  let publicou = false;
+  const restaurar = comSagaDublada(async () => {
+    publicou = true;
+    return jobPendente('job-1', 'gerentes');
+  });
+  try {
+    const semTelefone = resposta();
+    await inserir({ body: { ...NOVO_GERENTE, telefone: ' ' }, user: { cpf: CPF_LOGADO } }, semTelefone);
+    assert.equal(semTelefone.codigo, 400);
+    assert.match(semTelefone.corpo.mensagem, /telefone/);
+
+    const cpfComPontuacao = resposta();
+    await inserir({ body: { ...NOVO_GERENTE, cpf: '111.444.777-35' }, user: { cpf: CPF_LOGADO } }, cpfComPontuacao);
+    assert.equal(cpfComPontuacao.codigo, 400);
+    assert.match(cpfComPontuacao.corpo.mensagem, /CPF/);
+
     assert.equal(publicou, false);
   } finally {
     restaurar();
@@ -186,7 +229,7 @@ test('listar responde 200 com a composição dentro de { gerentes }', async () =
     const res = resposta();
     await listar({}, res);
     assert.equal(res.codigo, null);
-    assert.deepEqual(res.corpo, { gerentes: lista });
+    assert.deepEqual(res.corpo, { gerentes: lista, _links: { self: { href: '/gerentes' } } });
   } finally {
     gerentesService.listarTodos = original;
   }
@@ -235,6 +278,7 @@ test('buscar gerente inexistente responde 404', async () => {
     const res = resposta();
     await buscar({ params: { cpf: '00000000000' } }, res);
     assert.equal(res.codigo, 404);
+    assert.deepEqual(res.corpo, { status: 404, erro: 'Not Found', mensagem: 'Gerente não encontrado.' });
   } finally {
     gerenteService.buscar = original;
   }

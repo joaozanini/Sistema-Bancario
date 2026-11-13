@@ -5,15 +5,20 @@ export interface HateoasLink {
   href: string;
 }
 
+// Solicitação como o API Gateway devolve; a chave é o CPF
 export interface SolicitacaoDto {
-  id: string;
   cpf: string;
   nome: string;
   email?: string;
   salario: string;
   status: string;
-  motivoRejeicao?: string | null;
-  dataAprovacaoRejeicao?: string | null;
+  motivo?: string | null;
+  dataHoraProcessamento?: string | null;
+  _links?: Record<string, HateoasLink>;
+}
+
+export interface SolicitacoesListDto {
+  solicitacoes: SolicitacaoDto[];
   _links?: Record<string, HateoasLink>;
 }
 

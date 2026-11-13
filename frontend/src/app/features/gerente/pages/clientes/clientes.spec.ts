@@ -8,9 +8,9 @@ import { ClientesService } from '../../services/clientes';
 import { Clientes, filtrarClientes } from './clientes';
 
 const CLIENTES: Cliente[] = [
-  { cpf: '12912861012', nome: 'Catharyna', cidade: 'Curitiba', uf: 'PR', saldo: new MoneyDecimal('800') },
-  { cpf: '09506382000', nome: 'Cleuddônio', cidade: 'Curitiba', uf: 'PR', saldo: new MoneyDecimal('-10000') },
-  { cpf: '85733854057', nome: 'Catianna', cidade: 'Curitiba', uf: 'PR', saldo: new MoneyDecimal('200') },
+  { cpf: '12912861012', nome: 'Catharyna', cidade: 'Curitiba', estado: 'PR', saldo: new MoneyDecimal('800') },
+  { cpf: '09506382000', nome: 'Cleuddônio', cidade: 'Curitiba', estado: 'PR', saldo: new MoneyDecimal('-10000') },
+  { cpf: '85733854057', nome: 'Catianna', cidade: 'Curitiba', estado: 'PR', saldo: new MoneyDecimal('200') },
 ];
 
 describe('filtrarClientes', () => {
@@ -26,6 +26,15 @@ describe('filtrarClientes', () => {
   it('busca parte do CPF, com ou sem pontuação', () => {
     expect(filtrarClientes(CLIENTES, '129.128').map((c) => c.nome)).toEqual(['Catharyna']);
     expect(filtrarClientes(CLIENTES, '0950').map((c) => c.nome)).toEqual(['Cleuddônio']);
+  });
+
+  it('dígito dentro de um nome não casa com o CPF dos outros clientes', () => {
+    const comNumero: Cliente[] = [
+      ...CLIENTES,
+      { cpf: '00000000002', nome: 'Cliente Novo 1', cidade: 'Curitiba', estado: 'PR', saldo: new MoneyDecimal('0') },
+    ];
+
+    expect(filtrarClientes(comNumero, 'Cliente Novo 1').map((c) => c.nome)).toEqual(['Cliente Novo 1']);
   });
 });
 

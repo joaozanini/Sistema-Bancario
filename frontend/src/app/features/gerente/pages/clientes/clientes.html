@@ -49,7 +49,7 @@
                 <td>{{ c.cpf | cpf }}</td>
                 <td class="nome">{{ c.nome }}</td>
                 <td>{{ c.cidade || '—' }}</td>
-                <td class="centro">{{ c.uf || '—' }}</td>
+                <td class="centro">{{ c.estado || '—' }}</td>
                 <td class="numero" [class.negativo]="c.saldo.isNegative()">{{ c.saldo | brlCurrency }}</td>
               </tr>
             }

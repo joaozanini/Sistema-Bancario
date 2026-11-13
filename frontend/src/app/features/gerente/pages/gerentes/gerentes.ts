@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../../core/services/auth';
 import { CpfPipe } from '../../../../shared/pipes/cpf.pipe';
+import { mensagemDaApi } from '../../../../shared/utils/erro-api.util';
 import { GerenteDto } from '../../models/gerente.model';
 import { GerentesService } from '../../services/gerentes';
 
@@ -104,8 +105,8 @@ export class Gerentes implements OnInit {
       return 'Não foi possível conectar ao servidor. Tente novamente.';
     }
     if (err.status === 403) {
-      return err.error?.message || 'Você não pode remover a si mesmo.';
+      return mensagemDaApi(err, 'Você não pode remover a si mesmo.');
     }
-    return err.error?.message || err.error?.erro || 'Não foi possível remover o gerente.';
+    return mensagemDaApi(err, 'Não foi possível remover o gerente.');
   }
 }

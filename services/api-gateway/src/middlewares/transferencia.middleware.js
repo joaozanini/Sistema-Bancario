@@ -1,21 +1,42 @@
 const contaService = require('../services/conta.service');
 const clienteService = require('../services/cliente.service');
+const { responderErro } = require('../services/erro.service');
+
+// R6: só o titular transfere. A posse volta a ser conferida no MS Conta, que é quem
+// decide; conferir aqui primeiro evita responder a quem não é dono se a conta destino existe.
+async function validarContaOrigem(req, res, next) {
+  try {
+    const cpfTitular = await contaService.buscarCpfTitular(req.params.numero);
+    if (cpfTitular !== req.user.cpf) {
+      return responderErro(res, 403, 'Você só pode transferir a partir da sua própria conta.');
+    }
+  } catch (err) {
+    if (err instanceof contaService.ContaNaoEncontradaError) {
+      return responderErro(res, 404, 'Conta de origem não encontrada.');
+    }
+    console.error('Falha ao consultar a conta de origem:', err.message);
+    return responderErro(res, 502, 'Serviço de contas indisponível.');
+  }
+
+  return next();
+}
 
 // R6: a conta destino tem de existir — o Gateway resolve o CPF do titular antes de rotear ao MS Conta
 async function enriquecerCpfDestino(req, res, next) {
   const { contaDestino } = req.body || {};
   if (!contaDestino) {
-    return res.status(400).json({ message: 'Conta destino é obrigatória.' });
+    return responderErro(res, 400, 'Conta destino é obrigatória.');
   }
 
   try {
     req.body.cpfDestino = await contaService.buscarCpfTitular(contaDestino);
   } catch (err) {
     if (err instanceof contaService.ContaNaoEncontradaError) {
-      return res.status(404).json({ message: 'Conta destino não encontrada.' });
+      // 422 e não 404: o recurso da URL (a conta de origem) existe; o que falha é a regra do R6
+      return responderErro(res, 422, 'Conta destino não encontrada.');
     }
     console.error('Falha ao consultar a conta destino:', err.message);
-    return res.status(502).json({ message: 'Serviço de contas indisponível.' });
+    return responderErro(res, 502, 'Serviço de contas indisponível.');
   }
 
   return next();
@@ -38,13 +59,13 @@ async function enriquecerNomes(req, res, next) {
     req.body.nomeDestino = nomeDestino;
   } catch (err) {
     if (err instanceof clienteService.ClienteNaoEncontradoError) {
-      return res.status(404).json({ message: 'Cliente de origem ou destino não encontrado.' });
+      return responderErro(res, 422, 'Titular da conta de origem ou de destino não encontrado.');
     }
     console.error('Falha ao consultar nomes no MS Cliente:', err.message);
-    return res.status(502).json({ message: 'Serviço de clientes indisponível.' });
+    return responderErro(res, 502, 'Serviço de clientes indisponível.');
   }
 
   return next();
 }
 
-module.exports = { enriquecerCpfDestino, enriquecerNomes };
+module.exports = { validarContaOrigem, enriquecerCpfDestino, enriquecerNomes };

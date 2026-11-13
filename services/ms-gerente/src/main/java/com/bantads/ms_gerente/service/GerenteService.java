@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class GerenteService {
@@ -20,6 +21,19 @@ public class GerenteService {
 
     public GerenteService(GerenteRepository repository) {
         this.repository = repository;
+    }
+
+    // R12: devolve todos os gerentes; quem filtra os ativos e conta os clientes é a composição do Gateway
+    @Transactional(readOnly = true)
+    public List<GerenteDTO> listar() {
+        return repository.findAll().stream()
+                .map(GerenteDTO::de)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<GerenteDTO> buscarPorCpf(String cpf) {
+        return repository.findById(cpf).map(GerenteDTO::de);
     }
 
     // SAGA Aprovar Cliente (R9): o MS Conta escolhe entre estes o gerente com menos clientes
@@ -101,8 +115,16 @@ public class GerenteService {
         Gerente gerente = repository.findById(cpf)
                 .orElseThrow(() -> new GerenteNaoEncontradoException("Gerente não encontrado."));
 
-        gerente.setNome(dados.nome());
-        gerente.setTelefone(dados.telefone());
+        // R14: e-mail (login) e CPF são imutáveis. Repetir no corpo o valor atual é aceito; outro valor é erro
+        if (dados.email() != null && !dados.email().trim().equalsIgnoreCase(gerente.getEmail())) {
+            throw new IllegalArgumentException("O e-mail é o login do gerente e não pode ser alterado.");
+        }
+        if (dados.cpf() != null && !dados.cpf().replaceAll("\\D", "").equals(gerente.getCpf())) {
+            throw new IllegalArgumentException("O CPF do gerente não pode ser alterado.");
+        }
+
+        gerente.setNome(dados.nome().trim());
+        gerente.setTelefone(dados.telefone() == null ? null : dados.telefone().trim());
 
         return GerenteDTO.de(repository.save(gerente));
     }

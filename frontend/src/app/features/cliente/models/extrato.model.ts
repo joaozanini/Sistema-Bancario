@@ -5,18 +5,26 @@ export interface HateoasLink {
   href: string;
 }
 
+// Um dos lados de uma transferência: conta, CPF e nome do titular
+export interface ParteTransferenciaDto {
+  numeroConta?: string | null;
+  cpf?: string | null;
+  nome?: string | null;
+}
+
+// origem e destino só vêm preenchidos nas transferências
 export interface MovimentacaoDto {
   dataHora: string;
   tipo: string;
-  cpfOrigem?: string | null;
-  nomeOrigem?: string | null;
-  cpfDestino?: string | null;
-  nomeDestino?: string | null;
   valor: string;
+  origem?: ParteTransferenciaDto | null;
+  destino?: ParteTransferenciaDto | null;
 }
 
 export interface ExtratoDto {
   numeroConta: string;
+  dataInicio?: string;
+  dataFim?: string;
   saldoAbertura: string;
   movimentacoes: MovimentacaoDto[];
   _links?: Record<string, HateoasLink>;

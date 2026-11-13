@@ -124,7 +124,9 @@ test('falha de reset responde 502 e nao limpa o Redis', async () => {
     await reboot({}, res);
 
     assert.equal(res.codigo, 502);
-    assert.equal(res.corpo.status, 'erro');
+    assert.equal(res.corpo.status, 502);
+    assert.equal(res.corpo.erro, 'Bad Gateway');
+    assert.ok(res.corpo.mensagem);
     assert.equal(res.corpo.servicos.conta, 'respondeu 500');
     assert.equal(d.chamadas.keys.length, 0, 'sem seed recriado, apagar sessão só piora o estado');
   } finally {

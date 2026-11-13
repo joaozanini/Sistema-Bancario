@@ -1,8 +1,11 @@
 package com.bantads.ms_cliente.controller;
 
+import com.bantads.ms_cliente.dto.EnderecoDTO;
 import com.bantads.ms_cliente.dto.SolicitacaoCadastroDTO;
+import com.bantads.ms_cliente.dto.SolicitacoesListDTO;
 import com.bantads.ms_cliente.exception.CadastroDuplicadoException;
 import com.bantads.ms_cliente.model.SolicitacaoCadastro;
+import com.bantads.ms_cliente.model.StatusSolicitacao;
 import com.bantads.ms_cliente.service.AutoCadastroService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -10,11 +13,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/solicitacoes")
@@ -23,52 +27,59 @@ public class AutoCadastroController {
     private static final String SOLICITACOES_URL = "http://localhost:8082/solicitacoes";
     private static final String CLIENTES_URL = "http://localhost:8082/clientes";
 
+    // Mesmo formato dos valores do MS Conta: até 15 dígitos inteiros e 2 casas, o que cabe no NUMERIC(19, 4)
+    // e barra a notação científica ("1E-99999999" passa no new BigDecimal() e trava a thread na conversão)
+    private static final Pattern FORMATO_SALARIO = Pattern.compile("\\d{1,15}(\\.\\d{1,2})?");
+
     private final AutoCadastroService service;
 
     public AutoCadastroController(AutoCadastroService service) {
         this.service = service;
     }
 
+    /**
+     * Requisito R1: autocadastro. Grava a solicitação como PENDENTE e responde 201 com ela.
+     */
     @PostMapping
-    public ResponseEntity<?> criarSolicitacao(@RequestBody SolicitacaoCadastroDTO dto) {
+    public ResponseEntity<?> criarSolicitacao(@RequestBody(required = false) SolicitacaoCadastroDTO dto) {
         try {
             if (dto == null) {
                 return ResponseEntity.badRequest().body(Map.of("erro", "Dados da solicitação não informados."));
             }
 
             BigDecimal salario = null;
-            if (dto.getSalario() != null && !dto.getSalario().trim().isBlank()) {
-                try {
-                    salario = new BigDecimal(dto.getSalario().trim());
-                } catch (Exception e) {
+            if (dto.getSalario() != null && !dto.getSalario().isBlank()) {
+                String salarioInformado = dto.getSalario().trim();
+                if (!FORMATO_SALARIO.matcher(salarioInformado).matches()) {
                     return ResponseEntity.badRequest().body(Map.of("erro", "Salário inválido."));
                 }
+                salario = new BigDecimal(salarioInformado);
             }
 
-            // Mapeando DTO de entrada para a Entidade
+            // Mapeando DTO de entrada para a Entidade; sem "endereco" os campos ficam nulos e a validação recusa
+            EnderecoDTO endereco = dto.getEndereco() != null
+                    ? dto.getEndereco()
+                    : new EnderecoDTO(null, null, null, null, null, null);
+
             SolicitacaoCadastro entidade = new SolicitacaoCadastro();
             entidade.setNome(dto.getNome());
             entidade.setCpf(dto.getCpf());
             entidade.setEmail(dto.getEmail());
             entidade.setTelefone(dto.getTelefone());
             entidade.setSalario(salario);
-            entidade.setLogradouro(dto.getLogradouro());
-            entidade.setNumero(dto.getNumero());
-            entidade.setComplemento(dto.getComplemento());
-            entidade.setCep(dto.getCep());
-            entidade.setCidade(dto.getCidade());
-            entidade.setUf(dto.getUf());
+            entidade.setLogradouro(endereco.logradouro());
+            entidade.setNumero(endereco.numero());
+            entidade.setComplemento(endereco.complemento());
+            entidade.setCep(endereco.cep());
+            entidade.setCidade(endereco.cidade());
+            entidade.setUf(endereco.uf());
 
             // Regra de validação e unicidade
             SolicitacaoCadastro salva = service.registrarSolicitacao(entidade);
 
-            // Mapeando Entidade salva para DTO de saída
-            SolicitacaoCadastroDTO respostaDto = converterParaDTO(salva);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                    "mensagem", "Solicitação enviada com sucesso.",
-                    "solicitacao", respostaDto
-            ));
+            return ResponseEntity
+                    .created(URI.create("/solicitacoes/" + salva.getCpf()))
+                    .body(converterParaDTO(salva));
         } catch (CadastroDuplicadoException e) {
             // R1: CPF ou e-mail repetido é conflito com um cadastro existente, não dado malformado
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("erro", e.getMessage()));
@@ -82,31 +93,46 @@ public class AutoCadastroController {
 
     /**
      * Requisito R8: Listagem de solicitações de autocadastro (Pendente,
-     * Aprovado, Não aprovado).
+     * Aprovada, Não aprovada).
      */
     @GetMapping
-    public ResponseEntity<List<SolicitacaoCadastroDTO>> listarSolicitacoes(
+    public ResponseEntity<?> listarSolicitacoes(
             @RequestParam(value = "status", required = false) String status
     ) {
-        List<SolicitacaoCadastro> lista = service.listarSolicitacoes(status);
-        List<SolicitacaoCadastroDTO> dtos = lista.stream()
-                .map(this::converterParaDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(dtos);
+        try {
+            List<SolicitacaoCadastroDTO> dtos = service.listarSolicitacoes(status).stream()
+                    .map(this::converterParaDTO)
+                    .toList();
+            return ResponseEntity.ok(new SolicitacoesListDTO(dtos, Map.of("self", Map.of("href", SOLICITACOES_URL))));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("erro", e.getMessage()));
+        }
+    }
+
+    /**
+     * Requisito R8: consulta de uma solicitação pelo CPF.
+     */
+    @GetMapping("/{cpf}")
+    public ResponseEntity<?> buscarSolicitacao(@PathVariable("cpf") String cpf) {
+        try {
+            return ResponseEntity.ok(converterParaDTO(service.buscarPorCpf(cpf)));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("erro", e.getMessage()));
+        }
     }
 
     /**
      * Requisito R10: rejeitar solicitação pendente informando o motivo.
      * Síncrono (200).
      */
-    @PostMapping("/{id}/rejeitar")
+    @PostMapping("/{cpf}/rejeicao")
     public ResponseEntity<?> rejeitarSolicitacao(
-            @PathVariable("id") UUID id,
+            @PathVariable("cpf") String cpf,
             @RequestBody(required = false) Map<String, String> corpo
     ) {
         try {
             String motivo = corpo == null ? null : corpo.get("motivo");
-            SolicitacaoCadastro rejeitada = service.rejeitarSolicitacao(id, motivo);
+            SolicitacaoCadastro rejeitada = service.rejeitarSolicitacao(cpf, motivo);
             return ResponseEntity.ok(converterParaDTO(rejeitada));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("erro", e.getMessage()));
@@ -119,31 +145,33 @@ public class AutoCadastroController {
 
     private SolicitacaoCadastroDTO converterParaDTO(SolicitacaoCadastro entidade) {
         SolicitacaoCadastroDTO dto = new SolicitacaoCadastroDTO();
-        dto.setId(entidade.getId());
-        dto.setNome(entidade.getNome());
         dto.setCpf(entidade.getCpf());
+        dto.setNome(entidade.getNome());
         dto.setEmail(entidade.getEmail());
         dto.setTelefone(entidade.getTelefone());
         if (entidade.getSalario() != null) {
-            dto.setSalario(entidade.getSalario().toString());
+            // 2 casas na API; o banco guarda NUMERIC(19, 4) e devolveria "4500.0000"
+            dto.setSalario(entidade.getSalario().setScale(2, RoundingMode.HALF_EVEN).toPlainString());
         }
-        dto.setLogradouro(entidade.getLogradouro());
-        dto.setNumero(entidade.getNumero());
-        dto.setComplemento(entidade.getComplemento());
-        dto.setCep(entidade.getCep());
-        dto.setCidade(entidade.getCidade());
-        dto.setUf(entidade.getUf());
+        dto.setEndereco(new EnderecoDTO(
+                entidade.getLogradouro(),
+                entidade.getNumero(),
+                entidade.getComplemento(),
+                entidade.getCep(),
+                entidade.getCidade(),
+                entidade.getUf()));
         dto.setStatus(entidade.getStatus());
-        dto.setMotivoRejeicao(entidade.getMotivoRejeicao());
-        dto.setDataAprovacaoRejeicao(entidade.getDataAprovacaoRejeicao());
+        dto.setMotivo(entidade.getMotivoRejeicao());
+        dto.setDataHoraProcessamento(entidade.getDataAprovacaoRejeicao());
 
         // HATEOAS (enunciado 5.6): URL interna do MS; o Gateway reescreve o host para o dele.
-        // Não há GET por id de solicitação, então o item aponta para a coleção e para as ações possíveis.
-        dto.addLink("solicitacoes", SOLICITACOES_URL);
-        if ("PENDENTE".equalsIgnoreCase(entidade.getStatus())) {
-            dto.addLink("aprovar", SOLICITACOES_URL + "/" + entidade.getCpf() + "/aprovar");
-            dto.addLink("rejeitar", SOLICITACOES_URL + "/" + entidade.getId() + "/rejeitar");
-        } else if ("APROVADO".equalsIgnoreCase(entidade.getStatus())) {
+        // Os links seguem o estado: só a solicitação PENDENTE pode ser aprovada ou rejeitada.
+        String self = SOLICITACOES_URL + "/" + entidade.getCpf();
+        dto.addLink("self", self);
+        if (StatusSolicitacao.PENDENTE.equalsIgnoreCase(entidade.getStatus())) {
+            dto.addLink("aprovacao", self + "/aprovacao");
+            dto.addLink("rejeicao", self + "/rejeicao");
+        } else if (StatusSolicitacao.APROVADA.equalsIgnoreCase(entidade.getStatus())) {
             dto.addLink("cliente", CLIENTES_URL + "/" + entidade.getCpf());
         }
         return dto;

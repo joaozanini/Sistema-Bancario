@@ -1,5 +1,6 @@
 const tokenService = require('../services/token.service');
 const sessionService = require('../services/session.service');
+const { responderErro } = require('../services/erro.service');
 
 // request → CORS → JWT verify → Redis (sessão existe? revogada?) → renova TTL (sliding window) → injeta headers → proxy
 async function verifyJwtAndSession(req, res, next) {
@@ -28,11 +29,19 @@ async function verifyJwtAndSession(req, res, next) {
     await sessionService.renewSession(jti, cpf);
   } catch (err) {
     console.error('Falha ao consultar sessão no Redis:', err.message);
-    return res.status(503).json({ auth: false, message: 'Sessão indisponível.' });
+    return responderErro(res, 503, 'Sessão indisponível.');
   }
 
   req.user = { cpf, tipo };
   req.tokenMeta = { jti, exp };
+  next();
+}
+
+// Os MSs confiam em X-User-CPF e X-User-Tipo, então esses headers só podem nascer aqui,
+// a partir do token validado: o que vier de fora com esses nomes é descartado logo na entrada.
+function descartarIdentidadeDoCliente(req, res, next) {
+  delete req.headers['x-user-cpf'];
+  delete req.headers['x-user-tipo'];
   next();
 }
 
@@ -46,10 +55,10 @@ function injectUserHeaders(req, res, next) {
 function exigirTipo(tipoPermitido) {
   return (req, res, next) => {
     if (String(req.user.tipo).toUpperCase() !== tipoPermitido) {
-      return res.status(403).json({ message: 'Acesso negado.' });
+      return responderErro(res, 403, 'Acesso negado: operação exclusiva do perfil ' + tipoPermitido + '.');
     }
     return next();
   };
 }
 
-module.exports = { verifyJwtAndSession, injectUserHeaders, exigirTipo };
+module.exports = { verifyJwtAndSession, descartarIdentidadeDoCliente, injectUserHeaders, exigirTipo };

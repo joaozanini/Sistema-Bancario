@@ -1,14 +1,14 @@
 package com.bantads.ms_conta.dto;
 
+// Linha do extrato (R7). origem e destino só vêm preenchidos nas transferências: o front compara o CPF
+// do usuário logado com eles para saber se o valor entrou ou saiu
 public class ItemExtratoDTO {
 
     private String dataHora;
     private String tipo;
-    private String cpfOrigem;
-    private String nomeOrigem;
-    private String cpfDestino;
-    private String nomeDestino;
     private String valor;
+    private ParteTransferenciaDTO origem;
+    private ParteTransferenciaDTO destino;
 
     public ItemExtratoDTO() {
     }
@@ -16,19 +16,15 @@ public class ItemExtratoDTO {
     public ItemExtratoDTO(
             String dataHora,
             String tipo,
-            String cpfOrigem,
-            String nomeOrigem,
-            String cpfDestino,
-            String nomeDestino,
-            String valor
+            String valor,
+            ParteTransferenciaDTO origem,
+            ParteTransferenciaDTO destino
     ) {
         this.dataHora = dataHora;
         this.tipo = tipo;
-        this.cpfOrigem = cpfOrigem;
-        this.nomeOrigem = nomeOrigem;
-        this.cpfDestino = cpfDestino;
-        this.nomeDestino = nomeDestino;
         this.valor = valor;
+        this.origem = origem;
+        this.destino = destino;
     }
 
     public String getDataHora() {
@@ -47,43 +43,27 @@ public class ItemExtratoDTO {
         this.tipo = tipo;
     }
 
-    public String getCpfOrigem() {
-        return cpfOrigem;
-    }
-
-    public void setCpfOrigem(String cpfOrigem) {
-        this.cpfOrigem = cpfOrigem;
-    }
-
-    public String getNomeOrigem() {
-        return nomeOrigem;
-    }
-
-    public void setNomeOrigem(String nomeOrigem) {
-        this.nomeOrigem = nomeOrigem;
-    }
-
-    public String getCpfDestino() {
-        return cpfDestino;
-    }
-
-    public void setCpfDestino(String cpfDestino) {
-        this.cpfDestino = cpfDestino;
-    }
-
-    public String getNomeDestino() {
-        return nomeDestino;
-    }
-
-    public void setNomeDestino(String nomeDestino) {
-        this.nomeDestino = nomeDestino;
-    }
-
     public String getValor() {
         return valor;
     }
 
     public void setValor(String valor) {
         this.valor = valor;
+    }
+
+    public ParteTransferenciaDTO getOrigem() {
+        return origem;
+    }
+
+    public void setOrigem(ParteTransferenciaDTO origem) {
+        this.origem = origem;
+    }
+
+    public ParteTransferenciaDTO getDestino() {
+        return destino;
+    }
+
+    public void setDestino(ParteTransferenciaDTO destino) {
+        this.destino = destino;
     }
 }

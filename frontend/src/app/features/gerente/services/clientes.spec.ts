@@ -51,7 +51,7 @@ describe('ClientesService', () => {
   beforeEach(() => {
     jobsService = {
       aguardar: vi.fn().mockReturnValue(of(job({}))),
-      resultado: vi.fn().mockReturnValue(of(LINHAS)),
+      resultado: vi.fn().mockReturnValue(of({ clientes: LINHAS })),
     };
 
     TestBed.configureTestingModule({
@@ -82,10 +82,14 @@ describe('ClientesService', () => {
       .listar()
       .subscribe((lista) => (resultado = lista.map((c) => ({ nome: c.nome, saldo: c.saldo.toFixed(2) }))));
 
-    http.expectOne(`${environment.apiUrl}/clientes`).flush([
-      { cpf: '2', nome: 'Cleuddônio', cidade: 'Curitiba', uf: 'PR', saldo: '-10000.0000' },
-      { cpf: '1', nome: 'Catharyna', cidade: 'Curitiba', uf: 'PR', saldo: '800.0000' },
-    ]);
+    // a lista vem dentro de { clientes }, com o estado no campo "estado"
+    http.expectOne(`${environment.apiUrl}/clientes`).flush({
+      clientes: [
+        { cpf: '2', nome: 'Cleuddônio', cidade: 'Curitiba', estado: 'PR', saldo: '-10000.00' },
+        { cpf: '1', nome: 'Catharyna', cidade: 'Curitiba', estado: 'PR', saldo: '800.00' },
+      ],
+      _links: { self: { href: `${environment.apiUrl}/clientes` } },
+    });
 
     expect(resultado).toEqual([
       { nome: 'Catharyna', saldo: '800.00' },
@@ -114,10 +118,10 @@ describe('ClientesService', () => {
     expect(jobsService.resultado).not.toHaveBeenCalled();
   });
 
-  it('resposta síncrona (200) usa a lista direto, sem polling', () => {
+  it('resposta síncrona (200) usa o relatório do corpo, sem polling', () => {
     const saida = gerar();
 
-    http.expectOne(URL_RELATORIO).flush(LINHAS);
+    http.expectOne(URL_RELATORIO).flush({ clientes: LINHAS });
 
     expect(jobsService.aguardar).not.toHaveBeenCalled();
     expect(saida.linhas?.length).toBe(2);

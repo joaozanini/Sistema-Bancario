@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,9 +49,53 @@ class GerenteServiceTest {
                 new GerenteDTO(CPF, "Geniéve Silva", "ger1@bantads.com.br", "41988887777", true));
         assertThat(atualizado._links()).isNotNull();
         assertThat(atualizado._links().get("self")).containsEntry("href", "http://localhost:8083/gerentes/" + CPF);
-        assertThat(atualizado._links().get("gerentes")).containsEntry("href", "http://localhost:8083/gerentes");
-        assertThat(atualizado._links().get("atualizar")).containsEntry("href", "http://localhost:8083/gerentes/" + CPF);
-        assertThat(atualizado._links().get("remover")).containsEntry("href", "http://localhost:8083/gerentes/" + CPF);
+        assertThat(atualizado._links().get("atualizacao")).containsEntry("href", "http://localhost:8083/gerentes/" + CPF);
+        assertThat(atualizado._links().get("remocao")).containsEntry("href", "http://localhost:8083/gerentes/" + CPF);
+    }
+
+    @Test
+    @DisplayName("Deve recusar a atualização que tenta trocar o e-mail ou o CPF, que são imutáveis (R14)")
+    void deveRecusarTrocaDeEmailOuCpf() {
+        when(repository.findById(CPF)).thenReturn(Optional.of(gerenteExistente()));
+
+        assertThatThrownBy(() -> service.atualizar(CPF,
+                new AtualizacaoGerenteDTO("Geniéve", "41988887777", "outro@bantads.com.br", null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("e-mail");
+
+        assertThatThrownBy(() -> service.atualizar(CPF,
+                new AtualizacaoGerenteDTO("Geniéve", "41988887777", null, "00000000000")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("CPF");
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve aceitar e-mail e CPF no corpo quando são os mesmos do cadastro (R14)")
+    void deveAceitarEmailECpfIguaisAosAtuais() {
+        Gerente gerente = gerenteExistente();
+        when(repository.findById(CPF)).thenReturn(Optional.of(gerente));
+        when(repository.save(gerente)).thenReturn(gerente);
+
+        GerenteDTO atualizado = service.atualizar(CPF,
+                new AtualizacaoGerenteDTO(" Geniéve Silva ", "41988887777", "GER1@bantads.com.br", CPF));
+
+        assertThat(atualizado.nome()).isEqualTo("Geniéve Silva");
+        assertThat(atualizado.email()).isEqualTo("ger1@bantads.com.br");
+    }
+
+    @Test
+    @DisplayName("Deve listar todos os gerentes e buscar um pelo CPF")
+    void deveListarEBuscarGerentes() {
+        Gerente gerente = gerenteExistente();
+        when(repository.findAll()).thenReturn(List.of(gerente));
+        when(repository.findById(CPF)).thenReturn(Optional.of(gerente));
+        when(repository.findById("00000000000")).thenReturn(Optional.empty());
+
+        assertThat(service.listar()).extracting(GerenteDTO::cpf).containsExactly(CPF);
+        assertThat(service.buscarPorCpf(CPF)).map(GerenteDTO::nome).contains("Geniéve");
+        assertThat(service.buscarPorCpf("00000000000")).isEmpty();
     }
 
     @Test
@@ -84,7 +129,7 @@ class GerenteServiceTest {
 
         assertThat(criado.cpf()).isEqualTo("11144477735");
         assertThat(criado.email()).isEqualTo("novo@bantads.com.br");
-        assertThat(criado._links()).containsKeys("self", "gerentes", "atualizar", "remover");
+        assertThat(criado._links()).containsOnlyKeys("self", "atualizacao", "remocao");
     }
 
     @Test

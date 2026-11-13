@@ -5,7 +5,6 @@ import com.bantads.ms_conta.dto.ExtratoResponseDTO;
 import com.bantads.ms_conta.dto.MovimentacaoRequestDTO;
 import com.bantads.ms_conta.dto.MovimentacaoResponseDTO;
 import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
-import com.bantads.ms_conta.dto.TransferenciaResponseDTO;
 import com.bantads.ms_conta.service.ContaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,12 +23,12 @@ public class ContaController {
     }
 
     @PostMapping("/{numero}/transferencia")
-    public ResponseEntity<TransferenciaResponseDTO> transferir(
+    public ResponseEntity<MovimentacaoResponseDTO> transferir(
             @PathVariable("numero") String numeroContaOrigem,
             @RequestBody TransferenciaRequestDTO dto,
             @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
     ) {
-        TransferenciaResponseDTO resposta = service.transferir(numeroContaOrigem, dto, xUserCpf);
+        MovimentacaoResponseDTO resposta = service.transferir(numeroContaOrigem, dto, xUserCpf);
         // 201, como saque e depósito: a transferência cria os eventos TransferênciaOrigem/Destino
         return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
     }
@@ -54,35 +53,19 @@ public class ContaController {
         return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
     }
 
-    @GetMapping("/extrato")
-    public ResponseEntity<ExtratoResponseDTO> consultarExtratoDoCliente(
-            @RequestParam(value = "inicio", required = false) String inicio,
-            @RequestParam(value = "fim", required = false) String fim,
-            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
-    ) {
-        ExtratoResponseDTO resposta = service.consultarExtratoPorCpf(xUserCpf, inicio, fim);
-        return ResponseEntity.ok(resposta);
-    }
-
     @GetMapping("/{numero}/extrato")
     public ResponseEntity<ExtratoResponseDTO> consultarExtratoPorConta(
             @PathVariable("numero") String numeroConta,
             @RequestParam(value = "inicio", required = false) String inicio,
             @RequestParam(value = "fim", required = false) String fim,
-            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
+            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf,
+            @RequestHeader(value = "X-User-Tipo", required = false) String xUserTipo
     ) {
-        ExtratoResponseDTO resposta = service.consultarExtrato(numeroConta, inicio, fim, xUserCpf);
+        ExtratoResponseDTO resposta = service.consultarExtrato(numeroConta, inicio, fim, xUserCpf, xUserTipo);
         return ResponseEntity.ok(resposta);
     }
 
-    @GetMapping("/cliente")
-    public ResponseEntity<ContaDTO> buscarContaDoCliente(
-            @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
-    ) {
-        ContaDTO dto = service.buscarContaPorCpf(xUserCpf);
-        return ResponseEntity.ok(dto);
-    }
-
+    // Uso interno do Gateway nas composições (R11, R12, R16); não é exposto ao front
     @GetMapping
     public ResponseEntity<List<ContaDTO>> listarContas() {
         List<ContaDTO> contas = service.listarContas();

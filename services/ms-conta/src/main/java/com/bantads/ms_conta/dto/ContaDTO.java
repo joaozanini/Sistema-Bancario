@@ -7,10 +7,12 @@ import java.util.Map;
 
 public class ContaDTO {
 
-    private String numeroConta;
+    private String numero;
     private String cpfCliente;
-    private String gerenteCpf;
+    private String cpfGerente;
     private String saldo;
+    // só a data (AAAA-MM-DD): é assim que o enunciado apresenta a criação da conta
+    private String dataCriacao;
 
     @JsonProperty("_links")
     private Map<String, Map<String, String>> _links = new LinkedHashMap<>();
@@ -18,22 +20,22 @@ public class ContaDTO {
     public ContaDTO() {
     }
 
-    public ContaDTO(String numeroConta, String cpfCliente, String gerenteCpf) {
-        this.numeroConta = numeroConta;
+    public ContaDTO(String numero, String cpfCliente, String cpfGerente) {
+        this.numero = numero;
         this.cpfCliente = cpfCliente;
-        this.gerenteCpf = gerenteCpf;
+        this.cpfGerente = cpfGerente;
     }
 
     public void addLink(String rel, String href) {
         this._links.put(rel, Map.of("href", href));
     }
 
-    public String getNumeroConta() {
-        return numeroConta;
+    public String getNumero() {
+        return numero;
     }
 
-    public void setNumeroConta(String numeroConta) {
-        this.numeroConta = numeroConta;
+    public void setNumero(String numero) {
+        this.numero = numero;
     }
 
     public String getCpfCliente() {
@@ -44,12 +46,12 @@ public class ContaDTO {
         this.cpfCliente = cpfCliente;
     }
 
-    public String getGerenteCpf() {
-        return gerenteCpf;
+    public String getCpfGerente() {
+        return cpfGerente;
     }
 
-    public void setGerenteCpf(String gerenteCpf) {
-        this.gerenteCpf = gerenteCpf;
+    public void setCpfGerente(String cpfGerente) {
+        this.cpfGerente = cpfGerente;
     }
 
     public String getSaldo() {
@@ -58,6 +60,14 @@ public class ContaDTO {
 
     public void setSaldo(String saldo) {
         this.saldo = saldo;
+    }
+
+    public String getDataCriacao() {
+        return dataCriacao;
+    }
+
+    public void setDataCriacao(String dataCriacao) {
+        this.dataCriacao = dataCriacao;
     }
 
     @JsonProperty("_links")
