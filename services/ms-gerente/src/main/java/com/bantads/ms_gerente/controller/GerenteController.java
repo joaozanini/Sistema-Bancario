@@ -2,7 +2,6 @@ package com.bantads.ms_gerente.controller;
 
 import com.bantads.ms_gerente.dto.AtualizacaoGerenteDTO;
 import com.bantads.ms_gerente.dto.GerenteDTO;
-import com.bantads.ms_gerente.repository.GerenteRepository;
 import com.bantads.ms_gerente.service.GerenteService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -19,26 +18,20 @@ import java.util.List;
 @RequestMapping("/gerentes")
 public class GerenteController {
 
-    private final GerenteRepository repository;
     private final GerenteService service;
 
-    public GerenteController(GerenteRepository repository, GerenteService service) {
-        this.repository = repository;
+    public GerenteController(GerenteService service) {
         this.service = service;
     }
 
     @GetMapping
     public ResponseEntity<List<GerenteDTO>> listar() {
-        List<GerenteDTO> gerentes = repository.findAll().stream()
-                .map(GerenteDTO::de)
-                .toList();
-        return ResponseEntity.ok(gerentes);
+        return ResponseEntity.ok(service.listar());
     }
 
     @GetMapping("/{cpf}")
     public ResponseEntity<GerenteDTO> buscarPorCpf(@PathVariable String cpf) {
-        return repository.findById(cpf)
-                .map(GerenteDTO::de)
+        return service.buscarPorCpf(cpf)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
