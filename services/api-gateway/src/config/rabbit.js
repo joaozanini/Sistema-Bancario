@@ -7,14 +7,13 @@ let canalPromise = null;
 
 // Canal com confirmação: perder uma publicação em saga.cmd significa perder a SAGA
 // inteira, então esperamos o broker confirmar antes de responder 202 ao cliente.
-function abrirCanal() {
-  return amqp.connect(url).then((conexao) => {
-    conexao.on('error', (err) => console.error('Erro na conexão com o RabbitMQ:', err.message));
-    conexao.on('close', () => {
-      canalPromise = null;
-    });
-    return conexao.createConfirmChannel();
+async function abrirCanal() {
+  const conexao = await amqp.connect(url);
+  conexao.on('error', (err) => console.error('Erro na conexão com o RabbitMQ:', err.message));
+  conexao.on('close', () => {
+    canalPromise = null;
   });
+  return conexao.createConfirmChannel();
 }
 
 function canal() {

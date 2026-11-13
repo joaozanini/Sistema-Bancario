@@ -6,6 +6,9 @@
 // Registrar aqui evita que cada teste novo precise lembrar disso.
 const test = require('node:test');
 
+// o token.service não sobe sem chave; nos testes vale uma chave qualquer
+process.env.JWT_SECRET ??= 'segredo-de-teste';
+
 test.after(async () => {
   const caminho = require.resolve('./src/config/redis');
   // só fecha se o arquivo de teste realmente carregou o Redis

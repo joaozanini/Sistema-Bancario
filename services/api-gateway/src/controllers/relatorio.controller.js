@@ -26,19 +26,21 @@ async function gerar(req, res) {
   return undefined;
 }
 
-function comporEmSegundoPlano(jobId) {
-  relatorioService
-    .gerar()
+// Chamada sem await de propósito (o 202 já foi enviado). Todo erro é tratado aqui
+// dentro, então a promise devolvida nunca rejeita.
+async function comporEmSegundoPlano(jobId) {
+  try {
+    const linhas = await relatorioService.gerar();
     // o resultado inline do R16 é um objeto { clientes: [...] }, não a lista solta
-    .then((linhas) => jobService.concluirInline(jobId, { clientes: linhas }))
-    .catch(async (err) => {
-      console.error('Falha ao gerar o relatório de clientes:', err.message);
-      try {
-        await jobService.falhar(jobId, 'Não foi possível gerar o relatório de clientes.');
-      } catch (erroJob) {
-        console.error('Falha ao registrar o erro no job:', erroJob.message);
-      }
-    });
+    await jobService.concluirInline(jobId, { clientes: linhas });
+  } catch (err) {
+    console.error('Falha ao gerar o relatório de clientes:', err.message);
+    try {
+      await jobService.falhar(jobId, 'Não foi possível gerar o relatório de clientes.');
+    } catch (erroJob) {
+      console.error('Falha ao registrar o erro no job:', erroJob.message);
+    }
+  }
 }
 
 module.exports = { gerar, DOMINIO };
