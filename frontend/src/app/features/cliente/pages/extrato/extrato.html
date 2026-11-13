@@ -75,12 +75,9 @@
               }
 
               <tr class="saldo" [class.sem-movimento]="dia.movimentacoes.length === 0">
-                <td colspan="3">
-                  Saldo consolidado em {{ dia.dia | brDate }}
-                  @if (dia.movimentacoes.length === 0) {
-                    <span class="sem-mov">sem movimentações</span>
-                  }
-                </td>
+                <td>{{ dia.dia | brDate }}</td>
+                <td class="operacao">Saldo consolidado</td>
+                <td class="sem-mov">{{ dia.movimentacoes.length === 0 ? 'sem movimentações' : '' }}</td>
                 <td class="valor">{{ dia.saldoDoDia | brlCurrency }}</td>
               </tr>
             }

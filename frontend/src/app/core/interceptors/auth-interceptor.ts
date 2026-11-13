@@ -3,13 +3,15 @@ import { AuthService } from '../services/auth';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  const token = auth.obterToken();
+  const paraGateway = req.url.startsWith(environment.apiUrl);
+  const token = paraGateway ? auth.obterToken() : null;
 
-  const request = token ? 
+  const request = token ?
   req.clone({
     setHeaders: {
       'x-access-token': token,
@@ -19,7 +21,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(request).pipe(
     catchError((erro: HttpErrorResponse) => {
-    if(erro.status === 401) {
+    if(paraGateway && erro.status === 401) {
       auth.logout();
       router.navigateByUrl('/login');
     }

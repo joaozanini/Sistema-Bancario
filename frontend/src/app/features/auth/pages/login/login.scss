@@ -105,6 +105,16 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.sucesso {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .erro {
   margin: 0;
   padding: 10px 12px;
