@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth.routes');
 const jobsRoutes = require('./routes/jobs.routes');
 const clientesRoutes = require('./routes/clientes.routes');
 const solicitacoesRoutes = require('./routes/solicitacoes.routes');
+const cepRoutes = require('./routes/cep.routes');
 const relatorioRoutes = require('./routes/relatorio.routes');
 const proxyRoutes = require('./routes/proxy.routes');
 const { reescreverLinksDeRespostaJson } = require('./middlewares/links.middleware');
@@ -26,6 +27,7 @@ app.use(authRoutes);
 app.use(jobsRoutes);
 app.use(clientesRoutes);
 app.use(solicitacoesRoutes);
+app.use(cepRoutes);
 app.use(relatorioRoutes);
 app.use(proxyRoutes);
 
