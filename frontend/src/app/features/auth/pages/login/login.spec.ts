@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { throwError } from 'rxjs';
 
 import { AuthService } from '../../../../core/services/auth';
@@ -23,6 +23,24 @@ describe('Login', () => {
     component = fixture.componentInstance;
     component.email = 'cli1@bantads.com.br';
     component.senha = 'errada';
+  });
+
+  it('mostra a mensagem que chega do cadastro', () => {
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'currentNavigation').mockReturnValue({
+      extras: { state: { mensagem: 'Solicitação de cadastro enviada!' } },
+    } as unknown as ReturnType<Router['currentNavigation']>);
+
+    const outro = TestBed.createComponent(Login);
+    outro.detectChanges();
+
+    expect(outro.nativeElement.textContent).toContain('Solicitação de cadastro enviada!');
+  });
+
+  it('sem mensagem de cadastro não mostra o aviso', () => {
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.sucesso')).toBeNull();
   });
 
   function falharCom(erro: HttpErrorResponse) {

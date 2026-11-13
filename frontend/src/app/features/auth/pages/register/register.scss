@@ -133,6 +133,10 @@ small {
   font-weight: 400;
 }
 
+small.info {
+  color: #64748b;
+}
+
 button {
   margin-top: 24px;
   border: 0;
@@ -156,19 +160,14 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.success-message,
 .error-message {
-  margin: 14px 0 0;
+  margin: 24px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
   font-size: 14px;
   text-align: center;
-}
-
-.success-message {
-  color: #15803d;
-}
-
-.error-message {
-  color: #b91c1c;
 }
 
 .login-link {

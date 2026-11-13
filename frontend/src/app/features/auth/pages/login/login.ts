@@ -22,6 +22,9 @@ export class Login {
   // presa em "Entrando..." mesmo depois do erro chegar
   readonly erro = signal('');
   readonly carregando = signal(false);
+  readonly aviso = signal<string>(
+    this.router.currentNavigation()?.extras.state?.['mensagem'] ?? '',
+  );
 
   entrar() {
     if (!this.email || !this.senha) {

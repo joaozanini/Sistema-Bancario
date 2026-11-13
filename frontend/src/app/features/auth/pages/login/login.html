@@ -7,6 +7,10 @@
       <p>Entre com seu e-mail e senha do BANTADS.</p>
     </header>
 
+    @if (aviso()) {
+      <p class="sucesso" role="status">{{ aviso() }}</p>
+    }
+
     <form (ngSubmit)="entrar()" novalidate>
       <label>
         <span>E-mail</span>
