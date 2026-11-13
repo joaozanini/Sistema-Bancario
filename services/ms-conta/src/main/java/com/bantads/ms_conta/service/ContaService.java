@@ -6,8 +6,8 @@ import com.bantads.ms_conta.dto.ExtratoResponseDTO;
 import com.bantads.ms_conta.dto.ItemExtratoDTO;
 import com.bantads.ms_conta.dto.MovimentacaoRequestDTO;
 import com.bantads.ms_conta.dto.MovimentacaoResponseDTO;
+import com.bantads.ms_conta.dto.ParteTransferenciaDTO;
 import com.bantads.ms_conta.dto.TransferenciaRequestDTO;
-import com.bantads.ms_conta.dto.TransferenciaResponseDTO;
 import com.bantads.ms_conta.exception.AcessoNegadoException;
 import com.bantads.ms_conta.exception.ContaNaoEncontradaException;
 import com.bantads.ms_conta.exception.RegraNegocioException;
@@ -40,6 +40,7 @@ import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -56,6 +57,11 @@ public class ContaService {
     // Até 15 dígitos inteiros e 2 casas decimais, o que cabe no NUMERIC(19, 4). Também barra a notação
     // científica: "1E-99999999" passa no new BigDecimal() e prende a thread por mais de 1 min no setScale
     private static final Pattern FORMATO_VALOR = Pattern.compile("\\d{1,15}(\\.\\d{1,2})?");
+
+    // Datas da API sem fuso e sem fração de segundo (2026-04-30T10:00:00)
+    private static final DateTimeFormatter FORMATO_DATA_HORA = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+    private static final String URL_CONTAS = "http://localhost:8080/contas/";
 
     private final EventoContaRepository repository;
     private final ContaQueryRepository contaQueryRepository;
@@ -490,7 +496,7 @@ public class ContaService {
      * Requisito R6: Transferência Atômica entre contas com replay dinâmico,
      * posse obrigatória (X-User-CPF) e novo replay em conflito de versão (concorrência otimista).
      */
-    public TransferenciaResponseDTO transferir(String contaOrigem, TransferenciaRequestDTO dto, String xUserCpf) {
+    public MovimentacaoResponseDTO transferir(String contaOrigem, TransferenciaRequestDTO dto, String xUserCpf) {
         if (contaOrigem == null || contaOrigem.trim().isEmpty()) {
             throw new TransferenciaInvalidaException("Conta de origem é obrigatória.");
         }
@@ -518,7 +524,7 @@ public class ContaService {
                 () -> executarTransferencia(contaOrigem, contaDestino, dto, valorTransferencia, xUserCpf));
     }
 
-    private TransferenciaResponseDTO executarTransferencia(
+    private MovimentacaoResponseDTO executarTransferencia(
             String contaOrigem,
             String contaDestino,
             TransferenciaRequestDTO dto,
@@ -601,22 +607,9 @@ public class ContaService {
         publicarEventoCqrs(eventoOrigem);
         publicarEventoCqrs(eventoDestino);
 
-        TransferenciaResponseDTO resposta = new TransferenciaResponseDTO();
-        resposta.setIdOrigem(eventoOrigem.getId());
-        resposta.setIdDestino(eventoDestino.getId());
-        resposta.setContaOrigem(contaOrigem.trim());
-        resposta.setContaDestino(contaDestino.trim());
-        resposta.setValor(valorStr);
-        resposta.setDataHora(agora);
-        resposta.setMensagem("Transferência realizada com sucesso.");
-        resposta.setOrigem(new TransferenciaResponseDTO.Participante(contaOrigem.trim(), cpfOrigem, nomeOrigem));
-        resposta.setDestino(new TransferenciaResponseDTO.Participante(contaDestino.trim(), cpfDestino, nomeDestino));
-
-        resposta.addLink("self", "http://localhost:8080/contas/" + contaOrigem.trim() + "/transferencia");
-        resposta.addLink("deposito", "http://localhost:8080/contas/" + contaOrigem.trim() + "/deposito");
-        resposta.addLink("saque", "http://localhost:8080/contas/" + contaOrigem.trim() + "/saque");
-        resposta.addLink("extrato", "http://localhost:8080/contas/" + contaOrigem.trim() + "/extrato");
-
+        // Sem o novo saldo, como no saque e no depósito; o destino leva o nome enriquecido pelo Gateway
+        MovimentacaoResponseDTO resposta = montarOperacaoRealizada(contaOrigem.trim(), "TRANSFERENCIA", valorStr, agora);
+        resposta.setDestino(new ParteTransferenciaDTO(contaDestino.trim(), cpfDestino, nomeDestino));
         return resposta;
     }
 
@@ -682,20 +675,7 @@ public class ContaService {
         publicarEventoCqrs(evento);
 
         // Sem o novo saldo: o front-end reconsulta o lado query (CQRS)
-        MovimentacaoResponseDTO resposta = new MovimentacaoResponseDTO();
-        resposta.setId(evento.getId());
-        resposta.setNumeroConta(numeroConta.trim());
-        resposta.setTipo("SAQUE");
-        resposta.setValor(valorStr);
-        resposta.setDataHora(agora);
-        resposta.setMensagem("Saque realizado com sucesso.");
-
-        resposta.addLink("self", "http://localhost:8080/contas/" + numeroConta.trim() + "/saque");
-        resposta.addLink("deposito", "http://localhost:8080/contas/" + numeroConta.trim() + "/deposito");
-        resposta.addLink("transferencia", "http://localhost:8080/contas/" + numeroConta.trim() + "/transferencia");
-        resposta.addLink("extrato", "http://localhost:8080/contas/" + numeroConta.trim() + "/extrato");
-
-        return resposta;
+        return montarOperacaoRealizada(numeroConta.trim(), "SAQUE", valorStr, agora);
     }
 
     /**
@@ -755,19 +735,18 @@ public class ContaService {
         publicarEventoCqrs(evento);
 
         // Sem o novo saldo: o front-end reconsulta o lado query (CQRS)
+        return montarOperacaoRealizada(numeroConta.trim(), "DEPOSITO", valorStr, agora);
+    }
+
+    // Resposta das três operações (R4, R5, R6): o link "conta" é por onde o front reconsulta o saldo
+    private MovimentacaoResponseDTO montarOperacaoRealizada(String numeroConta, String tipo, String valor, LocalDateTime dataHora) {
         MovimentacaoResponseDTO resposta = new MovimentacaoResponseDTO();
-        resposta.setId(evento.getId());
-        resposta.setNumeroConta(numeroConta.trim());
-        resposta.setTipo("DEPOSITO");
-        resposta.setValor(valorStr);
-        resposta.setDataHora(agora);
-        resposta.setMensagem("Depósito realizado com sucesso.");
-
-        resposta.addLink("self", "http://localhost:8080/contas/" + numeroConta.trim() + "/deposito");
-        resposta.addLink("saque", "http://localhost:8080/contas/" + numeroConta.trim() + "/saque");
-        resposta.addLink("transferencia", "http://localhost:8080/contas/" + numeroConta.trim() + "/transferencia");
-        resposta.addLink("extrato", "http://localhost:8080/contas/" + numeroConta.trim() + "/extrato");
-
+        resposta.setNumeroConta(numeroConta);
+        resposta.setTipo(tipo);
+        resposta.setValor(valor);
+        resposta.setDataHora(dataHora);
+        resposta.addLink("conta", URL_CONTAS + numeroConta);
+        resposta.addLink("extrato", URL_CONTAS + numeroConta + "/extrato");
         return resposta;
     }
 
@@ -784,26 +763,50 @@ public class ContaService {
             throw new ContaNaoEncontradaException("Conta não encontrada: " + numeroConta);
         }
         EstadoConta estado = reconstruirEstadoPorReplay(eventos);
-        return montarContaDTO(numeroConta, estado.getCpfCliente(), estado.getGerenteCpf(), estado.getSaldo());
+        return montarContaDTO(numeroConta, estado.getCpfCliente(), estado.getGerenteCpf(), estado.getSaldo(), estado.getDataCriacao());
     }
 
     // Cliente so consulta a propria conta; gerente e a chamada interna do Gateway (sem identidade) consultam qualquer uma
     @Transactional(readOnly = true)
     public ContaDTO buscarContaPorNumero(String numeroConta, String xUserCpf, String xUserTipo) {
         ContaDTO conta = buscarContaPorNumero(numeroConta);
-        boolean cliente = xUserTipo != null && "CLIENTE".equalsIgnoreCase(xUserTipo.trim());
-        if (cliente && (xUserCpf == null || !xUserCpf.trim().equals(conta.getCpfCliente()))) {
+        if (ehCliente(xUserTipo) && (xUserCpf == null || !xUserCpf.trim().equals(conta.getCpfCliente()))) {
             throw new AcessoNegadoException("Usuário não autorizado a consultar esta conta.");
+        }
+        return ajustarLinksAoPerfil(conta, xUserTipo);
+    }
+
+    // R3: conta do cliente pelo CPF (GET /clientes/{cpf}/conta), com a mesma regra de acesso da consulta por número
+    @Transactional
+    public ContaDTO buscarContaDoCliente(String cpf, String xUserCpf, String xUserTipo) {
+        if (ehCliente(xUserTipo) && (xUserCpf == null || cpf == null || !xUserCpf.trim().equals(cpf.trim()))) {
+            throw new AcessoNegadoException("Usuário não autorizado a consultar esta conta.");
+        }
+        return ajustarLinksAoPerfil(buscarContaPorCpf(cpf), xUserTipo);
+    }
+
+    // HATEOAS conforme o perfil: gerente consulta mas não movimenta, então não recebe os links das operações
+    private ContaDTO ajustarLinksAoPerfil(ContaDTO conta, String xUserTipo) {
+        if (ehGerente(xUserTipo)) {
+            conta.get_links().keySet().removeAll(List.of("deposito", "saque", "transferencia"));
         }
         return conta;
     }
 
+    private boolean ehCliente(String xUserTipo) {
+        return xUserTipo != null && "CLIENTE".equalsIgnoreCase(xUserTipo.trim());
+    }
+
+    private boolean ehGerente(String xUserTipo) {
+        return xUserTipo != null && "GERENTE".equalsIgnoreCase(xUserTipo.trim());
+    }
+
     @Transactional
-    public ContaDTO buscarContaPorCpf(String xUserCpf) {
-        if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
-            throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");
+    public ContaDTO buscarContaPorCpf(String cpfCliente) {
+        if (cpfCliente == null || cpfCliente.trim().isEmpty()) {
+            throw new ContaNaoEncontradaException("CPF do cliente não informado.");
         }
-        String cpfLimpo = xUserCpf.trim();
+        String cpfLimpo = cpfCliente.trim();
 
         if (contaQueryRepository != null) {
             Optional<ContaQuery> contaQueryOpt = contaQueryRepository.findByCpfCliente(cpfLimpo);
@@ -849,55 +852,36 @@ public class ContaService {
     }
 
     private ContaDTO montarContaDTO(ContaQuery contaQuery) {
-        return montarContaDTO(contaQuery.getNumeroConta(), contaQuery.getCpfCliente(), contaQuery.getGerenteCpf(), contaQuery.getSaldo());
+        return montarContaDTO(contaQuery.getNumeroConta(), contaQuery.getCpfCliente(), contaQuery.getGerenteCpf(),
+                contaQuery.getSaldo(), contaQuery.getDataCriacao());
     }
 
-    private ContaDTO montarContaDTO(String numeroConta, String cpfCliente, String gerenteCpf, BigDecimal saldo) {
+    private ContaDTO montarContaDTO(String numeroConta, String cpfCliente, String gerenteCpf, BigDecimal saldo,
+                                    LocalDateTime dataCriacao) {
         ContaDTO dto = new ContaDTO(numeroConta, cpfCliente, gerenteCpf);
         dto.setSaldo(saldo.setScale(2, RoundingMode.HALF_UP).toString());
-        dto.addLink("self", "http://localhost:8080/contas/" + numeroConta);
-        dto.addLink("deposito", "http://localhost:8080/contas/" + numeroConta + "/deposito");
-        dto.addLink("saque", "http://localhost:8080/contas/" + numeroConta + "/saque");
-        dto.addLink("transferencia", "http://localhost:8080/contas/" + numeroConta + "/transferencia");
-        dto.addLink("extrato", "http://localhost:8080/contas/" + numeroConta + "/extrato");
+        dto.setDataCriacao(dataCriacao != null ? dataCriacao.toLocalDate().toString() : null);
+        dto.addLink("self", URL_CONTAS + numeroConta);
         dto.addLink("cliente", "http://localhost:8080/clientes/" + cpfCliente);
+        dto.addLink("deposito", URL_CONTAS + numeroConta + "/deposito");
+        dto.addLink("saque", URL_CONTAS + numeroConta + "/saque");
+        dto.addLink("transferencia", URL_CONTAS + numeroConta + "/transferencia");
+        dto.addLink("extrato", URL_CONTAS + numeroConta + "/extrato");
         return dto;
-    }
-
-    /**
-     * Requisito R7: Consulta de extrato no lado Query pelo CPF do cliente autenticado (X-User-CPF).
-     */
-    @Transactional
-    public ExtratoResponseDTO consultarExtratoPorCpf(String xUserCpf, String inicioStr, String fimStr) {
-        if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
-            throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");
-        }
-        String cpfLimpo = xUserCpf.trim();
-
-        if (contaQueryRepository != null) {
-            Optional<ContaQuery> contaQueryOpt = contaQueryRepository.findByCpfCliente(cpfLimpo);
-            if (contaQueryOpt.isPresent()) {
-                return consultarExtrato(contaQueryOpt.get().getNumeroConta(), inicioStr, fimStr, cpfLimpo);
-            }
-        }
-
-        // Fallback pelo Event Store caso a projeção assíncrona ainda não tenha processado
-        return buscarNumeroContaNoEventStore(cpfLimpo)
-                .map(numeroConta -> consultarExtrato(numeroConta, inicioStr, fimStr, cpfLimpo))
-                .orElseThrow(() -> new ContaNaoEncontradaException("Conta não encontrada para o cliente: " + cpfLimpo));
     }
 
     /**
      * Requisito R7: Consulta de extrato no lado Query da arquitetura CQRS por período (início e fim),
      * retornando saldo de abertura consolidado antes da data inicial, lista de movimentações (entradas e saídas)
-     * e links HATEOAS.
+     * e links HATEOAS. O titular consulta o próprio extrato; o gerente, o de qualquer conta.
      */
     @Transactional
     public ExtratoResponseDTO consultarExtrato(
             String numeroConta,
             String inicioStr,
             String fimStr,
-            String xUserCpf
+            String xUserCpf,
+            String xUserTipo
     ) {
         if (numeroConta == null || numeroConta.trim().isEmpty()) {
             throw new IllegalArgumentException("Número da conta é obrigatório.");
@@ -907,8 +891,9 @@ public class ContaService {
         LocalDate fim = (fimStr != null && !fimStr.isBlank()) ? parseData(fimStr.trim(), "fim") : LocalDate.now();
         LocalDate inicio = (inicioStr != null && !inicioStr.isBlank()) ? parseData(inicioStr.trim(), "inicio") : fim.minusDays(30);
 
+        // 422 e não 400: as duas datas são válidas, o que falha é a regra do período
         if (inicio.isAfter(fim)) {
-            throw new IllegalArgumentException("A data de início deve ser anterior ou igual à data de fim.");
+            throw new RegraNegocioException("A data de início deve ser anterior ou igual à data de fim.");
         }
         // R7: intervalo máximo de 365 dias (2020-01-01 a 2020-12-31 ainda passa)
         if (ChronoUnit.DAYS.between(inicio, fim) > MAX_DIAS_EXTRATO) {
@@ -924,12 +909,8 @@ public class ContaService {
             Optional<ContaQuery> contaQueryOpt = contaQueryRepository.findById(num);
             if (contaQueryOpt.isPresent()) {
                 ContaQuery contaQuery = contaQueryOpt.get();
-                EstadoConta estadoQuery = new EstadoConta();
-                estadoQuery.setCpfCliente(contaQuery.getCpfCliente());
-                estadoQuery.setGerenteCpf(contaQuery.getGerenteCpf());
-                estadoQuery.adicionarSaldo(contaQuery.getSaldo());
 
-                validarPosse(estadoQuery, xUserCpf);
+                validarConsulta(contaQuery.getCpfCliente(), xUserCpf, xUserTipo);
 
                 List<MovimentacaoQuery> todasMovs = movimentacaoQueryRepository
                         .findByNumeroContaOrderByDataHoraAscVersaoAsc(num);
@@ -942,20 +923,9 @@ public class ContaService {
                 BigDecimal saldoInicialCriacao = contaQuery.getSaldo().subtract(somaTodasMovs);
                 BigDecimal saldoAbertura = saldoInicialCriacao.add(somarMovimentacoesComSinal(movsAnteriores));
 
-                List<ItemExtratoDTO> itens = new ArrayList<>();
-                for (MovimentacaoQuery mov : movsPeriodo) {
-                    itens.add(new ItemExtratoDTO(
-                            mov.getDataHora().toString(),
-                            mov.getTipo(),
-                            mov.getCpfOrigem(),
-                            mov.getNomeOrigem(),
-                            mov.getCpfDestino(),
-                            mov.getNomeDestino(),
-                            mov.getValor().setScale(2, RoundingMode.HALF_UP).toString()
-                    ));
-                }
+                List<ItemExtratoDTO> itens = movsPeriodo.stream().map(this::montarItemExtrato).toList();
 
-                return montarExtratoResponse(num, saldoAbertura, contaQuery.getSaldo(), itens);
+                return montarExtratoResponse(num, inicio, fim, saldoAbertura, itens);
             }
         }
 
@@ -966,7 +936,7 @@ public class ContaService {
         }
 
         EstadoConta estado = reconstruirEstadoPorReplay(eventos);
-        validarPosse(estado, xUserCpf);
+        validarConsulta(estado.getCpfCliente(), xUserCpf, xUserTipo);
 
         BigDecimal saldoAbertura = BigDecimal.ZERO;
         List<ItemExtratoDTO> itens = new ArrayList<>();
@@ -995,19 +965,11 @@ public class ContaService {
                     saldoAbertura = saldoAbertura.subtract(mov.getValor());
                 }
             } else if (!dataEvento.isAfter(dataHoraFim)) {
-                itens.add(new ItemExtratoDTO(
-                        mov.getDataHora().toString(),
-                        mov.getTipo(),
-                        mov.getCpfOrigem(),
-                        mov.getNomeOrigem(),
-                        mov.getCpfDestino(),
-                        mov.getNomeDestino(),
-                        mov.getValor().setScale(2, RoundingMode.HALF_UP).toString()
-                ));
+                itens.add(montarItemExtrato(mov));
             }
         }
 
-        return montarExtratoResponse(num, saldoAbertura, estado.getSaldo(), itens);
+        return montarExtratoResponse(num, inicio, fim, saldoAbertura, itens);
     }
 
     /**
@@ -1168,16 +1130,20 @@ public class ContaService {
             case "TRANSFERENCIAORIGEM" -> {
                 mov.setTipo("TRANSFERENCIA");
                 mov.setNatureza("SAIDA");
+                mov.setContaOrigem(extrairTexto(payload, "contaOrigem", evento.getObjetoId()));
                 mov.setCpfOrigem(extrairTexto(payload, "cpfOrigem", cpfTitularConta));
                 mov.setNomeOrigem(extrairTexto(payload, "nomeOrigem", null));
+                mov.setContaDestino(extrairTexto(payload, "contaDestino", null));
                 mov.setCpfDestino(extrairTexto(payload, "cpfDestino", null));
                 mov.setNomeDestino(extrairTexto(payload, "nomeDestino", null));
             }
             case "TRANSFERENCIADESTINO" -> {
                 mov.setTipo("TRANSFERENCIA");
                 mov.setNatureza("ENTRADA");
+                mov.setContaOrigem(extrairTexto(payload, "contaOrigem", null));
                 mov.setCpfOrigem(extrairTexto(payload, "cpfOrigem", null));
                 mov.setNomeOrigem(extrairTexto(payload, "nomeOrigem", null));
+                mov.setContaDestino(extrairTexto(payload, "contaDestino", evento.getObjetoId()));
                 mov.setCpfDestino(extrairTexto(payload, "cpfDestino", cpfTitularConta));
                 mov.setNomeDestino(extrairTexto(payload, "nomeDestino", null));
             }
@@ -1204,23 +1170,34 @@ public class ContaService {
         return soma;
     }
 
+    // origem e destino só existem na transferência; depósito e saque não têm contraparte
+    private ItemExtratoDTO montarItemExtrato(MovimentacaoQuery mov) {
+        boolean transferencia = "TRANSFERENCIA".equals(mov.getTipo());
+        return new ItemExtratoDTO(
+                FORMATO_DATA_HORA.format(mov.getDataHora()),
+                mov.getTipo(),
+                mov.getValor().setScale(2, RoundingMode.HALF_UP).toString(),
+                transferencia ? new ParteTransferenciaDTO(mov.getContaOrigem(), mov.getCpfOrigem(), mov.getNomeOrigem()) : null,
+                transferencia ? new ParteTransferenciaDTO(mov.getContaDestino(), mov.getCpfDestino(), mov.getNomeDestino()) : null
+        );
+    }
+
     private ExtratoResponseDTO montarExtratoResponse(
             String numeroConta,
+            LocalDate inicio,
+            LocalDate fim,
             BigDecimal saldoAbertura,
-            BigDecimal saldoAtual,
             List<ItemExtratoDTO> itens
     ) {
         ExtratoResponseDTO response = new ExtratoResponseDTO(
                 numeroConta,
+                inicio.toString(),
+                fim.toString(),
                 saldoAbertura.setScale(2, RoundingMode.HALF_UP).toString(),
-                saldoAtual.setScale(2, RoundingMode.HALF_UP).toString(),
                 itens
         );
-        response.addLink("self", "http://localhost:8080/contas/" + numeroConta + "/extrato");
-        response.addLink("conta", "http://localhost:8080/contas/" + numeroConta);
-        response.addLink("deposito", "http://localhost:8080/contas/" + numeroConta + "/deposito");
-        response.addLink("saque", "http://localhost:8080/contas/" + numeroConta + "/saque");
-        response.addLink("transferencia", "http://localhost:8080/contas/" + numeroConta + "/transferencia");
+        response.addLink("self", URL_CONTAS + numeroConta + "/extrato");
+        response.addLink("conta", URL_CONTAS + numeroConta);
         return response;
     }
 
@@ -1283,6 +1260,7 @@ public class ContaService {
 
             switch (tipoNormalizado) {
                 case "CRIADO" -> {
+                    estado.setDataCriacao(extrairDataHoraEvento(evento, payloadNode));
                     if (payloadNode.has("saldo")) {
                         estado.adicionarSaldo(new BigDecimal(payloadNode.get("saldo").asText()));
                     }
@@ -1352,7 +1330,20 @@ public class ContaService {
         return valor != null && FORMATO_VALOR.matcher(valor).matches();
     }
 
-    // Posse obrigatória (R4, R5, R6, R7): só o titular opera ou consulta o extrato da conta
+    // R7: o titular consulta o extrato da própria conta e o gerente, o de qualquer cliente
+    private void validarConsulta(String cpfTitular, String xUserCpf, String xUserTipo) {
+        if (ehGerente(xUserTipo)) {
+            return;
+        }
+        if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
+            throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");
+        }
+        if (cpfTitular == null || !xUserCpf.trim().equals(cpfTitular.trim())) {
+            throw new AcessoNegadoException("Usuário não autorizado a consultar esta conta.");
+        }
+    }
+
+    // Posse obrigatória (R4, R5, R6): só o titular movimenta a conta
     private void validarPosse(EstadoConta estado, String xUserCpf) {
         if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
             throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");
@@ -1400,6 +1391,7 @@ public class ContaService {
         private BigDecimal saldo = BigDecimal.ZERO;
         private String cpfCliente;
         private String gerenteCpf;
+        private LocalDateTime dataCriacao;
 
         public void adicionarSaldo(BigDecimal valor) {
             if (valor != null) {
@@ -1431,6 +1423,14 @@ public class ContaService {
 
         public void setGerenteCpf(String gerenteCpf) {
             this.gerenteCpf = gerenteCpf;
+        }
+
+        public LocalDateTime getDataCriacao() {
+            return dataCriacao;
+        }
+
+        public void setDataCriacao(LocalDateTime dataCriacao) {
+            this.dataCriacao = dataCriacao;
         }
     }
 }

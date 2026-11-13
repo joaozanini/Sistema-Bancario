@@ -43,6 +43,12 @@ public class MovimentacaoQuery {
     @Column(name = "nome_destino", length = 150)
     private String nomeDestino;
 
+    @Column(name = "conta_origem", length = 50)
+    private String contaOrigem;
+
+    @Column(name = "conta_destino", length = 50)
+    private String contaDestino;
+
     @Column(nullable = false)
     private Integer versao;
 
@@ -135,5 +141,21 @@ public class MovimentacaoQuery {
 
     public void setVersao(Integer versao) {
         this.versao = versao;
+    }
+
+    public String getContaOrigem() {
+        return contaOrigem;
+    }
+
+    public void setContaOrigem(String contaOrigem) {
+        this.contaOrigem = contaOrigem;
+    }
+
+    public String getContaDestino() {
+        return contaDestino;
+    }
+
+    public void setContaDestino(String contaDestino) {
+        this.contaDestino = contaDestino;
     }
 }

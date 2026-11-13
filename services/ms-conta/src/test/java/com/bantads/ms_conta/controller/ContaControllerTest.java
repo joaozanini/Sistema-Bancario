@@ -51,18 +51,16 @@ class ContaControllerTest {
     }
 
     @Test
-    @DisplayName("Deve retornar 201 com origem e destino ao realizar transferência com sucesso (R6)")
+    @DisplayName("Deve retornar 201 com o destino e sem o novo saldo ao realizar transferência com sucesso (R6)")
     void deveTransferirComSucesso() throws Exception {
         TransferenciaRequestDTO request = new TransferenciaRequestDTO("0950", "250.00");
-        TransferenciaResponseDTO response = new TransferenciaResponseDTO();
-        response.setContaOrigem("1291");
-        response.setContaDestino("0950");
+        MovimentacaoResponseDTO response = new MovimentacaoResponseDTO();
+        response.setNumeroConta("1291");
+        response.setTipo("TRANSFERENCIA");
         response.setValor("250.00");
-        response.setDataHora(LocalDateTime.now());
-        response.setMensagem("Transferência realizada com sucesso.");
-        response.setOrigem(new TransferenciaResponseDTO.Participante("1291", "12912861012", "Catharyna"));
-        response.setDestino(new TransferenciaResponseDTO.Participante("0950", "09506382000", "Cleuddônio"));
-        response.addLink("self", "http://localhost:8080/contas/1291/transferencia");
+        response.setDataHora(LocalDateTime.of(2026, 4, 30, 10, 0, 0, 123_000_000));
+        response.setDestino(new ParteTransferenciaDTO("0950", "09506382000", "Cleuddônio"));
+        response.addLink("conta", "http://localhost:8080/contas/1291");
 
         when(service.transferir(eq("1291"), any(TransferenciaRequestDTO.class), eq("12912861012")))
                 .thenReturn(response);
@@ -72,12 +70,16 @@ class ContaControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.contaOrigem").value("1291"))
-                .andExpect(jsonPath("$.contaDestino").value("0950"))
+                .andExpect(jsonPath("$.numeroConta").value("1291"))
+                .andExpect(jsonPath("$.tipo").value("TRANSFERENCIA"))
+                .andExpect(jsonPath("$.destino.numeroConta").value("0950"))
+                .andExpect(jsonPath("$.destino.cpf").value("09506382000"))
                 .andExpect(jsonPath("$.destino.nome").value("Cleuddônio"))
-                .andExpect(jsonPath("$.origem.numero").value("1291"))
                 .andExpect(jsonPath("$.valor").value("250.00"))
-                .andExpect(jsonPath("$._links.self.href").exists());
+                // data/hora sem fração de segundo, como no contrato
+                .andExpect(jsonPath("$.dataHora").value("2026-04-30T10:00:00"))
+                .andExpect(jsonPath("$.saldo").doesNotExist())
+                .andExpect(jsonPath("$._links.conta.href").exists());
     }
 
     @Test
@@ -121,8 +123,7 @@ class ContaControllerTest {
         response.setTipo("SAQUE");
         response.setValor("150.00");
         response.setDataHora(LocalDateTime.now());
-        response.setMensagem("Saque realizado com sucesso.");
-        response.addLink("self", "http://localhost:8080/contas/1291/saque");
+        response.addLink("conta", "http://localhost:8080/contas/1291");
 
         when(service.sacar(eq("1291"), any(MovimentacaoRequestDTO.class), eq("12912861012")))
                 .thenReturn(response);
@@ -136,7 +137,9 @@ class ContaControllerTest {
                 .andExpect(jsonPath("$.tipo").value("SAQUE"))
                 .andExpect(jsonPath("$.valor").value("150.00"))
                 .andExpect(jsonPath("$.saldo").doesNotExist())
-                .andExpect(jsonPath("$._links.self.href").exists());
+                // "destino" só existe na transferência
+                .andExpect(jsonPath("$.destino").doesNotExist())
+                .andExpect(jsonPath("$._links.conta.href").exists());
     }
 
     @Test
@@ -147,8 +150,7 @@ class ContaControllerTest {
         response.setTipo("DEPOSITO");
         response.setValor("150.00");
         response.setDataHora(LocalDateTime.now());
-        response.setMensagem("Depósito realizado com sucesso.");
-        response.addLink("self", "http://localhost:8080/contas/1291/deposito");
+        response.addLink("conta", "http://localhost:8080/contas/1291");
 
         when(service.depositar(eq("1291"), any(MovimentacaoRequestDTO.class), eq("12912861012")))
                 .thenReturn(response);
@@ -160,7 +162,7 @@ class ContaControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.tipo").value("DEPOSITO"))
                 .andExpect(jsonPath("$.saldo").doesNotExist())
-                .andExpect(jsonPath("$._links.self.href").exists());
+                .andExpect(jsonPath("$._links.conta.href").exists());
     }
 
     @Test
@@ -194,69 +196,62 @@ class ContaControllerTest {
     }
 
     @Test
-    @DisplayName("Deve consultar extrato do cliente autenticado em GET /contas/extrato (R7)")
-    void deveConsultarExtratoDoClienteComSucesso() throws Exception {
-        ItemExtratoDTO item = new ItemExtratoDTO(
-                "2026-10-10T14:30:00",
-                "DEPOSITO",
-                null,
-                null,
-                null,
-                null,
-                "1000.00"
-        );
-        ExtratoResponseDTO response = new ExtratoResponseDTO(
-                "1291",
-                "800.00",
-                "1800.00",
-                List.of(item)
-        );
-        response.addLink("self", "http://localhost:8080/contas/1291/extrato");
-
-        when(service.consultarExtratoPorCpf("12912861012", "2026-10-01", "2026-10-31"))
-                .thenReturn(response);
-
-        mockMvc.perform(get("/contas/extrato")
-                        .param("inicio", "2026-10-01")
-                        .param("fim", "2026-10-31")
-                        .header("X-User-CPF", "12912861012"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.numeroConta").value("1291"))
-                .andExpect(jsonPath("$.saldoAbertura").value("800.00"))
-                .andExpect(jsonPath("$.saldo").value("1800.00"))
-                .andExpect(jsonPath("$.movimentacoes[0].tipo").value("DEPOSITO"))
-                .andExpect(jsonPath("$.movimentacoes[0].valor").value("1000.00"))
-                .andExpect(jsonPath("$._links.self.href").exists());
-    }
-
-    @Test
     @DisplayName("Deve consultar extrato por número da conta em GET /contas/{numero}/extrato (R7)")
     void deveConsultarExtratoPorNumeroContaComSucesso() throws Exception {
+        ItemExtratoDTO deposito = new ItemExtratoDTO("2026-10-10T14:30:00", "DEPOSITO", "1000.00", null, null);
+        ItemExtratoDTO transferencia = new ItemExtratoDTO("2026-10-12T09:00:00", "TRANSFERENCIA", "350.00",
+                new ParteTransferenciaDTO("1291", "12912861012", "Catharyna"),
+                new ParteTransferenciaDTO("0950", "09506382000", "Cleuddônio"));
         ExtratoResponseDTO response = new ExtratoResponseDTO(
                 "1291",
+                "2026-10-01",
+                "2026-10-31",
                 "800.00",
-                "800.00",
-                List.of()
+                List.of(deposito, transferencia)
         );
         response.addLink("self", "http://localhost:8080/contas/1291/extrato");
 
-        when(service.consultarExtrato("1291", "2026-10-01", "2026-10-31", "12912861012"))
+        when(service.consultarExtrato("1291", "2026-10-01", "2026-10-31", "12912861012", "CLIENTE"))
                 .thenReturn(response);
 
         mockMvc.perform(get("/contas/1291/extrato")
                         .param("inicio", "2026-10-01")
                         .param("fim", "2026-10-31")
-                        .header("X-User-CPF", "12912861012"))
+                        .header("X-User-CPF", "12912861012")
+                        .header("X-User-Tipo", "CLIENTE"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.numeroConta").value("1291"))
+                .andExpect(jsonPath("$.dataInicio").value("2026-10-01"))
+                .andExpect(jsonPath("$.dataFim").value("2026-10-31"))
                 .andExpect(jsonPath("$.saldoAbertura").value("800.00"))
+                .andExpect(jsonPath("$.movimentacoes[0].tipo").value("DEPOSITO"))
+                .andExpect(jsonPath("$.movimentacoes[0].valor").value("1000.00"))
+                .andExpect(jsonPath("$.movimentacoes[0].origem").doesNotExist())
+                .andExpect(jsonPath("$.movimentacoes[1].origem.nome").value("Catharyna"))
+                .andExpect(jsonPath("$.movimentacoes[1].destino.numeroConta").value("0950"))
                 .andExpect(jsonPath("$._links.self.href").exists());
+    }
+
+    @Test
+    @DisplayName("Gerente consulta o extrato de qualquer conta (R7)")
+    void devePermitirExtratoParaGerente() throws Exception {
+        ExtratoResponseDTO response = new ExtratoResponseDTO("1291", "2026-10-01", "2026-10-31", "800.00", List.of());
+
+        when(service.consultarExtrato("1291", null, null, "98574307084", "GERENTE")).thenReturn(response);
+
+        mockMvc.perform(get("/contas/1291/extrato")
+                        .header("X-User-CPF", "98574307084")
+                        .header("X-User-Tipo", "GERENTE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.saldoAbertura").value("800.00"));
     }
 
     @Test
     @DisplayName("Deve buscar conta por número com sucesso")
     void deveBuscarContaPorNumero() throws Exception {
         ContaDTO dto = new ContaDTO("1291", "12912861012", "98574307084");
+        dto.setSaldo("800.00");
+        dto.setDataCriacao("2000-01-01");
         dto.addLink("self", "http://localhost:8080/contas/1291");
 
         when(service.buscarContaPorNumero("1291", "12912861012", "CLIENTE")).thenReturn(dto);
@@ -265,9 +260,11 @@ class ContaControllerTest {
                         .header("X-User-CPF", "12912861012")
                         .header("X-User-Tipo", "CLIENTE"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.numeroConta").value("1291"))
+                .andExpect(jsonPath("$.numero").value("1291"))
                 .andExpect(jsonPath("$.cpfCliente").value("12912861012"))
-                .andExpect(jsonPath("$.gerenteCpf").value("98574307084"))
+                .andExpect(jsonPath("$.cpfGerente").value("98574307084"))
+                .andExpect(jsonPath("$.saldo").value("800.00"))
+                .andExpect(jsonPath("$.dataCriacao").value("2000-01-01"))
                 .andExpect(jsonPath("$._links.self.href").exists());
     }
 
@@ -303,13 +300,14 @@ class ContaControllerTest {
     @Test
     @DisplayName("Deve retornar 422 quando o extrato passar de 365 dias (R7)")
     void deveRetornar422QuandoExtratoPassaDe365Dias() throws Exception {
-        when(service.consultarExtrato("1291", "2020-01-01", "2023-01-01", "12912861012"))
+        when(service.consultarExtrato("1291", "2020-01-01", "2023-01-01", "12912861012", "CLIENTE"))
                 .thenThrow(new RegraNegocioException("O intervalo do extrato não pode passar de 365 dias."));
 
         mockMvc.perform(get("/contas/1291/extrato")
                         .param("inicio", "2020-01-01")
                         .param("fim", "2023-01-01")
-                        .header("X-User-CPF", "12912861012"))
+                        .header("X-User-CPF", "12912861012")
+                        .header("X-User-Tipo", "CLIENTE"))
                 .andExpect(status().isUnprocessableEntity());
     }
 }
