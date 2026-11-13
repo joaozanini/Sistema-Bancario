@@ -17,6 +17,11 @@ import java.util.Optional;
 @Service
 public class GerenteService {
 
+    // tamanho das colunas da tabela gerente (V1__create_table_gerente.sql)
+    private static final int TAMANHO_NOME = 100;
+    private static final int TAMANHO_EMAIL = 100;
+    private static final int TAMANHO_TELEFONE = 20;
+
     private final GerenteRepository repository;
 
     public GerenteService(GerenteRepository repository) {
@@ -86,12 +91,16 @@ public class GerenteService {
         if (novoGerente.getNome() == null || novoGerente.getNome().isBlank()) {
             throw new IllegalArgumentException("Nome é obrigatório.");
         }
+        String nome = validarTamanho("Nome", novoGerente.getNome().trim(), TAMANHO_NOME);
+        String telefone = novoGerente.getTelefone() == null ? null
+                : validarTamanho("Telefone", novoGerente.getTelefone().trim(), TAMANHO_TELEFONE);
 
         validarUnicidadeCriacao(cpfLimpo, emailLimpo);
 
         novoGerente.setCpf(cpfLimpo);
         novoGerente.setEmail(emailLimpo);
-        novoGerente.setNome(novoGerente.getNome().trim());
+        novoGerente.setNome(nome);
+        novoGerente.setTelefone(telefone);
         novoGerente.setAtivo(true);
 
         return GerenteDTO.de(repository.save(novoGerente));
@@ -123,8 +132,9 @@ public class GerenteService {
             throw new IllegalArgumentException("O CPF do gerente não pode ser alterado.");
         }
 
-        gerente.setNome(dados.nome().trim());
-        gerente.setTelefone(dados.telefone() == null ? null : dados.telefone().trim());
+        gerente.setNome(validarTamanho("Nome", dados.nome().trim(), TAMANHO_NOME));
+        gerente.setTelefone(dados.telefone() == null ? null
+                : validarTamanho("Telefone", dados.telefone().trim(), TAMANHO_TELEFONE));
 
         return GerenteDTO.de(repository.save(gerente));
     }
@@ -148,6 +158,15 @@ public class GerenteService {
         if (!emailLimpo.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
             throw new IllegalArgumentException("E-mail inválido.");
         }
-        return emailLimpo;
+        return validarTamanho("E-mail", emailLimpo, TAMANHO_EMAIL);
+    }
+
+    // Sem conferir aqui, o valor maior que a coluna só estoura no INSERT: na SAGA isso vira falha técnica
+    // (retentativas e DLQ) e no PUT caía no tratamento de CPF/e-mail repetido
+    private String validarTamanho(String campo, String valor, int maximo) {
+        if (valor.length() > maximo) {
+            throw new IllegalArgumentException(campo + " deve ter no máximo " + maximo + " caracteres.");
+        }
+        return valor;
     }
 }
