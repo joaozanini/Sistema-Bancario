@@ -11,8 +11,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,6 +30,9 @@ class AutoCadastroServiceTest {
 
     @Mock
     private ClienteRepository clienteRepository;
+
+    @Mock
+    private RabbitTemplate rabbitTemplate;
 
     @InjectMocks
     private AutoCadastroService service;
@@ -158,5 +165,79 @@ class AutoCadastroServiceTest {
         SolicitacaoCadastro salva = service.registrarSolicitacao(solicitacaoValida);
 
         assertEquals("Maria Silva", salva.getNome());
+    }
+
+    @Test
+    @DisplayName("Deve gravar o CEP só com dígitos e a UF em maiúsculas, como no contrato (R1)")
+    void deveNormalizarCepEUf() {
+        solicitacaoValida.setCep("80000-000");
+        solicitacaoValida.setUf("pr");
+        solicitacaoValida.setComplemento("   ");
+        when(solicitacaoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SolicitacaoCadastro salva = service.registrarSolicitacao(solicitacaoValida);
+
+        assertEquals("80000000", salva.getCep());
+        assertEquals("PR", salva.getUf());
+        assertNull(salva.getComplemento());
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar solicitação com endereço fora do formato (R1)")
+    void deveRejeitarEnderecoInvalido() {
+        solicitacaoValida.setCep("8000");
+        assertThrows(IllegalArgumentException.class, () -> service.registrarSolicitacao(solicitacaoValida));
+
+        solicitacaoValida.setCep("80000000");
+        solicitacaoValida.setUf("Parana");
+        assertThrows(IllegalArgumentException.class, () -> service.registrarSolicitacao(solicitacaoValida));
+
+        solicitacaoValida.setUf("PR");
+        solicitacaoValida.setNumero("12345678901");
+        assertThrows(IllegalArgumentException.class, () -> service.registrarSolicitacao(solicitacaoValida));
+
+        verify(solicitacaoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve filtrar a listagem pelo status do contrato e aceitar a grafia antiga (R8)")
+    void deveFiltrarListagemPorStatus() {
+        when(solicitacaoRepository.findByStatusIgnoreCase("APROVADA")).thenReturn(List.of(solicitacaoValida));
+
+        assertEquals(1, service.listarSolicitacoes("APROVADA").size());
+        assertEquals(1, service.listarSolicitacoes("aprovado").size());
+        assertThrows(IllegalArgumentException.class, () -> service.listarSolicitacoes("QUALQUER"));
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar pelo CPF uma solicitação pendente, gravando motivo e data/hora (R10)")
+    void deveRejeitarSolicitacaoPendentePeloCpf() {
+        solicitacaoValida.setStatus("PENDENTE");
+        when(solicitacaoRepository.findByCpf("12912861012")).thenReturn(Optional.of(solicitacaoValida));
+        when(solicitacaoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SolicitacaoCadastro rejeitada = service.rejeitarSolicitacao("12912861012", " renda insuficiente ");
+
+        assertEquals("NAO_APROVADA", rejeitada.getStatus());
+        assertEquals("renda insuficiente", rejeitada.getMotivoRejeicao());
+        assertNotNull(rejeitada.getDataAprovacaoRejeicao());
+        // o e-mail com o motivo sai por ms.email.cmd, sem esperar resposta
+        verify(rabbitTemplate).convertAndSend(eq(AutoCadastroService.FILA_EMAIL_CMD), any(Object.class));
+    }
+
+    @Test
+    @DisplayName("Rejeição de solicitação inexistente, sem motivo ou já processada não grava nada (R10)")
+    void naoDeveRejeitarSolicitacaoInvalida() {
+        when(solicitacaoRepository.findByCpf("00000000000")).thenReturn(Optional.empty());
+        assertThrows(NoSuchElementException.class, () -> service.rejeitarSolicitacao("00000000000", "x"));
+
+        assertThrows(IllegalArgumentException.class, () -> service.rejeitarSolicitacao("12912861012", "  "));
+
+        solicitacaoValida.setStatus("APROVADA");
+        when(solicitacaoRepository.findByCpf("12912861012")).thenReturn(Optional.of(solicitacaoValida));
+        assertThrows(IllegalStateException.class, () -> service.rejeitarSolicitacao("12912861012", "x"));
+
+        verify(solicitacaoRepository, never()).save(any());
+        verifyNoInteractions(rabbitTemplate);
     }
 }

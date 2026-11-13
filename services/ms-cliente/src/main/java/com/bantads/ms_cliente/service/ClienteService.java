@@ -2,6 +2,7 @@ package com.bantads.ms_cliente.service;
 
 import com.bantads.ms_cliente.model.Cliente;
 import com.bantads.ms_cliente.model.SolicitacaoCadastro;
+import com.bantads.ms_cliente.model.StatusSolicitacao;
 import com.bantads.ms_cliente.repository.ClienteRepository;
 import com.bantads.ms_cliente.repository.SolicitacaoCadastroRepository;
 import org.slf4j.Logger;
@@ -17,7 +18,6 @@ import java.util.*;
 public class ClienteService {
 
     private static final Logger log = LoggerFactory.getLogger(ClienteService.class);
-    private static final String STATUS_PENDENTE = "PENDENTE";
 
     private final ClienteRepository clienteRepository;
     private final SolicitacaoCadastroRepository solicitacaoRepository;
@@ -28,6 +28,12 @@ public class ClienteService {
     ) {
         this.clienteRepository = clienteRepository;
         this.solicitacaoRepository = solicitacaoRepository;
+    }
+
+    // Dados cadastrais de um cliente, consultados pelo Gateway (login, R11, R16 e nomes da transferência)
+    @Transactional(readOnly = true)
+    public Optional<Cliente> buscarPorCpf(String cpf) {
+        return clienteRepository.findById(cpf);
     }
 
     /**
@@ -92,7 +98,7 @@ public class ClienteService {
     }
 
     /**
-     * SAGA Aprovar Cliente (R9 - Passo 1): Marca solicitação como APROVADO.
+     * SAGA Aprovar Cliente (R9 - Passo 1): Marca solicitação como APROVADA.
      */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> aprovarSolicitacao(String cpfBruto) {
@@ -107,12 +113,12 @@ public class ClienteService {
         // Aprovar de novo (dois gerentes clicando juntos, ou uma solicitação já recusada) faz a SAGA falhar
         // aqui, no primeiro passo, que não tem nada a compensar. Se passasse, a falha no MS Auth (login
         // duplicado) acionaria as compensações e apagaria o cliente criado pela primeira aprovação
-        if (!STATUS_PENDENTE.equalsIgnoreCase(solicitacao.getStatus())) {
+        if (!StatusSolicitacao.PENDENTE.equalsIgnoreCase(solicitacao.getStatus())) {
             throw new IllegalStateException("A solicitação do CPF " + solicitacao.getCpf()
                     + " não está pendente (status atual: " + solicitacao.getStatus() + ").");
         }
 
-        solicitacao.setStatus("APROVADO");
+        solicitacao.setStatus(StatusSolicitacao.APROVADA);
         solicitacao.setDataAprovacaoRejeicao(LocalDateTime.now());
         solicitacaoRepository.save(solicitacao);
 
@@ -139,19 +145,18 @@ public class ClienteService {
         String cpf = cpfBruto.replaceAll("\\D", "");
         solicitacaoRepository.findByCpf(cpf)
                 .or(() -> solicitacaoRepository.findByCpf(cpfBruto.trim()))
-                // Só desfaz uma aprovação desta SAGA: o status tem de ser APROVADO e o cliente já ter sido
+                // Só desfaz uma aprovação desta SAGA: o status tem de ser APROVADA e o cliente já ter sido
                 // removido pela compensação do passo 4 (que vem antes, na mesma fila). Sem isso, um timeout
                 // na reaprovação devolveria para PENDENTE a solicitação de um cliente que já existe
-                .filter(solicitacao -> "APROVADO".equalsIgnoreCase(solicitacao.getStatus()))
+                .filter(solicitacao -> StatusSolicitacao.APROVADA.equalsIgnoreCase(solicitacao.getStatus()))
                 .filter(solicitacao -> !clienteRepository.existsById(solicitacao.getCpf()))
                 .ifPresent(solicitacao -> {
-                    solicitacao.setStatus(novoStatus != null && !novoStatus.isBlank() ? novoStatus : "PENDENTE");
-                    solicitacao.setMotivoRejeicao(motivo);
-                    if ("PENDENTE".equalsIgnoreCase(solicitacao.getStatus())) {
-                        solicitacao.setDataAprovacaoRejeicao(null);
-                    } else {
-                        solicitacao.setDataAprovacaoRejeicao(LocalDateTime.now());
-                    }
+                    // A compensação só leva a dois destinos: NAO_APROVADA (login duplicado no MS Auth,
+                    // com motivo automático) ou de volta para PENDENTE (qualquer outra falha)
+                    boolean naoAprovada = StatusSolicitacao.NAO_APROVADA.equals(StatusSolicitacao.normalizar(novoStatus));
+                    solicitacao.setStatus(naoAprovada ? StatusSolicitacao.NAO_APROVADA : StatusSolicitacao.PENDENTE);
+                    solicitacao.setMotivoRejeicao(naoAprovada ? motivo : null);
+                    solicitacao.setDataAprovacaoRejeicao(naoAprovada ? LocalDateTime.now() : null);
                     solicitacaoRepository.save(solicitacao);
                 });
     }

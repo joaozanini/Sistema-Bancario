@@ -114,7 +114,7 @@ class ClienteServiceTest {
     @Test
     @DisplayName("Deve falhar ao aprovar uma solicitação que não está mais pendente (R9)")
     void deveFalharAoAprovarSolicitacaoNaoPendente() {
-        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADO");
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADA");
         when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
@@ -133,7 +133,7 @@ class ClienteServiceTest {
 
         Map<String, Object> dados = service.aprovarSolicitacao("11122233344");
 
-        assertEquals("APROVADO", dados.get("status"));
+        assertEquals("APROVADA", dados.get("status"));
         assertNotNull(solicitacao.getDataAprovacaoRejeicao());
         verify(solicitacaoRepository).save(solicitacao);
     }
@@ -141,7 +141,7 @@ class ClienteServiceTest {
     @Test
     @DisplayName("Compensação do passo 1 devolve para PENDENTE a aprovação desfeita pela SAGA (R9)")
     void deveCompensarAprovacaoQuandoClienteJaFoiRemovido() {
-        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADO");
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADA");
         when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
         when(clienteRepository.existsById("11122233344")).thenReturn(false);
 
@@ -155,18 +155,18 @@ class ClienteServiceTest {
     @Test
     @DisplayName("Compensação do passo 1 não mexe na solicitação de um cliente que já existe (R9)")
     void naoDeveCompensarAprovacaoDeClienteExistente() {
-        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADO");
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADA");
         when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
         when(clienteRepository.existsById("11122233344")).thenReturn(true);
 
         service.compensarAprovacaoSolicitacao("11122233344", "PENDENTE", null);
 
-        assertEquals("APROVADO", solicitacao.getStatus());
+        assertEquals("APROVADA", solicitacao.getStatus());
         verify(solicitacaoRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Compensação do passo 1 ignora solicitação que não está APROVADO (R9)")
+    @DisplayName("Compensação do passo 1 ignora solicitação que não está APROVADA (R9)")
     void naoDeveCompensarSolicitacaoNaoAprovada() {
         SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "NAO_APROVADA");
         when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
@@ -175,5 +175,42 @@ class ClienteServiceTest {
 
         assertEquals("NAO_APROVADA", solicitacao.getStatus());
         verify(solicitacaoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Compensação por e-mail duplicado marca a solicitação como NAO_APROVADA com o motivo (R9)")
+    void deveMarcarComoNaoAprovadaQuandoLoginDuplicado() {
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADA");
+        when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
+        when(clienteRepository.existsById("11122233344")).thenReturn(false);
+
+        service.compensarAprovacaoSolicitacao("11122233344", "NAO_APROVADA", "E-mail já cadastrado");
+
+        assertEquals("NAO_APROVADA", solicitacao.getStatus());
+        assertEquals("E-mail já cadastrado", solicitacao.getMotivoRejeicao());
+        assertNotNull(solicitacao.getDataAprovacaoRejeicao());
+        verify(solicitacaoRepository).save(solicitacao);
+    }
+
+    @Test
+    @DisplayName("Compensação aceita a grafia antiga NAO_APROVADO de uma mensagem ainda em trânsito (R9)")
+    void deveAceitarGrafiaAntigaNaCompensacao() {
+        SolicitacaoCadastro solicitacao = criarSolicitacao("11122233344", "APROVADA");
+        when(solicitacaoRepository.findByCpf("11122233344")).thenReturn(Optional.of(solicitacao));
+        when(clienteRepository.existsById("11122233344")).thenReturn(false);
+
+        service.compensarAprovacaoSolicitacao("11122233344", "NAO_APROVADO", "E-mail já cadastrado");
+
+        assertEquals("NAO_APROVADA", solicitacao.getStatus());
+    }
+
+    @Test
+    @DisplayName("Deve buscar o cliente pelo CPF")
+    void deveBuscarClientePorCpf() {
+        Cliente cliente = criarCliente("12912861012", "Catharyna", "cli1@bantads.com.br", "10000.00");
+        when(clienteRepository.findById("12912861012")).thenReturn(Optional.of(cliente));
+
+        assertSame(cliente, service.buscarPorCpf("12912861012").orElseThrow());
+        assertTrue(service.buscarPorCpf("00000000000").isEmpty());
     }
 }

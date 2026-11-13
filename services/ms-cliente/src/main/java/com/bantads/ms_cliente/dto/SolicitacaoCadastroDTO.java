@@ -1,5 +1,6 @@
 package com.bantads.ms_cliente.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
@@ -7,32 +8,28 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 
+// Entrada do autocadastro (R1) e saída das consultas de solicitação (R8): na entrada só chegam os dados
+// do cliente; status, motivo, data/hora e _links são preenchidos pelo serviço
 @Getter
 @Setter
 public class SolicitacaoCadastroDTO {
-    private UUID id;
-    private String nome;
     private String cpf;
+    private String nome;
     private String email;
     private String telefone;
-    private String salario; 
-    
-    private String logradouro;
-    private String numero;
-    private String complemento;
-    private String cep;
-    private String cidade;
-    private String uf;
-    
+    private String salario;
+    private EnderecoDTO endereco;
+
     private String status;
-    private String motivoRejeicao;
-    private LocalDateTime dataAprovacaoRejeicao;
-    
+    private String motivo;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime dataHoraProcessamento;
+
     @JsonProperty("_links")
     private Map<String, Map<String, String>> _links = new LinkedHashMap<>();
-    
+
     public void addLink(String rel, String href) {
         this._links.put(rel, Map.of("href", href));
     }
