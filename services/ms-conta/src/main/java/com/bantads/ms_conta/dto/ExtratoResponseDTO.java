@@ -7,8 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-// Extrato (R7): saldo de abertura (anterior à data inicial) e movimentações do período. O saldo de cada
-// dia não vem daqui: o front acumula sobre o saldoAbertura
+// Extrato (R7): saldo de abertura e movimentações do período
 public class ExtratoResponseDTO {
 
     private String numeroConta;

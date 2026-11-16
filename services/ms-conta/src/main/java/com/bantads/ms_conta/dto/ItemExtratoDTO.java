@@ -1,7 +1,6 @@
 package com.bantads.ms_conta.dto;
 
-// Linha do extrato (R7). origem e destino só vêm preenchidos nas transferências: o front compara o CPF
-// do usuário logado com eles para saber se o valor entrou ou saiu
+// Linha do extrato (R7); origem e destino só nas transferências
 public class ItemExtratoDTO {
 
     private String dataHora;

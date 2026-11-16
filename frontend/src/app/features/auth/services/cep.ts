@@ -22,8 +22,7 @@ export class CepNaoEncontradoError extends Error {
 export class CepService {
   private http = inject(HttpClient);
 
-  // A consulta passa pelo API Gateway (GET /cep/{cep}), que é quem fala com o ViaCEP:
-  // o front só conversa com o Gateway
+  // consulta o CEP pelo API Gateway (GET /cep/{cep})
   buscar(cep: string): Observable<Endereco> {
     const digitos = cep.replace(/\D/g, '');
 

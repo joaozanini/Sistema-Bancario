@@ -56,12 +56,7 @@ public class EmailService {
         return TIPO_TROCA_GERENTE.equals(tipo) || TIPO_REMOCAO_GERENTE.equals(tipo);
     }
 
-    /**
-     * R13 e R15 notificam todos os clientes afetados. Um cliente sem e-mail e
-     * registrado e pulado em vez de abortar: interromper no meio faria a
-     * retentativa da fila reenviar para quem ja recebeu. So quando nenhum
-     * destinatario existe a excecao sobe, porque ai a retentativa tem sentido.
-     */
+    /** Avisa os clientes afetados (R13, R15), pulando quem não tem e-mail */
     private void avisarClientes(ComandoEmail comando) {
         List<Map<String, Object>> clientes = comando.lista("clientes");
         String nomeGerente = comando.texto("nomeGerente");

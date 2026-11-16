@@ -26,7 +26,6 @@ async function logout(req, res) {
 
   try {
     await authService.encerrarSessao(jti, cpf, exp);
-    // 204: a sessão foi encerrada e não há nada a devolver
     return res.status(204).end();
   } catch (err) {
     console.error("Falha ao encerrar sessão:", err.message);

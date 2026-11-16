@@ -2,8 +2,7 @@ const contaService = require('./conta.service');
 const clienteService = require('./cliente.service');
 const gerenteService = require('./gerente.service');
 
-// Uma conta sem gerente não deveria existir depois do R9, mas se existir o
-// relatório inteiro não pode cair por causa de uma linha.
+// nome do gerente, ou null se a conta não tiver gerente
 async function nomeDoGerente(cpf) {
   if (!cpf) {
     return null;
@@ -13,7 +12,7 @@ async function nomeDoGerente(cpf) {
   return nome;
 }
 
-// R16: os oito campos vêm de três serviços que não se conhecem — a junção é aqui
+// R16: monta a linha com dados da conta, do cliente e do gerente
 async function comporLinha(conta) {
   const [cliente, nomeGerente] = await Promise.all([
     clienteService.buscar(conta.cpfCliente),

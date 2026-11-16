@@ -8,10 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Consumidor CQRS do lado Query: escuta os eventos publicados na fila ms.conta.events
- * e projeta de forma assíncrona e idempotente as tabelas de leitura (conta_query e movimentacao_query).
- */
+/** Consome ms.conta.events e projeta as tabelas do lado query */
 @Component
 public class ContaEventConsumer {
 

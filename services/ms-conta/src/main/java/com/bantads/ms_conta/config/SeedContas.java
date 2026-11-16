@@ -4,9 +4,7 @@ import com.bantads.ms_conta.service.ResetService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-/**
- * So semeia com o event store vazio, para nao apagar as operacoes a cada restart.
- */
+/** Semeia as contas só com o Event Store vazio */
 @Component
 public class SeedContas implements CommandLineRunner {
 

@@ -33,7 +33,7 @@ async function autenticar(email, senha) {
   return { token, tipo, usuario };
 }
 
-// passa pelo cache-aside: dado cadastral muda pouco e o login e a rota mais chamada
+// busca nome e e-mail do usuário via cache-aside
 async function comporUsuario(cpf, tipo) {
   const isGerente = String(tipo).toUpperCase() === 'GERENTE';
   const dados = isGerente ? await gerenteService.buscar(cpf) : await clienteService.buscar(cpf);

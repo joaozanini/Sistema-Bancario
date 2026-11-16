@@ -37,7 +37,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("erro", ex.getMessage()));
     }
 
-    // Versão duplicada no Event Store ou deadlock entre transferências cruzadas, depois de esgotar o novo replay
+    // Conflito de concorrência no Event Store responde 409
     @ExceptionHandler({DataIntegrityViolationException.class, ConcurrencyFailureException.class})
     public ResponseEntity<Map<String, String>> handleConcorrencia(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("erro", "Conflito de concorrência detectado. Tente a operação novamente."));

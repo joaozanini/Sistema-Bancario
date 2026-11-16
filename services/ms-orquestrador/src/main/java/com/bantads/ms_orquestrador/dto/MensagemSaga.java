@@ -4,9 +4,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-/**
- * Envelope de toda mensagem das filas da SAGA.
- */
+/** Envelope de toda mensagem das filas da SAGA */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record MensagemSaga(
         String sagaId,

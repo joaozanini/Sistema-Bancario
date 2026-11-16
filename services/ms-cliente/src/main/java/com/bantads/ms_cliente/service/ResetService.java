@@ -27,7 +27,7 @@ public class ResetService {
         this.idempotenciaRepository = idempotenciaRepository;
     }
 
-    // Clientes pre-cadastrados (enunciado, secao 4); solicitacoes ficam vazias (5.11)
+    // Clientes pré-cadastrados
     @Transactional
     public void reset() {
         idempotenciaRepository.deleteAllInBatch();

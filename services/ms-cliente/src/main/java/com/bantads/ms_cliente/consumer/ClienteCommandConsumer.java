@@ -21,7 +21,7 @@ public class ClienteCommandConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(ClienteCommandConsumer.class);
 
-    // nomes exatos do AprovarClienteSaga do orquestrador (R9)
+    // Tipos de comando da SAGA Aprovar Cliente (R9)
     public static final String APROVAR_SOLICITACAO = "cliente.aprovar-solicitacao";
     public static final String COMPENSAR_APROVAR_SOLICITACAO = "cliente.aprovar-solicitacao.compensar";
     public static final String CRIAR_CLIENTE = "cliente.criar-cliente";
@@ -57,7 +57,7 @@ public class ClienteCommandConsumer {
 
         log.info("Processando comando SAGA no MS Cliente - sagaId: {}, tipo: {}", sagaId, tipo);
 
-        // Deduplicação / Idempotência
+        // Deduplicação por idempotência
         if (sagaId != null && tipo != null) {
             Optional<SagaIdempotencia> existente = idempotenciaRepository.findBySagaIdAndTipo(sagaId, tipo);
             if (existente.isPresent()) {
@@ -82,7 +82,7 @@ public class ClienteCommandConsumer {
             resposta = RespostaSagaDTO.falha(sagaId, tipo, ex.getMessage());
         }
 
-        // Salva resposta para garantir idempotência futura
+        // Salva a resposta para idempotência
         if (sagaId != null && tipo != null) {
             try {
                 String respostaJson = objectMapper.writeValueAsString(resposta);
@@ -99,7 +99,7 @@ public class ClienteCommandConsumer {
             }
         }
 
-        // Envia resposta para o Orquestrador
+        // Envia a resposta para o orquestrador
         try {
             rabbitTemplate.convertAndSend(RabbitMQConfig.FILA_ORQUESTRADOR_REPLY, resposta);
             log.info("Resposta SAGA enviada com sucesso para orquestrador.reply: sagaId={}, status={}", sagaId, resposta.getStatus());
@@ -127,10 +127,9 @@ public class ClienteCommandConsumer {
 
         String tipoNorm = tipo != null ? tipo.toLowerCase().replace("_", "-").trim() : "";
 
-        // 1. SAGA Remover Gerente (R15): Obter dados dos clientes transferidos
+        // 1. R15: dados dos clientes transferidos
         if (tipoNorm.contains("clientes-transferidos")
-                // o Orquestrador publica "cliente.obter-dados" no R13 e no R15, sempre
-                // com uma lista em "cpfs" — sem esta linha as duas SAGAs compensam
+                // cliente.obter-dados com lista em "cpfs" (R13 e R15)
                 || tipoNorm.contains("obter-dados")
                 || tipoNorm.contains("obter-clientes")
                 || tipoNorm.contains("buscar-clientes")
@@ -148,7 +147,7 @@ public class ClienteCommandConsumer {
             return RespostaSagaDTO.sucesso(sagaId, tipo, respostaPayload);
         }
 
-        // 2. Consulta de um único cliente (ex.: R13 / R15 quando enviado individualmente)
+        // 2. Consulta de um único cliente
         if (tipoNorm.contains("obter-cliente") || tipoNorm.contains("buscar-cliente") || tipoNorm.contains("consultar-cliente")) {
             List<String> cpfs = extrairCpfsClientes(payload);
             if (cpfs.size() > 1 || payload.containsKey("cpfs") || payload.containsKey("clientesTransferidos") || payload.containsKey("contasTransferidas")) {
@@ -192,7 +191,7 @@ public class ClienteCommandConsumer {
         return RespostaSagaDTO.sucesso(sagaId, tipo, resultado);
     }
 
-    // o orquestrador manda PENDENTE (falha tecnica) ou NAO_APROVADA com motivo (login duplicado)
+    // Volta a solicitação para PENDENTE ou NAO_APROVADA
     private RespostaSagaDTO compensarAprovacaoSolicitacao(String sagaId, String tipo, Map<String, Object> payload) {
         String cpf = extrairString(payload, "cpf", "cpfCliente");
         String statusSolicitacao = extrairString(payload, "statusSolicitacao", "status");

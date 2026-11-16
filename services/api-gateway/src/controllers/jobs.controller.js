@@ -1,8 +1,7 @@
 const jobService = require('../services/job.service');
 const { responderErro } = require('../services/erro.service');
 
-// Resposta das operações assíncronas (R9, R13, R15, R16): 202 com o job no corpo e,
-// no Location, o endereço em que o front acompanha o andamento.
+// responde 202 com o job e o Location do status
 function responderJobAceito(res, job) {
   return res.status(202).location(`/jobs/${job.jobId}/status`).json(job);
 }
@@ -21,7 +20,7 @@ async function status(req, res) {
     const job = await buscarOuResponder404(req, res);
     if (!job) return undefined;
 
-    // o payload do resultado sai daqui: quem precisa dele busca em /jobs/:id/result
+    // devolve o job sem o resultado
     const { resultado, ...semResultado } = job;
     return res.json(semResultado);
   } catch (err) {
@@ -35,7 +34,7 @@ async function resultado(req, res) {
     const job = await buscarOuResponder404(req, res);
     if (!job) return undefined;
 
-    // pendente, com falha ou concluído com resultType "resource": não há resultado inline
+    // 409 se o job não tem resultado inline
     if (job.resultType !== 'inline') {
       return responderErro(res, 409, 'Este job não tem resultado inline. Consulte /jobs/:id/status.');
     }

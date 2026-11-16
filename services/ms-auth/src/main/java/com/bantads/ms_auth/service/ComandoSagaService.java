@@ -18,10 +18,7 @@ import com.bantads.ms_auth.exception.UsuarioNaoEncontradoException;
 import com.bantads.ms_auth.model.ComandoProcessado;
 import com.bantads.ms_auth.repository.ComandoProcessadoRepository;
 
-/**
- * Passos de SAGA do MS Auth. Nenhum log inclui payload: a resposta de
- * auth.criar-usuario carrega a senha em claro.
- */
+/** Passos de SAGA do MS Auth */
 @Service
 public class ComandoSagaService {
 
@@ -33,7 +30,7 @@ public class ComandoSagaService {
     public static final String DESATIVAR_USUARIO = "auth.desativar-usuario";
     public static final String COMPENSAR_DESATIVAR_USUARIO = "auth.desativar-usuario.compensar";
 
-    // contrato com o orquestrador: este erro faz a solicitacao virar Nao aprovada
+    // Erro de login duplicado
     public static final String ERRO_LOGIN_DUPLICADO = "LOGIN_DUPLICADO";
 
     private static final DateTimeFormatter FORMATO_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
@@ -81,7 +78,7 @@ public class ComandoSagaService {
         if (tipoUsuario != null && !gerente && !"CLIENTE".equals(tipoUsuario)) {
             return Optional.of(registrarFalha(comando, "Tipo de usuario nao suportado: " + tipoUsuario));
         }
-        // R13: a senha vem do formulario e nao volta na resposta
+        // R13: senha informada no formulário
         String senhaInformada = texto(payload, "senha");
         if (gerente && senhaInformada == null) {
             return Optional.of(registrarFalha(comando, "senha e obrigatoria para gerente"));
@@ -104,10 +101,7 @@ public class ComandoSagaService {
         return Optional.of(MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), resposta));
     }
 
-    /**
-     * Sucesso repetido nao e reenviado: a senha nao fica guardada para remontar a
-     * resposta. Se a primeira resposta se perdeu, o timeout do passo compensa.
-     */
+    /** Trata comando repetido: reenvia só a falha */
     private Optional<MensagemSaga> repetido(MensagemSaga comando, ComandoProcessado anterior) {
         if (anterior.getStatus() == StatusResposta.SUCESSO) {
             log.info("Comando repetido ignorado: sagaId={} tipo={}", comando.sagaId(), comando.tipo());
@@ -117,7 +111,6 @@ public class ComandoSagaService {
         return Optional.of(MensagemSaga.falha(comando.sagaId(), comando.tipo(), agora(), anterior.getErro()));
     }
 
-    // remover e idempotente, entao a compensacao dispensa o registro de deduplicacao
     private MensagemSaga compensarCriacao(MensagemSaga comando, Map<String, Object> payload) {
         String cpf = texto(payload, "cpf");
         if (cpf == null) {
@@ -127,7 +120,6 @@ public class ComandoSagaService {
         return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of());
     }
 
-    // desativar e idempotente e a resposta nao carrega segredo, entao dispensa o registro de deduplicacao
     private MensagemSaga desativarUsuario(MensagemSaga comando, Map<String, Object> payload) {
         String cpf = texto(payload, "cpf");
         if (cpf == null) {

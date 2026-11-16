@@ -6,15 +6,13 @@ const { responderJobAceito } = require('./jobs.controller');
 const TIPO_APROVAR_CLIENTE = 'aprovar-cliente';
 const DOMINIO = 'clientes';
 
-// R9: aprovar é SAGA, então o Gateway só publica e devolve 202 — quem conclui é o
-// Orquestrador, e o front acompanha por /jobs/:id/status. O estado da solicitação
-// não é conferido aqui: inexistente ou já processada termina como job FALHA.
+// R9: inicia a SAGA de aprovação e responde 202
 async function aprovar(req, res) {
   const { cpf } = req.params;
 
   try {
     const job = await sagaService.iniciar(TIPO_APROVAR_CLIENTE, DOMINIO, { cpf });
-    // R9 cria o cliente: o que estiver em cache para esse CPF fica obsoleto
+    // invalida o cache do cliente
     await clienteService.invalidar(cpf);
     return responderJobAceito(res, job);
   } catch (err) {

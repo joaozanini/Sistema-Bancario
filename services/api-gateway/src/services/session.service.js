@@ -1,6 +1,6 @@
 const redis = require('../config/redis');
 
-const SESSION_TTL_SECONDS = 30 * 60; // timeout de inatividade (sliding window), fixo pelo enunciado
+const SESSION_TTL_SECONDS = 30 * 60; // timeout de inatividade (sliding window)
 
 const sessionKey = (jti) => `sessao:${jti}`;
 const reverseKey = (cpf) => `sessao:cpf:${cpf}`;
@@ -27,7 +27,7 @@ async function isRevoked(jti) {
   return (await redis.exists(revokedKey(jti))) === 1;
 }
 
-// remainingTokenSeconds = tempo restante até o exp do JWT (TTL do revogado, per enunciado)
+// apaga a sessão e marca o jti como revogado até o exp do JWT
 async function revokeSession(jti, cpf, remainingTokenSeconds) {
   await redis.del(sessionKey(jti));
   await redis.del(reverseKey(cpf));

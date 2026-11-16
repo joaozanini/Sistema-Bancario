@@ -2,15 +2,13 @@ const redis = require('../config/redis');
 
 const CACHE_TTL_SECONDS = 5 * 60;
 
-// Só dados CADASTRAIS entram aqui. Saldo, extrato e contagem de clientes vêm do
-// MS Conta, que é de consistência eventual (CQRS) — cachear esconderia a defasagem.
+// domínios cadastrais que usam cache
 const DOMINIOS = { CLIENTE: 'cliente', GERENTE: 'gerente' };
 
 const chave = (dominio, cpf) => `cache:${dominio}:${cpf}`;
 const expiraEm = (segundos) => ({ expiration: { type: 'EX', value: segundos } });
 
-// Cache-aside: lê do cache, e só vai à origem quando não achou.
-// Falha de Redis nunca derruba a requisição — degrada para a origem.
+// cache-aside: lê do Redis e busca na origem se não achar ou se o Redis falhar
 async function lerOuBuscar(dominio, cpf, buscarNaOrigem) {
   try {
     const bruto = await redis.get(chave(dominio, cpf));

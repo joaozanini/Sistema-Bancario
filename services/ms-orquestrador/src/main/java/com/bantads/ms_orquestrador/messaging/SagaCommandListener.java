@@ -44,7 +44,7 @@ public class SagaCommandListener {
         ler(message, message.getMessageProperties().getConsumerQueue()).ifPresent(sagaService::processarFalhaTecnica);
     }
 
-    // JSON invalido nao melhora com retentativa; o corpo nao e logado porque pode conter a senha
+    // JSON invalido e descartado sem retentativa e sem logar o corpo
     private Optional<MensagemSaga> ler(Message message, String fila) {
         try {
             return Optional.of(codec.ler(message));

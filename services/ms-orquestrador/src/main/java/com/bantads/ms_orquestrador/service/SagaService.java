@@ -29,10 +29,7 @@ import com.bantads.ms_orquestrador.repository.SagaRepository;
 import com.bantads.ms_orquestrador.saga.DefinicaoSaga;
 import com.bantads.ms_orquestrador.saga.PassoSaga;
 
-/**
- * Motor das SAGAs. Nunca loga payload nem os segredos em memoria: a resposta do
- * MS Auth e o comando de e-mail da R9 carregam a senha em claro.
- */
+/** Motor das SAGAs, sem logar payload nem segredos */
 @Service
 public class SagaService {
 
@@ -40,7 +37,7 @@ public class SagaService {
 
     private static final DateTimeFormatter FORMATO_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
-    // a etapa 0 so serve para deduplicar o inicio reentregue
+    // etapa usada para deduplicar o inicio reentregue
     private static final int ETAPA_INICIO = 0;
 
     private final Map<String, DefinicaoSaga> definicoes;
@@ -116,9 +113,7 @@ public class SagaService {
         }
     }
 
-    /**
-     * Comando que esgotou as retentativas no MS de destino e caiu na DLQ
-     */
+    /** Trata o comando que esgotou as retentativas e caiu na DLQ */
     public void processarFalhaTecnica(MensagemSaga comando) {
         Optional<EstadoSaga> encontrado = comando.sagaId() == null
                 ? Optional.empty()
@@ -160,7 +155,7 @@ public class SagaService {
         DefinicaoSaga definicao = definicoes.get(estado.tipo());
         String tipo = passoAtual(definicao, estado).tipoComando();
         log.warn("Timeout: sagaId={} tipo={} etapa={}", estado.sagaId(), tipo, estado.etapaAtual());
-        // sem resposta nao se sabe se o passo executou; as compensacoes sao idempotentes
+        // compensa incluindo o passo que nao respondeu
         compensar(estado, definicao, "Tempo esgotado aguardando " + tipo, true);
     }
 
@@ -184,11 +179,7 @@ public class SagaService {
         executarAPartirDe(estado.comEtapa(estado.etapaAtual(), dados, agora()), definicao, estado.etapaAtual());
     }
 
-    /**
-     * Envia os passos fire-and-forget em sequencia ate o proximo passo que
-     * aguarda resposta, ou conclui a SAGA. Os comandos recebem os dados do
-     * estado mais os segredos em memoria daquela SAGA.
-     */
+    /** Envia os passos sem resposta ate o proximo que aguarda resposta, ou conclui a SAGA */
     private void executarAPartirDe(EstadoSaga estado, DefinicaoSaga definicao, int indice) {
         List<PassoSaga> passos = definicao.passos();
         Map<String, Object> dadosComando = new LinkedHashMap<>(estado.payload());
@@ -230,11 +221,7 @@ public class SagaService {
         enviar(estado.sagaId(), etapa, passo.fila(), passo.tipoComando(), passo.payloadComando().apply(dadosComando));
     }
 
-    /**
-     * Um segredo exigido pelo passo sumiu da memoria (o Orquestrador reiniciou
-     * depois de recebe-lo): o passo falha antes do envio e todos os anteriores
-     * sao compensados. So os nomes das chaves vao para o log.
-     */
+    /** Falha o passo e compensa os anteriores se faltar uma chave exigida */
     private boolean faltamDados(EstadoSaga estado, DefinicaoSaga definicao, int indice,
             Map<String, Object> dadosComando) {
         PassoSaga passo = definicao.passos().get(indice);
@@ -262,9 +249,7 @@ public class SagaService {
         }
     }
 
-    /**
-     * Publica as compensações em ordem inversa sem aguardar resposta
-     */
+    /** Publica as compensações em ordem inversa sem aguardar resposta */
     private void compensar(EstadoSaga estado, DefinicaoSaga definicao, String erro, boolean incluirPassoFalho) {
         EstadoSaga compensando = estado.comStatus(StatusSaga.COMPENSANDO, agora());
         repository.salvar(compensando);

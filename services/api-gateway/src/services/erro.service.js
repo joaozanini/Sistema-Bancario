@@ -1,8 +1,6 @@
 const { STATUS_CODES } = require('node:http');
 
-// Corpo padrão de erro do contrato: { status, erro, mensagem }. "erro" é o nome
-// do status HTTP (ex.: Unprocessable Entity) e "mensagem" é o texto para o usuário.
-// O 401 fica de fora: ele segue o { auth, message } do verifyJWT (enunciado 5.4).
+// monta o corpo de erro { status, erro, mensagem }
 function corpoErro(status, mensagem) {
   return { status, erro: STATUS_CODES[status] || 'Erro', mensagem };
 }
@@ -19,8 +17,7 @@ const MENSAGENS_PADRAO = {
   422: 'Regra de negócio violada.',
 };
 
-// Os MSs respondem erro como { erro: "texto" }; quando o texto não vem (corpo vazio
-// ou o JSON padrão do Spring), vale uma mensagem genérica para o status.
+// extrai a mensagem de erro do MS ou usa uma genérica pelo status
 function mensagemDoMs(corpo, status) {
   const texto = corpo && typeof corpo === 'object' ? corpo.mensagem || corpo.erro || corpo.message : null;
   if (typeof texto === 'string' && texto.trim()) {

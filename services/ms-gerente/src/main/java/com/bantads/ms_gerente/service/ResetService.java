@@ -19,7 +19,7 @@ public class ResetService {
         this.idempotenciaRepository = idempotenciaRepository;
     }
 
-    // Gerentes pre-cadastrados (enunciado, secao 4)
+    // Gerentes pré-cadastrados
     @Transactional
     public void reset() {
         idempotenciaRepository.deleteAllInBatch();

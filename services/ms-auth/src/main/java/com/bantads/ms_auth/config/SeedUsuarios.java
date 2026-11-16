@@ -5,9 +5,7 @@ import org.springframework.stereotype.Component;
 
 import com.bantads.ms_auth.service.ResetService;
 
-/**
- * So semeia com a colecao vazia, para nao duplicar a cada restart.
- */
+/** Semeia os usuários só com a coleção vazia */
 @Component
 public class SeedUsuarios implements CommandLineRunner {
 

@@ -15,7 +15,7 @@ const { rotaNaoEncontrada, tratarErro } = require('./middlewares/erro.middleware
 
 const app = express();
 
-// Location vai exposto para o front poder ler o endereço de polling do job (202)
+// CORS liberando a leitura do header Location
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*', exposedHeaders: ['Location'] }));
 app.use(express.json());
 app.use(descartarIdentidadeDoCliente);

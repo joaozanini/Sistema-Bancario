@@ -36,7 +36,7 @@ public class GerenteCommandListener {
         try {
             comando = jsonMapper.readValue(message.getBody(), MensagemSaga.class);
         } catch (JacksonException e) {
-            // JSON invalido nao melhora com retentativa
+            // JSON inválido não é retentado
             log.warn("[{}] mensagem descartada: JSON invalido", RabbitMQConfig.FILA_GERENTE_CMD);
             return;
         }

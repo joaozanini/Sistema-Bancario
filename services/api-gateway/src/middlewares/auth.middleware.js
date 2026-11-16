@@ -2,7 +2,7 @@ const tokenService = require('../services/token.service');
 const sessionService = require('../services/session.service');
 const { responderErro } = require('../services/erro.service');
 
-// request → CORS → JWT verify → Redis (sessão existe? revogada?) → renova TTL (sliding window) → injeta headers → proxy
+// valida o JWT e a sessão no Redis e renova o TTL da sessão
 async function verifyJwtAndSession(req, res, next) {
   const token = req.headers['x-access-token'];
   if (!token) {
@@ -37,15 +37,14 @@ async function verifyJwtAndSession(req, res, next) {
   next();
 }
 
-// Os MSs confiam em X-User-CPF e X-User-Tipo, então esses headers só podem nascer aqui,
-// a partir do token validado: o que vier de fora com esses nomes é descartado logo na entrada.
+// remove os headers de identidade vindos do cliente HTTP
 function descartarIdentidadeDoCliente(req, res, next) {
   delete req.headers['x-user-cpf'];
   delete req.headers['x-user-tipo'];
   next();
 }
 
-// microsserviços não revalidam o JWT — confiam nesses headers (só alcançáveis pela rede interna do docker-compose)
+// injeta X-User-CPF e X-User-Tipo a partir do token
 function injectUserHeaders(req, res, next) {
   req.headers['x-user-cpf'] = req.user.cpf;
   req.headers['x-user-tipo'] = req.user.tipo;

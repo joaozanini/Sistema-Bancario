@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class GeradorSenha {
 
-    // sem 0/O, 1/l/I: a senha e digitada a partir do e-mail
+    // Caracteres da senha, sem os ambíguos
     private static final String ALFABETO = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
     private static final int TAMANHO = 8;
 

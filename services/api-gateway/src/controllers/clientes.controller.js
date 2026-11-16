@@ -2,7 +2,7 @@ const clientesService = require('../services/clientes.service');
 const clienteService = require('../services/cliente.service');
 const { responderErro } = require('../services/erro.service');
 
-// R11: a lista vai dentro de { clientes }, com os _links da própria listagem
+// R11: lista os clientes em { clientes } com _links
 async function listar(req, res) {
   try {
     const clientes = await clientesService.listarTodos(req.query.busca);

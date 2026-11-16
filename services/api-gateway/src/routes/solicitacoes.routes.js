@@ -5,18 +5,18 @@ const { aprovar } = require('../controllers/solicitacoes.controller');
 
 const router = Router();
 
-// R1: autocadastro é público — quem se cadastra ainda não tem login
+// R1: autocadastro público
 router.post('/solicitacoes', clienteProxy);
 
-// R8: a tela inicial do gerente lista as solicitações em todos os status
+// R8: lista as solicitações
 router.get('/solicitacoes', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, clienteProxy);
 
 router.get('/solicitacoes/:cpf', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, clienteProxy);
 
-// R9 é SAGA: publica em saga.cmd e responde 202
+// R9: aprovação via SAGA (202)
 router.post('/solicitacoes/:cpf/aprovacao', verifyJwtAndSession, exigirTipo('GERENTE'), aprovar);
 
-// R10: rejeição é síncrona (200), não SAGA — o MS Cliente grava e publica o e-mail
+// R10: rejeição síncrona, repassada ao MS Cliente
 router.post('/solicitacoes/:cpf/rejeicao', verifyJwtAndSession, exigirTipo('GERENTE'), injectUserHeaders, clienteProxy);
 
 module.exports = router;

@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-// Confirmação de depósito, saque ou transferência (R4, R5, R6). Não leva o novo saldo: o front
-// reconsulta a conta pelo link "conta", porque a projeção do lado query é assíncrona
+// Confirmação de depósito, saque ou transferência (R4, R5, R6)
 public class MovimentacaoResponseDTO {
 
     private String numeroConta;
@@ -20,7 +19,7 @@ public class MovimentacaoResponseDTO {
 
     private String valor;
 
-    // só nas transferências; nos nomes vem o que o Gateway enriqueceu a partir do MS Cliente
+    // Origem e destino, só nas transferências
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private ParteTransferenciaDTO destino;
 

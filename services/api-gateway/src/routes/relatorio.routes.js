@@ -4,7 +4,7 @@ const { gerar } = require('../controllers/relatorio.controller');
 
 const router = Router();
 
-// R16: o relatório expõe salário e saldo de todos os clientes — só gerente
+// R16: relatório de clientes, só para gerente
 router.get('/relatorios/clientes', verifyJwtAndSession, exigirTipo('GERENTE'), gerar);
 
 module.exports = router;

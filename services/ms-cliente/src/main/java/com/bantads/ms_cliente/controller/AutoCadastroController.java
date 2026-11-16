@@ -27,8 +27,7 @@ public class AutoCadastroController {
     private static final String SOLICITACOES_URL = "http://localhost:8082/solicitacoes";
     private static final String CLIENTES_URL = "http://localhost:8082/clientes";
 
-    // Mesmo formato dos valores do MS Conta: até 15 dígitos inteiros e 2 casas, o que cabe no NUMERIC(19, 4)
-    // e barra a notação científica ("1E-99999999" passa no new BigDecimal() e trava a thread na conversão)
+    // Até 15 dígitos inteiros e 2 casas decimais
     private static final Pattern FORMATO_SALARIO = Pattern.compile("\\d{1,15}(\\.\\d{1,2})?");
 
     private final AutoCadastroService service;
@@ -37,9 +36,7 @@ public class AutoCadastroController {
         this.service = service;
     }
 
-    /**
-     * Requisito R1: autocadastro. Grava a solicitação como PENDENTE e responde 201 com ela.
-     */
+    /** R1: grava a solicitação de autocadastro como PENDENTE */
     @PostMapping
     public ResponseEntity<?> criarSolicitacao(@RequestBody(required = false) SolicitacaoCadastroDTO dto) {
         try {
@@ -56,7 +53,7 @@ public class AutoCadastroController {
                 salario = new BigDecimal(salarioInformado);
             }
 
-            // Mapeando DTO de entrada para a Entidade; sem "endereco" os campos ficam nulos e a validação recusa
+            // Converte o DTO de entrada na entidade
             EnderecoDTO endereco = dto.getEndereco() != null
                     ? dto.getEndereco()
                     : new EnderecoDTO(null, null, null, null, null, null);
@@ -74,27 +71,24 @@ public class AutoCadastroController {
             entidade.setCidade(endereco.cidade());
             entidade.setUf(endereco.uf());
 
-            // Regra de validação e unicidade
+            // Valida e salva a solicitação
             SolicitacaoCadastro salva = service.registrarSolicitacao(entidade);
 
             return ResponseEntity
                     .created(URI.create("/solicitacoes/" + salva.getCpf()))
                     .body(converterParaDTO(salva));
         } catch (CadastroDuplicadoException e) {
-            // R1: CPF ou e-mail repetido é conflito com um cadastro existente, não dado malformado
+            // R1: CPF ou e-mail repetido responde 409
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("erro", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("erro", e.getMessage()));
         } catch (DataIntegrityViolationException e) {
-            // Dois autocadastros simultâneos passam pela checagem acima; o índice único barra o segundo
+            // Índice único barra cadastro simultâneo duplicado
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("erro", "CPF ou e-mail já cadastrado no sistema."));
         }
     }
 
-    /**
-     * Requisito R8: Listagem de solicitações de autocadastro (Pendente,
-     * Aprovada, Não aprovada).
-     */
+    /** R8: lista as solicitações de autocadastro */
     @GetMapping
     public ResponseEntity<?> listarSolicitacoes(
             @RequestParam(value = "status", required = false) String status
@@ -109,9 +103,7 @@ public class AutoCadastroController {
         }
     }
 
-    /**
-     * Requisito R8: consulta de uma solicitação pelo CPF.
-     */
+    /** R8: consulta uma solicitação pelo CPF */
     @GetMapping("/{cpf}")
     public ResponseEntity<?> buscarSolicitacao(@PathVariable("cpf") String cpf) {
         try {
@@ -121,10 +113,7 @@ public class AutoCadastroController {
         }
     }
 
-    /**
-     * Requisito R10: rejeitar solicitação pendente informando o motivo.
-     * Síncrono (200).
-     */
+    /** R10: rejeita a solicitação pendente com motivo */
     @PostMapping("/{cpf}/rejeicao")
     public ResponseEntity<?> rejeitarSolicitacao(
             @PathVariable("cpf") String cpf,
@@ -150,7 +139,7 @@ public class AutoCadastroController {
         dto.setEmail(entidade.getEmail());
         dto.setTelefone(entidade.getTelefone());
         if (entidade.getSalario() != null) {
-            // 2 casas na API; o banco guarda NUMERIC(19, 4) e devolveria "4500.0000"
+            // Salário com 2 casas decimais
             dto.setSalario(entidade.getSalario().setScale(2, RoundingMode.HALF_EVEN).toPlainString());
         }
         dto.setEndereco(new EnderecoDTO(
@@ -164,8 +153,7 @@ public class AutoCadastroController {
         dto.setMotivo(entidade.getMotivoRejeicao());
         dto.setDataHoraProcessamento(entidade.getDataAprovacaoRejeicao());
 
-        // HATEOAS (enunciado 5.6): URL interna do MS; o Gateway reescreve o host para o dele.
-        // Os links seguem o estado: só a solicitação PENDENTE pode ser aprovada ou rejeitada.
+        // Links HATEOAS; aprovação e rejeição só para solicitação PENDENTE
         String self = SOLICITACOES_URL + "/" + entidade.getCpf();
         dto.addLink("self", self);
         if (StatusSolicitacao.PENDENTE.equalsIgnoreCase(entidade.getStatus())) {

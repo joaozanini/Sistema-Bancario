@@ -30,16 +30,13 @@ public class ClienteService {
         this.solicitacaoRepository = solicitacaoRepository;
     }
 
-    // Dados cadastrais de um cliente, consultados pelo Gateway (login, R11, R16 e nomes da transferência)
+    // Busca os dados cadastrais de um cliente pelo CPF
     @Transactional(readOnly = true)
     public Optional<Cliente> buscarPorCpf(String cpf) {
         return clienteRepository.findById(cpf);
     }
 
-    /**
-     * SAGA Remover Gerente (R15): Obtém os dados cadastrais dos clientes cujas contas
-     * foram transferidas do gerente removido para os gerentes remanescentes.
-     */
+    /** R15: dados cadastrais dos clientes transferidos do gerente removido */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> obterDadosClientesTransferidos(List<String> cpfsClientes) {
         if (cpfsClientes == null || cpfsClientes.isEmpty()) {
@@ -78,9 +75,7 @@ public class ClienteService {
         return resultado;
     }
 
-    /**
-     * Obtém os dados cadastrais de um único cliente por CPF (usado em consultas de SAGA como R13/R15).
-     */
+    /** Dados cadastrais de um único cliente por CPF */
     @Transactional(readOnly = true)
     public Map<String, Object> obterDadosClientePorCpf(String cpfBruto) {
         if (cpfBruto == null || cpfBruto.isBlank()) {
@@ -97,9 +92,7 @@ public class ClienteService {
         return converterClienteParaMapa(cliente);
     }
 
-    /**
-     * SAGA Aprovar Cliente (R9 - Passo 1): Marca solicitação como APROVADA.
-     */
+    /** R9 passo 1: marca a solicitação como APROVADA */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> aprovarSolicitacao(String cpfBruto) {
         if (cpfBruto == null || cpfBruto.isBlank()) {
@@ -110,9 +103,7 @@ public class ClienteService {
                 .or(() -> solicitacaoRepository.findByCpf(cpfBruto.trim()))
                 .orElseThrow(() -> new IllegalArgumentException("Solicitação de cadastro não encontrada para o CPF: " + cpfBruto));
 
-        // Aprovar de novo (dois gerentes clicando juntos, ou uma solicitação já recusada) faz a SAGA falhar
-        // aqui, no primeiro passo, que não tem nada a compensar. Se passasse, a falha no MS Auth (login
-        // duplicado) acionaria as compensações e apagaria o cliente criado pela primeira aprovação
+        // Só aprova solicitação PENDENTE
         if (!StatusSolicitacao.PENDENTE.equalsIgnoreCase(solicitacao.getStatus())) {
             throw new IllegalStateException("A solicitação do CPF " + solicitacao.getCpf()
                     + " não está pendente (status atual: " + solicitacao.getStatus() + ").");
@@ -134,9 +125,7 @@ public class ClienteService {
         return dados;
     }
 
-    /**
-     * SAGA Aprovar Cliente (R9 - Compensação Passo 1): Reverte status da solicitação.
-     */
+    /** R9 compensação do passo 1: reverte o status da solicitação */
     @Transactional(rollbackFor = Exception.class)
     public void compensarAprovacaoSolicitacao(String cpfBruto, String novoStatus, String motivo) {
         if (cpfBruto == null || cpfBruto.isBlank()) {
@@ -145,14 +134,11 @@ public class ClienteService {
         String cpf = cpfBruto.replaceAll("\\D", "");
         solicitacaoRepository.findByCpf(cpf)
                 .or(() -> solicitacaoRepository.findByCpf(cpfBruto.trim()))
-                // Só desfaz uma aprovação desta SAGA: o status tem de ser APROVADA e o cliente já ter sido
-                // removido pela compensação do passo 4 (que vem antes, na mesma fila). Sem isso, um timeout
-                // na reaprovação devolveria para PENDENTE a solicitação de um cliente que já existe
+                // Só reverte solicitação APROVADA cujo cliente já foi removido
                 .filter(solicitacao -> StatusSolicitacao.APROVADA.equalsIgnoreCase(solicitacao.getStatus()))
                 .filter(solicitacao -> !clienteRepository.existsById(solicitacao.getCpf()))
                 .ifPresent(solicitacao -> {
-                    // A compensação só leva a dois destinos: NAO_APROVADA (login duplicado no MS Auth,
-                    // com motivo automático) ou de volta para PENDENTE (qualquer outra falha)
+                    // Volta para NAO_APROVADA com motivo ou para PENDENTE
                     boolean naoAprovada = StatusSolicitacao.NAO_APROVADA.equals(StatusSolicitacao.normalizar(novoStatus));
                     solicitacao.setStatus(naoAprovada ? StatusSolicitacao.NAO_APROVADA : StatusSolicitacao.PENDENTE);
                     solicitacao.setMotivoRejeicao(naoAprovada ? motivo : null);
@@ -161,9 +147,7 @@ public class ClienteService {
                 });
     }
 
-    /**
-     * SAGA Aprovar Cliente (R9 - Passo 4): Cria o registro definitivo de Cliente a partir da solicitação.
-     */
+    /** R9 passo 4: cria o cliente a partir da solicitação */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> criarClienteDaSolicitacao(String cpfBruto) {
         if (cpfBruto == null || cpfBruto.isBlank()) {
@@ -202,9 +186,7 @@ public class ClienteService {
         return converterClienteParaMapa(salvo);
     }
 
-    /**
-     * SAGA Aprovar Cliente (R9 - Compensação Passo 4): Remove cliente recém-criado.
-     */
+    /** R9 compensação do passo 4: remove o cliente criado */
     @Transactional(rollbackFor = Exception.class)
     public void compensarCriacaoCliente(String cpfBruto) {
         if (cpfBruto == null || cpfBruto.isBlank()) {

@@ -5,10 +5,7 @@ import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Mesmos argumentos de rabbitmq/definitions.json: o broker recusa redeclarar
- * uma fila com argumentos diferentes.
- */
+/** Declara as filas com os argumentos de rabbitmq/definitions.json */
 @Configuration
 public class RabbitMQConfig {
 

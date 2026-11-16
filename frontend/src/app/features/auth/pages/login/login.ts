@@ -17,9 +17,6 @@ export class Login {
 
   email = '';
   senha = '';
-  // signals, e nao campos comuns: o app e zoneless, entao uma atribuicao dentro
-  // do callback do subscribe nao agendaria a deteccao de mudancas e a tela ficaria
-  // presa em "Entrando..." mesmo depois do erro chegar
   readonly erro = signal('');
   readonly carregando = signal(false);
   readonly aviso = signal<string>(

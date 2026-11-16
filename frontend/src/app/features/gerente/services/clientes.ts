@@ -41,7 +41,7 @@ export class ClientesService {
         switchMap((resposta) => {
           const corpo = resposta.body;
           if (resposta.status !== 202) {
-            // resposta síncrona (200): o relatório já vem no corpo, no mesmo formato do resultado do job
+            // resposta síncrona (200): relatório já no corpo
             return of(linhasDoRelatorio(corpo as RelatorioClientesDto | null));
           }
 

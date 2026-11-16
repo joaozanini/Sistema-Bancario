@@ -1,14 +1,11 @@
 const { responderErro } = require('../services/erro.service');
 
-// Caminho que não é de nenhuma rota do contrato: sem isto o Express devolve uma página HTML
+// responde 404 no formato de erro do contrato
 function rotaNaoEncontrada(req, res) {
   return responderErro(res, 404, 'Rota não encontrada.');
 }
 
-// Último middleware: o que escapar das rotas ainda sai no formato de erro do contrato.
-// O caso comum é o corpo com JSON malformado, recusado pelo express.json().
-// O parâmetro next não é usado, mas precisa existir: o Express só reconhece o
-// tratador de erro pela assinatura de quatro parâmetros.
+// trata erros não capturados no formato do contrato (JSON malformado vira 400)
 function tratarErro(err, req, res, next) {
   if (err.type === 'entity.parse.failed') {
     return responderErro(res, 400, 'O corpo da requisição não é um JSON válido.');

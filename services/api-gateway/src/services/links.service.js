@@ -1,5 +1,4 @@
-// Enunciado 5.6: os MSs montam os _links com a URL interna deles (ex.: http://localhost:8080)
-// e o Gateway reescreve para o próprio endereço, para o front nunca enxergar um MS.
+// reescreve os _links dos MSs com o endereço do Gateway
 
 function baseUrl(req) {
   if (process.env.GATEWAY_PUBLIC_URL) {
@@ -9,7 +8,7 @@ function baseUrl(req) {
   return `${protocolo}://${req.headers.host}`;
 }
 
-// só o caminho e a query interessam: o host vem sempre do Gateway
+// troca o host do href pelo do Gateway
 function reescreverHref(href, base) {
   if (typeof href !== 'string') {
     return href;
@@ -18,7 +17,7 @@ function reescreverHref(href, base) {
     const url = new URL(href);
     return `${base}${url.pathname}${url.search}${url.hash}`;
   } catch {
-    // href relativo: já é um caminho do Gateway
+    // href relativo recebe a base do Gateway
     return href.startsWith('/') ? `${base}${href}` : href;
   }
 }

@@ -9,13 +9,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
-/**
- * R15. O gerente e inativado antes de listar os ativos, para que o proprio
- * removido nunca apareca como destino das contas. O encerramento da sessao no
- * Redis e um passo do proprio Orquestrador, sem mensagem e sem compensacao: se
- * a SAGA falhar depois dele, o gerente reativado faz novo login. Sem contas a
- * transferir, os passos de consulta ao MS Cliente e de e-mail sao pulados.
- */
+/** R15: inativa o gerente, encerra a sessao e transfere as contas aos ativos */
 @Component
 public class RemoverGerenteSaga implements DefinicaoSaga {
 
@@ -78,15 +72,14 @@ public class RemoverGerenteSaga implements DefinicaoSaga {
     }
 
     private static Map<String, Object> comandoTransferir(Map<String, Object> dados) {
-        // defesa em profundidade: o removido ja esta inativo, mas nunca e destino
+        // tira o gerente removido dos destinos
         List<?> destinos = dados.get("gerentes") instanceof List<?> ativos
                 ? ativos.stream().filter(cpf -> !cpf.equals(dados.get("cpf"))).toList()
                 : List.of();
         return Map.of("gerenteRemovidoCpf", dados.get("cpf"), "gerentes", destinos);
     }
 
-    // cpfsClientes so existe se o MS Conta chegou a responder; num timeout ele
-    // reassocia as contas que moveu nesta SAGA, identificadas pelo sagaId
+    // devolve as contas transferidas ao gerente removido
     private static Map<String, Object> compensacaoTransferir(Map<String, Object> dados, String erro) {
         Map<String, Object> payload = campos(dados, "cpfsClientes");
         payload.put("gerenteOriginalCpf", dados.get("cpf"));

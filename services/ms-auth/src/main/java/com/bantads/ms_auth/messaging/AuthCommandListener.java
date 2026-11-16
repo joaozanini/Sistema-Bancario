@@ -15,10 +15,7 @@ import com.bantads.ms_auth.service.ComandoSagaService;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Consumidor de ms.auth.cmd. Erro de negocio volta como FALHA em
- * orquestrador.reply; erro tecnico sobe para o retry e, esgotado, vai para a DLQ.
- */
+/** Consumidor da fila ms.auth.cmd */
 @Component
 public class AuthCommandListener {
 
@@ -40,7 +37,7 @@ public class AuthCommandListener {
         try {
             comando = jsonMapper.readValue(message.getBody(), MensagemSaga.class);
         } catch (JacksonException e) {
-            // JSON invalido nao melhora com retentativa; o corpo nao e logado
+            // JSON inválido não é retentado
             log.warn("[{}] mensagem descartada: JSON invalido", RabbitMQConfig.FILA_AUTH_CMD);
             return;
         }

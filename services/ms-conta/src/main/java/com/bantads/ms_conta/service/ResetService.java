@@ -42,7 +42,7 @@ public class ResetService {
         this.objectMapper = objectMapper;
     }
 
-    // Subida com volume novo: sem isso as contas so existiriam depois do primeiro /reboot
+    // Semeia as contas se o Event Store estiver vazio
     @Transactional
     public void semearSeVazio() {
         if (repository.count() == 0) {
@@ -50,7 +50,7 @@ public class ResetService {
         }
     }
 
-    // Contas e movimentacoes pre-cadastradas (enunciado, secao 4): o replay dos eventos fecha os saldos da tabela
+    // Recria as contas e movimentações pré-cadastradas
     @Transactional
     public void reset() {
         idempotenciaRepository.deleteAllInBatch();

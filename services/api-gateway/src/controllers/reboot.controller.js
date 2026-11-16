@@ -17,10 +17,7 @@ const SERVICOS = [
   { nome: 'auth', url: authServiceUrl },
 ];
 
-// Nada disso pode sobreviver a um reboot, senão a correção parte de um estado
-// que não é o do seed. 'saga:*' cobre as três chaves do Orquestrador —
-// saga:<id>, saga:<id>:etapa:<n> e o sorted set saga:timeouts; sem apagar o
-// último, o agendador dispara timeout de uma SAGA que já não existe.
+// padrões de chaves do Redis apagados no reboot
 const PADROES_REDIS = ['sessao:*', 'job:*', 'cache:*', 'saga:*'];
 
 async function resetar({ nome, url }) {
@@ -39,8 +36,6 @@ async function resetar({ nome, url }) {
 
 async function limparRedis() {
   for (const padrao of PADROES_REDIS) {
-    // KEYS varre tudo, mas o reboot roda num banco de teste com poucas chaves e
-    // fora do caminho das requisições — não vale a complexidade do SCAN aqui.
     const chaves = await redis.keys(padrao);
     if (chaves.length > 0) {
       await redis.del(chaves);
@@ -63,7 +58,7 @@ async function reboot(req, res) {
 
   if (falhas.length > 0) {
     console.error('Reboot falhou:', falhas.map((f) => `${f.nome}: ${f.motivo}`).join('; '));
-    // além do erro padrão, diz qual serviço falhou: é o que se quer saber na hora da correção
+    // inclui no erro o resultado de cada serviço
     return res.status(502).json({
       ...corpoErro(502, 'Não foi possível recriar o seed em todos os serviços.'),
       servicos: Object.fromEntries(resultados.map((r) => [r.nome, r.ok ? 'ok' : r.motivo])),
@@ -81,7 +76,6 @@ async function reboot(req, res) {
   try {
     contagens = await contar();
   } catch (err) {
-    // O seed foi recriado; só a contagem falhou. Devolver 200 esconderia isso.
     console.error('Reboot recriou o seed mas falhou ao contar:', err.message);
     return responderErro(res, 502, 'Seed recriado, mas a contagem falhou.');
   }

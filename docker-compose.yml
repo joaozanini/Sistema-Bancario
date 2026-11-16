@@ -43,7 +43,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: bantads-redis
-    # noeviction: o Redis guarda sessao, jobs e estado das SAGAs, que nao podem ser descartados sob pressao de memoria
+    # Redis sem descarte de chaves por memória
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--maxmemory", "100mb", "--maxmemory-policy", "noeviction"]
     ports:
       - "6379:6379"
@@ -65,7 +65,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
-    # Com load_definitions o RabbitMQ não cria o usuário padrão, cria aqui a partir do .env
+    # Cria o usuário padrão a partir do .env
     command:
       - sh
       - -c
@@ -316,7 +316,7 @@ services:
       - bantads-net
     mem_limit: 128m
     healthcheck:
-      # 127.0.0.1 e nao localhost: o wget do busybox tenta o ::1 primeiro e o nginx so escuta em IPv4
+      # Healthcheck em 127.0.0.1
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
       interval: 15s
       timeout: 10s

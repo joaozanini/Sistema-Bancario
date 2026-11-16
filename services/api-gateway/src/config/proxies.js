@@ -3,7 +3,7 @@ const { contaServiceUrl, clienteServiceUrl } = require('./services');
 const { interceptarRespostaDoProxy } = require('../middlewares/links.middleware');
 const { responderErro } = require('../services/erro.service');
 
-// MS fora do ar: sem isto o http-proxy-middleware responde um 504 em texto puro
+// responde 502 quando o MS está fora do ar
 function aoFalhar(err, req, res) {
   console.error(`Falha ao repassar ${req.method} ${req.originalUrl}:`, err.message);
   if (res.headersSent || typeof res.status !== 'function') {
@@ -12,8 +12,7 @@ function aoFalhar(err, req, res) {
   return responderErro(res, 502, 'Serviço indisponível.');
 }
 
-// Roteamento simples (enunciado 5.3): o Gateway repassa a requisição ao MS por REST
-// e trata a resposta na volta (links do HATEOAS e formato de erro).
+// cria o proxy REST para o MS, tratando links e erros na resposta
 function criarProxy(target, aoResponder = interceptarRespostaDoProxy) {
   return createProxyMiddleware({
     target,

@@ -4,7 +4,7 @@ const gerentesService = require("../services/gerentes.service");
 const { responderErro } = require("../services/erro.service");
 const { responderJobAceito } = require("./jobs.controller");
 
-// R12: a lista vai dentro de { gerentes }, com os _links da própria listagem
+// R12: lista os gerentes em { gerentes } com _links
 async function listar(req, res) {
   try {
     const gerentes = await gerentesService.listarTodos();
@@ -15,8 +15,7 @@ async function listar(req, res) {
   }
 }
 
-// R14: a tela de edicao carrega o gerente por aqui antes de enviar o PUT.
-// Passa pelo cache-aside, como a composicao do login.
+// R14: busca o gerente pelo CPF via cache-aside
 async function buscar(req, res) {
   const { cpf } = req.params;
 
@@ -36,9 +35,7 @@ const TIPO_REMOVER_GERENTE = "remover-gerente";
 const DOMINIO = "gerentes";
 const CAMPOS_OBRIGATORIOS = ["cpf", "nome", "email", "telefone", "senha"];
 
-// R13: a senha segue no payload da SAGA e o Orquestrador a mantém só em memória
-// até o passo do MS Auth. Aqui só se confere o formato da requisição (400); e-mail
-// ou CPF já usados são regra de negócio e aparecem depois, como job FALHA.
+// R13: valida o corpo e inicia a SAGA de inserção de gerente
 async function inserir(req, res) {
   const { cpf, nome, email, telefone, senha } = req.body || {};
 
@@ -60,7 +57,7 @@ async function inserir(req, res) {
       telefone,
       senha,
     });
-    // R13 grava o gerente: o enunciado (5.5) pede invalidar o cadastro em cache
+    // invalida o cache do gerente
     await gerenteService.invalidar(cpf);
     return responderJobAceito(res, job);
   } catch (err) {
@@ -69,8 +66,7 @@ async function inserir(req, res) {
   }
 }
 
-// R15: o Gateway recusa a auto-remocao ANTES de publicar, senao a SAGA chegaria
-// a inativar o gerente e so depois seria desfeita por compensacao.
+// R15: recusa a auto-remoção e inicia a SAGA de remoção de gerente
 async function remover(req, res) {
   const { cpf } = req.params;
 
@@ -82,7 +78,7 @@ async function remover(req, res) {
     const job = await sagaService.iniciar(TIPO_REMOVER_GERENTE, DOMINIO, {
       cpf,
     });
-    // R15 inativa o gerente: o cadastro em cache deixa de valer
+    // invalida o cache do gerente
     await gerenteService.invalidar(cpf);
     return responderJobAceito(res, job);
   } catch (err) {

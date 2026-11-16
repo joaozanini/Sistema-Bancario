@@ -9,7 +9,7 @@ public record Job(
         String dominio,
         String resourceId,
         String erro,
-        // so aparece no resultType "inline"; nos demais o formato da 5.8 nao tem a chave
+        // so preenchido no resultType "inline"
         @JsonInclude(JsonInclude.Include.NON_NULL) Object resultado) {
 
     public static Job concluidoComRecurso(String jobId, String dominio, String resourceId) {

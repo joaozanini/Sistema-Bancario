@@ -10,12 +10,7 @@ import org.springframework.stereotype.Component;
 import com.bantads.ms_orquestrador.config.RabbitMQConfig;
 import static com.bantads.ms_orquestrador.saga.DefinicaoSaga.campos;
 
-/**
- * R9, na ordem do enunciado (5.9): o MS Auth cria o usuario antes da conta, entao
- * um e-mail ja usado falha antes de existir conta para compensar. A senha em
- * claro da resposta do Auth fica so na memoria do Orquestrador ate o comando de
- * e-mail; se ela se perder (reinicio no meio), o e-mail falha e a SAGA compensa.
- */
+/** R9: aprova a solicitacao, cria cliente, usuario e conta e envia a senha por e-mail */
 @Component
 public class AprovarClienteSaga implements DefinicaoSaga {
 
@@ -72,7 +67,7 @@ public class AprovarClienteSaga implements DefinicaoSaga {
 
     @Override
     public Optional<ComandoSaga> emailFalha(Map<String, Object> dados) {
-        // nome e e-mail so existem depois do passo 1; sem eles nao ha para quem avisar
+        // sem e-mail nos dados nao envia aviso de falha
         if (dados.get("email") == null) {
             return Optional.empty();
         }
@@ -91,8 +86,7 @@ public class AprovarClienteSaga implements DefinicaoSaga {
         return payload;
     }
 
-    // Login duplicado nunca vai passar numa nova tentativa: a solicitacao sai de
-    // Pendente para nao ficar travada.
+    // com login duplicado, marca a solicitacao como NAO_APROVADA
     private static Map<String, Object> compensacaoSolicitacao(Map<String, Object> dados, String erro) {
         Map<String, Object> payload = campos(dados, "cpf");
         if (ERRO_LOGIN_DUPLICADO.equals(erro)) {

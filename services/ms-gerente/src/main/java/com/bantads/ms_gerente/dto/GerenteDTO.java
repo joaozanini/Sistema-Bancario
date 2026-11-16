@@ -40,7 +40,6 @@ public record GerenteDTO(
         Map<String, Map<String, String>> links = new LinkedHashMap<>();
         String cpfPath = cpf != null ? cpf : "";
         String baseUrl = "http://localhost:8083/gerentes";
-        // mesmo endereço nos três: o que muda é o verbo (GET, PUT, DELETE)
         links.put("self", Map.of("href", baseUrl + "/" + cpfPath));
         links.put("atualizacao", Map.of("href", baseUrl + "/" + cpfPath));
         links.put("remocao", Map.of("href", baseUrl + "/" + cpfPath));

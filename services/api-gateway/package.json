@@ -5,8 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
-    "test": "node --test --import=./test-setup.js"
+    "dev": "node --watch src/server.js"
   },
   "dependencies": {
     "amqplib": "^2.2.0",

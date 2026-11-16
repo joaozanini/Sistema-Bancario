@@ -6,8 +6,7 @@ const { responderJobAceito } = require('./jobs.controller');
 
 const DOMINIO = 'relatorios';
 
-// R16 é assíncrono sem ser SAGA: nenhum dado é alterado, só composto. Por isso o
-// jobId nasce aqui e não vem do Orquestrador — quem conclui o job é o Gateway.
+// R16: cria o job, responde 202 e compõe o relatório em segundo plano
 async function gerar(req, res) {
   const jobId = randomUUID();
 
@@ -19,19 +18,16 @@ async function gerar(req, res) {
     return responderErro(res, 503, 'Serviço de jobs indisponível.');
   }
 
-  // 202 primeiro: a composição percorre todas as contas e não pode prender a
-  // resposta. O front acompanha por /jobs/:id/status.
   responderJobAceito(res, job);
   comporEmSegundoPlano(jobId);
   return undefined;
 }
 
-// Chamada sem await de propósito (o 202 já foi enviado). Todo erro é tratado aqui
-// dentro, então a promise devolvida nunca rejeita.
+// compõe o relatório e conclui o job ou marca falha
 async function comporEmSegundoPlano(jobId) {
   try {
     const linhas = await relatorioService.gerar();
-    // o resultado inline do R16 é um objeto { clientes: [...] }, não a lista solta
+    // resultado inline no formato { clientes }
     await jobService.concluirInline(jobId, { clientes: linhas });
   } catch (err) {
     console.error('Falha ao gerar o relatório de clientes:', err.message);

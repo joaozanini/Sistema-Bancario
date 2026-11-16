@@ -9,8 +9,7 @@ function contarClientesPorGerente(contas) {
   return contagem;
 }
 
-// R12: os dados cadastrais vêm do MS Gerente e a quantidade de clientes das
-// contas do MS Conta (gerente sem nenhuma conta tem 0 clientes)
+// R12: lista os gerentes ativos com a quantidade de clientes de cada um
 async function listarTodos() {
   const [gerentes, contas] = await Promise.all([gerenteService.listarAtivos(), contaService.listar()]);
   const clientesPorGerente = contarClientesPorGerente(contas);

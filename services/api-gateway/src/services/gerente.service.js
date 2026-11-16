@@ -20,7 +20,7 @@ async function buscar(cpf) {
   return cache.lerOuBuscar(cache.DOMINIOS.GERENTE, cpf, () => buscarNaOrigem(cpf));
 }
 
-// Lista não é cacheada: o cache-aside cobre só o dado cadastral individual (5.5)
+// lista os gerentes ativos, sem cache
 async function listarAtivos() {
   const resposta = await fetch(`${gerenteServiceUrl}/gerentes`);
 

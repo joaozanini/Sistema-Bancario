@@ -57,7 +57,7 @@ export function paraAutocadastroDto(dados: SolicitacaoCadastroRequest): Autocada
       logradouro: dados.logradouro,
       numero: dados.numero,
       complemento: complemento || null,
-      // o formulário usa a máscara 80000-000; a API recebe só os dígitos
+      // envia só os dígitos do CEP
       cep: dados.cep.replace(/\D/g, ''),
       cidade: dados.cidade,
       uf: dados.uf,

@@ -54,7 +54,7 @@ public class ResetService {
     }
 
     private void inserirSeed() {
-        // cada usuario recebe o proprio hash (salt aleatorio), mesmo com a mesma senha
+        // Gera um hash por usuário
         List<Usuario> usuarios = SEEDS.stream()
                 .map(s -> new Usuario(s.cpf(), s.tipo(), s.login(), passwordEncoder.encode(SENHA_SEED)))
                 .toList();

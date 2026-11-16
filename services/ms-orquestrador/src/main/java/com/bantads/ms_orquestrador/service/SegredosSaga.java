@@ -6,13 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
 
-/**
- * Segredos da SAGA guardados so em memoria: os do payload inicial (a senha
- * informada na R13) e os que chegam nas respostas (a senha gerada pelo MS Auth
- * na R9). Nunca sao logados nem serializados. Se o Orquestrador reiniciar no
- * meio da SAGA eles se perdem: o passo que precisava deles falha e a SAGA
- * compensa.
- */
+/** Segredos da SAGA guardados so em memoria */
 @Component
 public class SegredosSaga {
 

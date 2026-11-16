@@ -5,8 +5,7 @@ const url = `amqp://${process.env.RABBITMQ_USER || 'admin'}:${process.env.RABBIT
 
 let canalPromise = null;
 
-// Canal com confirmação: perder uma publicação em saga.cmd significa perder a SAGA
-// inteira, então esperamos o broker confirmar antes de responder 202 ao cliente.
+// abre a conexão e um canal com confirmação do broker
 async function abrirCanal() {
   const conexao = await amqp.connect(url);
   conexao.on('error', (err) => console.error('Erro na conexão com o RabbitMQ:', err.message));

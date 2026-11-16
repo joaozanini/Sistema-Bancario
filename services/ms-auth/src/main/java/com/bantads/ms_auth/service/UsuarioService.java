@@ -34,7 +34,7 @@ public class UsuarioService {
         Optional<Usuario> encontrado = repository.findByLogin(login);
         String hashArmazenado = encontrado.map(Usuario::getSenhaHash).orElse(hashDescartavel);
 
-        // o hash roda sempre, mesmo para inativo/inexistente, para nao vazar pelo tempo de resposta
+        // Confere o hash mesmo para usuário inativo ou inexistente
         boolean senhaConfere = passwordEncoder.matches(senha, hashArmazenado);
         if (encontrado.isEmpty() || !senhaConfere || !encontrado.get().isAtivo()) {
             throw new CredenciaisInvalidasException();
@@ -42,19 +42,14 @@ public class UsuarioService {
         return encontrado.get();
     }
 
-    /**
-     * Cria o registro do cliente aprovado (R9) e devolve a senha em claro, que so
-     * existe no retorno: no banco fica apenas o hash.
-     */
+    /** R9: cria o usuário do cliente aprovado e devolve a senha em claro */
     public String criarCliente(String sagaId, String cpf, String login) {
         String senha = geradorSenha.gerar();
         criar(sagaId, cpf, TipoUsuario.CLIENTE, login, senha);
         return senha;
     }
 
-    /**
-     * Cria o registro do gerente inserido (R13) com a senha informada no formulario.
-     */
+    /** R13: cria o usuário do gerente com a senha informada */
     public void criarGerente(String sagaId, String cpf, String login, String senha) {
         criar(sagaId, cpf, TipoUsuario.GERENTE, login, senha);
     }
@@ -69,7 +64,7 @@ public class UsuarioService {
             if (!sagaId.equals(existente.getSagaCriacao())) {
                 throw new CpfJaCadastradoException();
             }
-            // entrega anterior desta SAGA caiu antes de responder: regrava o hash com a senha atual
+            // Reentrega da mesma SAGA: regrava o hash da senha
             existente.setSenhaHash(passwordEncoder.encode(senha));
             repository.save(existente);
             return;
@@ -86,7 +81,6 @@ public class UsuarioService {
         try {
             repository.insert(usuario);
         } catch (DuplicateKeyException e) {
-            // corrida com outra criacao: o indice unico e quem decide
             if (repository.existsByLogin(loginLimpo) || repository.existsByLoginIgnoreCase(loginLimpo)) {
                 throw new LoginJaCadastradoException(loginLimpo);
             }
@@ -101,10 +95,7 @@ public class UsuarioService {
                 .ifPresent(repository::delete);
     }
 
-    /**
-     * R15: o gerente removido nao consegue mais logar. Repetir o comando para um
-     * registro ja inativo nao muda nada.
-     */
+    /** R15: desativa o usuário do gerente removido */
     public void desativar(String sagaId, String cpf) {
         Usuario usuario = repository.findByCpf(normalizarCpf(cpf)).orElseThrow(UsuarioNaoEncontradoException::new);
         if (!usuario.isAtivo()) {

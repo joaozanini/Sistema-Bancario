@@ -31,11 +31,11 @@ Copie `.env.example` para `.env` e preencha as variáveis locais (senha de app d
 
 Cada microsserviço Spring Boot lê `src/main/resources/application.properties`, que não é versionado: o repositório traz só o `application.properties.example`, sem segredos (os valores vêm das variáveis do `.env`). Depois de clonar, copie o exemplo em cada serviço:
 
-Sem essa cópia o serviço sobe sem porta, schema do banco e política de retentativa, e os testes do Orquestrador falham. O PostgreSQL usa um schema por serviço (`conta`, `cliente`, `gerente`), criado pelo Flyway na primeira subida.
+Sem essa cópia o serviço sobe sem porta, schema do banco e política de retentativa. O PostgreSQL usa um schema por serviço (`conta`, `cliente`, `gerente`), criado pelo Flyway na primeira subida.
 
 ## CI/CD
 
 O pipeline fica em `.github/workflows/ci-cd.yml` e roda no GitHub Actions:
 
-- **CI** (todo push e pull request para a `main`): `mvnw verify` de cada microsserviço Java contra Postgres e Mongo reais, `npm test` do API Gateway, e lint, testes e build do frontend. Também constrói todas as imagens Docker.
+- **CI** (todo push e pull request para a `main`): build de cada microsserviço Java e lint e build do frontend. Também constrói todas as imagens Docker.
 - **CD** (só em push na `main`, com o CI verde): publica as imagens em `ghcr.io/<dono-do-repo>/bantads-<serviço>`, com a tag do commit e `latest`.

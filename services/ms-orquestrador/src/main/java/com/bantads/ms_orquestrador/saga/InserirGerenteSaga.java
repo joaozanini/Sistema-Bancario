@@ -9,12 +9,7 @@ import org.springframework.stereotype.Component;
 import com.bantads.ms_orquestrador.config.RabbitMQConfig;
 import static com.bantads.ms_orquestrador.saga.DefinicaoSaga.campos;
 
-/**
- * R13. A senha informada no formulario chega no payload inicial e fica so em
- * memoria ate o comando do MS Auth. Sem conta a transferir (primeiro gerente ou
- * todos com no maximo uma conta), os passos de atribuicao, consulta ao MS
- * Cliente e e-mail sao pulados e o gerente e criado sem contas.
- */
+/** R13: cria o gerente e o usuario e transfere uma conta para ele, se houver */
 @Component
 public class InserirGerenteSaga implements DefinicaoSaga {
 
@@ -90,7 +85,6 @@ public class InserirGerenteSaga implements DefinicaoSaga {
         return payload;
     }
 
-    // lista para o mesmo comando servir a R15, que transfere varias contas
     private static Map<String, Object> comandoObterCliente(Map<String, Object> dados) {
         return Map.of("cpfs", List.of(dados.get("cpfCliente")));
     }

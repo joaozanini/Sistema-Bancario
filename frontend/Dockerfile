@@ -3,8 +3,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# O caminho de saida do Angular varia com a versao do builder; em vez de fixar
-# dist/<projeto>/browser, localiza o index.html gerado e normaliza em /app/publico.
+# copia a pasta do index.html gerado para /app/publico
 RUN npm run build \
  && mkdir -p /app/publico \
  && cp -r "$(dirname "$(find dist -name index.html | head -1)")"/. /app/publico/
