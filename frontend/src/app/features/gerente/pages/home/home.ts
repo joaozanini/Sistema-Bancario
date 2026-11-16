@@ -90,6 +90,7 @@ export class Home implements OnInit {
         },
         error: (err: HttpErrorResponse | Error) => {
           this.processandoId.set(null);
+          this.carregar();
           this.erro.set(
             err instanceof HttpErrorResponse
               ? this.mensagemDeErro(err, 'Não foi possível aprovar a solicitação.')
