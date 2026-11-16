@@ -10,14 +10,7 @@ import org.springframework.stereotype.Repository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Sessoes gravadas pelo API Gateway no login. O Orquestrador so apaga, nunca
- * cria: na Remocao de Gerente (R15) o acesso do gerente removido tem de cair
- * na hora, sem esperar o TTL de inatividade expirar.
- *
- * O formato das chaves e o mesmo do session.service.js do Gateway; mudar la
- * exige mudar aqui.
- */
+/** Apaga no Redis as sessoes gravadas pelo API Gateway (R15) */
 @Repository
 public class SessaoRepository {
 
@@ -33,10 +26,7 @@ public class SessaoRepository {
         this.jsonMapper = jsonMapper;
     }
 
-    /**
-     * Apaga as sessoes do CPF e devolve true se havia alguma. A chave reversa
-     * existe justamente para isto: aqui so se conhece o CPF, nunca o jti.
-     */
+    /** Apaga as sessoes do CPF e devolve true se havia alguma */
     public boolean encerrarPorCpf(String cpf) {
         if (cpf == null || cpf.isBlank()) {
             return false;
@@ -46,17 +36,14 @@ public class SessaoRepository {
         jti.ifPresent(valor -> redis.delete(chaveSessao(valor)));
         redis.delete(chaveReversa(cpf));
 
-        // A chave reversa guarda so o jti do ultimo login. Quem entrou em dois
-        // navegadores tem uma sessao mais antiga que ela nao aponta (e o logout de
-        // uma apaga a reversa da outra): sem procurar pelo CPF, essa sessao
-        // continuaria valendo depois da remocao
+        // apaga tambem as sessoes do CPF que a chave reversa nao aponta
         List<String> restantes = sessoesDoCpf(cpf);
         restantes.forEach(redis::delete);
 
         return jti.isPresent() || !restantes.isEmpty();
     }
 
-    // percorre sessao:<jti> com SCAN (nao bloqueia o Redis como o KEYS) e fica com as do CPF
+    // percorre sessao:<jti> com SCAN e fica com as do CPF
     private List<String> sessoesDoCpf(String cpf) {
         List<String> chaves = new ArrayList<>();
         ScanOptions opcoes = ScanOptions.scanOptions().match(PREFIXO_SESSAO + "*").count(100).build();
@@ -74,7 +61,7 @@ public class SessaoRepository {
         return chaves;
     }
 
-    // o Gateway grava { cpf, tipo } em sessao:<jti>
+    // le o cpf do valor { cpf, tipo } de sessao:<jti>
     private String cpfDaSessao(String valor) {
         if (valor == null) {
             return null;

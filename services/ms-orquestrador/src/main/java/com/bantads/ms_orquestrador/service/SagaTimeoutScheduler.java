@@ -9,10 +9,7 @@ import org.springframework.stereotype.Component;
 import com.bantads.ms_orquestrador.model.TimeoutPasso;
 import com.bantads.ms_orquestrador.repository.SagaRepository;
 
-/**
- * Prazos ficam num sorted set no Redis para sobreviver a restart do
- * orquestrador.
- */
+/** Verifica os prazos vencidos dos passos das SAGAs */
 @Component
 @ConditionalOnProperty(name = "saga.timeout.verificar", havingValue = "true", matchIfMissing = true)
 public class SagaTimeoutScheduler {

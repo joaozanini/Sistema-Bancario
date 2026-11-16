@@ -11,7 +11,6 @@ public class Usuario {
     @Id
     private String id;
 
-    // CPF liga o registro de autenticacao ao MS Cliente/MS Gerente
     @Indexed(unique = true)
     private String cpf;
 
@@ -25,11 +24,11 @@ public class Usuario {
 
     private boolean ativo = true;
 
-    // SAGA que criou o registro; a compensacao so remove o que a propria SAGA criou
+    // SAGA que criou o registro
     @Field("saga_criacao")
     private String sagaCriacao;
 
-    // SAGA que desativou o registro; a compensacao so reativa o que a propria SAGA desativou
+    // SAGA que desativou o registro
     @Field("saga_desativacao")
     private String sagaDesativacao;
 

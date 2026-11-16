@@ -11,13 +11,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Consumidor de ms.email.cmd. Fire-and-forget: nao publica em orquestrador.reply,
- * entao uma falha aqui nunca aborta a SAGA.
- *
- * Nenhum log inclui o payload: email.enviar-senha carrega a senha em claro, que
- * pelo enunciado nao pode aparecer em log, banco ou estado da SAGA.
- */
+/** Consome ms.email.cmd e envia o e-mail do comando, sem logar o payload */
 @Component
 public class EmailCommandListener {
 
@@ -37,7 +31,7 @@ public class EmailCommandListener {
         try {
             comando = jsonMapper.readValue(message.getBody(), ComandoEmail.class);
         } catch (JacksonException e) {
-            // JSON invalido nao melhora com retentativa
+            // Descarta JSON inválido
             log.warn("[{}] mensagem descartada: JSON invalido", RabbitConfig.MS_EMAIL_CMD);
             return;
         }
@@ -47,7 +41,6 @@ public class EmailCommandListener {
             return;
         }
 
-        // deixa a excecao subir: o retry da fila tenta de novo antes de descartar
         emailService.enviar(comando);
         log.info("[{}] e-mail '{}' enviado (saga {})", RabbitConfig.MS_EMAIL_CMD, comando.tipo(), comando.sagaId());
     }

@@ -13,7 +13,7 @@ async function comporCliente(conta) {
   };
 }
 
-// sem acento e em minúsculas: "coan" tem de achar "Coândrya"
+// remove acentos e converte para minúsculas
 function normalizar(texto) {
   return String(texto ?? '')
     .normalize('NFD')
@@ -22,9 +22,7 @@ function normalizar(texto) {
     .trim();
 }
 
-// R11: pesquisa por nome (ou parte) ou por CPF (ou parte). O CPF só entra na
-// comparação quando o termo é feito de dígitos e pontuação de CPF: num termo como
-// "Cliente Novo 1" o dígito faz parte do nome e não pode casar com todo CPF que tenha "1".
+// R11: filtra por parte do nome ou, se o termo for numérico, por parte do CPF
 function filtrar(clientes, busca) {
   const termo = normalizar(busca);
   if (!termo) {
@@ -37,7 +35,7 @@ function filtrar(clientes, busca) {
   );
 }
 
-// R11: o saldo vem do MS Conta e os dados cadastrais do MS Cliente
+// R11: compõe os clientes com o saldo do MS Conta e os dados do MS Cliente
 async function listarTodos(busca) {
   const contas = await contaService.listar();
   const clientes = await Promise.all(contas.map(comporCliente));

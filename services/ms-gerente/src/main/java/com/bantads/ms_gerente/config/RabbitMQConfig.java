@@ -12,7 +12,7 @@ public class RabbitMQConfig {
     public static final String FILA_GERENTE_CMD_DLQ = "ms.gerente.cmd.dlq";
     public static final String FILA_ORQUESTRADOR_REPLY = "orquestrador.reply";
 
-    // mesmos argumentos de rabbitmq/definitions.json: o broker recusa redeclarar com argumentos diferentes
+    // Argumentos das filas iguais aos de rabbitmq/definitions.json
     @Bean
     public Declarables filasGerente() {
         return new Declarables(

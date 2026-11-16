@@ -12,10 +12,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Estado das SAGAs, jobs e prazos dos passos no Redis. Valores gravados como
- * JSON legivel para inspecao pelo redis-cli.
- */
+/** Estado das SAGAs, jobs e prazos dos passos no Redis, em JSON */
 @Repository
 public class SagaRepository {
 
@@ -40,10 +37,7 @@ public class SagaRepository {
                 .map(json -> jsonMapper.readValue(json, EstadoSaga.class));
     }
 
-    /**
-     * Resposta, DLQ e timeout podem resolver o mesmo passo; so o primeiro a
-     * gravar a chave de controle segue adiante.
-     */
+    /** Grava a chave de controle da etapa e devolve true so para o primeiro */
     public boolean reivindicarEtapa(String sagaId, int etapa) {
         return Boolean.TRUE.equals(
                 redis.opsForValue().setIfAbsent(chaveSaga(sagaId) + ":etapa:" + etapa, "1", TTL_SAGA));

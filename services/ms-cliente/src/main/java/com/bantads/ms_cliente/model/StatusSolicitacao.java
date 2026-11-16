@@ -1,6 +1,6 @@
 package com.bantads.ms_cliente.model;
 
-// Estados da solicitação de autocadastro, com a grafia do contrato da API (R8)
+// Estados da solicitação de autocadastro (R8)
 public final class StatusSolicitacao {
 
     public static final String PENDENTE = "PENDENTE";
@@ -10,8 +10,7 @@ public final class StatusSolicitacao {
     private StatusSolicitacao() {
     }
 
-    // Aceita também a grafia antiga (APROVADO / NAO_APROVADO): ela ainda pode chegar no filtro da listagem
-    // ou numa compensação de SAGA publicada antes da troca. Devolve null para o que não for um estado
+    // Normaliza o status, aceitando a grafia antiga; null se inválido
     public static String normalizar(String status) {
         if (status == null) {
             return null;

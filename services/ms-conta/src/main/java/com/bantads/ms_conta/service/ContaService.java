@@ -54,8 +54,7 @@ public class ContaService {
     private static final int MAX_TENTATIVAS_REPLAY = 3;
     private static final long MAX_DIAS_EXTRATO = 365;
 
-    // Até 15 dígitos inteiros e 2 casas decimais, o que cabe no NUMERIC(19, 4). Também barra a notação
-    // científica: "1E-99999999" passa no new BigDecimal() e prende a thread por mais de 1 min no setScale
+    // Valor com até 15 dígitos inteiros e 2 casas decimais, sem notação científica
     private static final Pattern FORMATO_VALOR = Pattern.compile("\\d{1,15}(\\.\\d{1,2})?");
 
     // Datas da API sem fuso e sem fração de segundo (2026-04-30T10:00:00)
@@ -104,8 +103,7 @@ public class ContaService {
         return acao.get();
     }
 
-    // Optimistic locking (enunciado 5.10): quem perde a disputa pela versão refaz o replay e revalida.
-    // ConcurrencyFailureException cobre o deadlock do Postgres, que não chega como DataIntegrityViolation
+    // Executa a ação em transação e refaz o replay quando perde a disputa de versão
     private <T> T executarComNovoReplay(String operacao, Supplier<T> acao) {
         for (int tentativa = 1; ; tentativa++) {
             try {
@@ -121,17 +119,14 @@ public class ContaService {
         }
     }
 
-    /**
-     * SAGA Aprovar Cliente (R9 - Passo 3): Identifica, dentre os gerentes ativos informados,
-     * o que possui menos clientes/contas atreladas (gerentes sem conta possuem 0 clientes).
-     */
+    /** SAGA Aprovar Cliente (R9): escolhe o gerente ativo com menos clientes */
     @Transactional(readOnly = true)
     public String identificarGerenteComMenosClientes(List<String> gerentesAtivos) {
         if (gerentesAtivos == null || gerentesAtivos.isEmpty()) {
             throw new IllegalArgumentException("Lista de gerentes ativos não pode ser vazia.");
         }
 
-        // LinkedHashMap: no empate fica o primeiro da lista recebida, e a escolha não muda de uma execução para outra
+        // Empate fica com o primeiro gerente da lista
         Map<String, Long> contagemPorGerente = new LinkedHashMap<>();
         for (String cpf : gerentesAtivos) {
             if (cpf != null && !cpf.isBlank()) {
@@ -161,9 +156,7 @@ public class ContaService {
         return gerenteEscolhido != null ? gerenteEscolhido : gerentesAtivos.get(0);
     }
 
-    /**
-     * SAGA Inserir Gerente (R13 - Passo 3): Identifica qual conta vai passar para o novo gerente.
-     */
+    /** SAGA Inserir Gerente (R13): escolhe a conta que passa para o novo gerente */
     @Transactional(readOnly = true)
     public Map<String, Object> identificarContaParaNovoGerente(List<String> gerentesAtivos) {
         return identificarContaParaNovoGerente(gerentesAtivos, null);
@@ -171,7 +164,7 @@ public class ContaService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> identificarContaParaNovoGerente(List<String> gerentesAtivos, String novoGerenteCpf) {
-        // Se a lista de gerentes veio vazia do Orquestrador, descobre os gerentes que já possuem contas
+        // Lista vazia: usa os gerentes que já possuem contas
         if (gerentesAtivos == null || gerentesAtivos.isEmpty()) {
             Map<String, String> gerentePorContaAtual = mapearGerenteAtualPorConta();
             gerentesAtivos = gerentePorContaAtual.values().stream()
@@ -186,8 +179,7 @@ public class ContaService {
 
         Map<String, String> gerentePorConta = mapearGerenteAtualPorConta();
 
-        // Ordem estável nos empates (mesma quantidade de contas, mesmo saldo): ordem da lista de gerentes
-        // e, dentro de cada gerente, número da conta
+        // Desempate pela ordem da lista de gerentes e pelo número da conta
         Map<String, List<String>> contasPorGerente = new LinkedHashMap<>();
         for (String cpf : gerentesAtivos) {
             if (cpf != null && !cpf.isBlank()) {
@@ -270,10 +262,7 @@ public class ContaService {
         return resultado;
     }
 
-    /**
-     * SAGA Inserir Gerente (R13 - Passo 4): Atribui a conta ao novo gerente, gerando
-     * o evento GerenteAlterado no Event Store.
-     */
+    /** SAGA Inserir Gerente (R13): atribui a conta ao novo gerente e grava GerenteAlterado */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> atribuirConta(String numeroConta, String novoGerenteCpf, String gerenteAntigoCpf) {
         return atribuirConta(numeroConta, novoGerenteCpf, gerenteAntigoCpf, null);
@@ -324,9 +313,7 @@ public class ContaService {
         return resultado;
     }
 
-    /**
-     * SAGA Inserir Gerente (R13 - Compensação): Reassocia a conta ao gerente original.
-     */
+    /** Compensação da R13: devolve a conta ao gerente original */
     @Transactional(rollbackFor = Exception.class)
     public void compensarAtribuicaoConta(String numeroConta, String gerenteOriginalCpf) {
         if (numeroConta == null || gerenteOriginalCpf == null) {
@@ -336,7 +323,7 @@ public class ContaService {
         log.warn("Compensação SAGA executada: Conta {} reassociada ao gerente original {}", numeroConta, gerenteOriginalCpf);
     }
 
-    // SAGA Remover Gerente (R15): todas as contas do removido vao para o ativo com menos clientes, um GerenteAlterado por conta
+    // SAGA Remover Gerente (R15): move as contas do removido para o ativo com menos clientes
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> transferirContas(String sagaId, String gerenteRemovidoCpf, List<String> gerentesAtivos) {
         if (gerenteRemovidoCpf == null || gerenteRemovidoCpf.isBlank()) {
@@ -351,7 +338,7 @@ public class ContaService {
 
         List<String> cpfsClientes = new ArrayList<>();
         if (!contas.isEmpty()) {
-            // O removido não pode receber as próprias contas, mesmo que ainda apareça na lista de ativos
+            // Exclui o gerente removido dos candidatos
             List<String> candidatos = gerentesAtivos == null ? List.of() : gerentesAtivos.stream()
                     .filter(Objects::nonNull)
                     .map(String::trim)
@@ -377,7 +364,7 @@ public class ContaService {
         return resultado;
     }
 
-    // compensacao da R15: as contas movidas nesta SAGA sao achadas pelo sagaId gravado no evento
+    // Compensação da R15: devolve as contas movidas nesta SAGA ao gerente original
     @Transactional(rollbackFor = Exception.class)
     public void compensarTransferenciaContas(String sagaId, String gerenteOriginalCpf) {
         if (sagaId == null || gerenteOriginalCpf == null) {
@@ -397,9 +384,7 @@ public class ContaService {
         log.warn("Compensação SAGA executada: {} conta(s) reassociada(s) ao gerente original {}", contas.size(), gerenteOriginalCpf);
     }
 
-    /**
-     * SAGA Aprovar Cliente (R9 - Passo 6): Cria nova conta e vincula ao gerente.
-     */
+    /** SAGA Aprovar Cliente (R9): cria a conta e vincula ao gerente */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> criarConta(String cpfCliente, String gerenteCpf, String salarioStr) {
         if (cpfCliente == null || cpfCliente.isBlank()) {
@@ -408,8 +393,7 @@ public class ContaService {
         if (gerenteCpf == null || gerenteCpf.isBlank()) {
             throw new IllegalArgumentException("CPF do gerente é obrigatório para criação de conta.");
         }
-        // R1: cada cliente tem uma só conta. A idempotência por (sagaId, tipo) não cobre uma segunda SAGA
-        // para o mesmo CPF, e duas contas quebrariam a busca da conta pelo CPF (R3, R7)
+        // R1: recusa segunda conta para o mesmo CPF
         Optional<String> contaExistente = buscarNumeroContaNoEventStore(cpfCliente.trim());
         if (contaExistente.isPresent()) {
             throw new IllegalStateException("O cliente " + cpfCliente.trim() + " já possui a conta " + contaExistente.get() + ".");
@@ -456,9 +440,7 @@ public class ContaService {
         return resultado;
     }
 
-    /**
-     * SAGA Compensação de Criação de Conta (R9).
-     */
+    /** Compensação da R9: remove a conta criada */
     @Transactional(rollbackFor = Exception.class)
     public void compensarCriacaoConta(String numeroConta, String cpfCliente) {
         if (numeroConta != null && !numeroConta.isBlank()) {
@@ -492,10 +474,7 @@ public class ContaService {
         }
     }
 
-    /**
-     * Requisito R6: Transferência Atômica entre contas com replay dinâmico,
-     * posse obrigatória (X-User-CPF) e novo replay em conflito de versão (concorrência otimista).
-     */
+    /** R6: transferência entre contas com replay e validação de posse e saldo */
     public MovimentacaoResponseDTO transferir(String contaOrigem, TransferenciaRequestDTO dto, String xUserCpf) {
         if (contaOrigem == null || contaOrigem.trim().isEmpty()) {
             throw new TransferenciaInvalidaException("Conta de origem é obrigatória.");
@@ -531,7 +510,7 @@ public class ContaService {
             BigDecimal valorTransferencia,
             String xUserCpf
     ) {
-        // Novo replay dos eventos da conta de origem
+        // Replay dos eventos da conta de origem
         List<EventoConta> eventosOrigem = repository.findByObjetoIdOrderByVersaoAsc(contaOrigem.trim());
         if (eventosOrigem.isEmpty()) {
             throw new ContaNaoEncontradaException("Conta de origem não encontrada: " + contaOrigem);
@@ -539,18 +518,17 @@ public class ContaService {
 
         EstadoConta estadoOrigem = reconstruirEstadoPorReplay(eventosOrigem);
 
-        // Posse obrigatória (R6): validação do titular
+        // Valida o titular (R6)
         validarPosse(estadoOrigem, xUserCpf);
 
-        // Validação de saldo estritamente via replay (R6 -> 422 em saldo insuficiente)
+        // Valida o saldo pelo replay (422 se insuficiente)
         if (estadoOrigem.getSaldo().compareTo(valorTransferencia) < 0) {
             throw new SaldoInsuficienteException("Saldo insuficiente para realizar a transferência.");
         }
 
-        // Novo replay dos eventos da conta de destino
+        // Replay dos eventos da conta de destino
         List<EventoConta> eventosDestino = repository.findByObjetoIdOrderByVersaoAsc(contaDestino.trim());
         if (eventosDestino.isEmpty()) {
-            // 422 e não 404: o recurso da URL (a conta de origem) existe; o que falha é a regra do R6
             throw new RegraNegocioException("Conta de destino não encontrada: " + contaDestino);
         }
         EstadoConta estadoDestino = reconstruirEstadoPorReplay(eventosDestino);
@@ -596,9 +574,7 @@ public class ContaService {
         eventoDestino.setVersao(proximaVersaoDestino);
         eventoDestino.setTimestamp(agora);
 
-        // Grava sempre na ordem do número da conta. Em duas transferências cruzadas (A→B e B→A), as duas
-        // disputam primeiro a mesma chave (objeto_id, versao) e uma perde por versão duplicada, que tem
-        // novo replay; na ordem origem→destino cada uma travaria a chave que a outra espera (deadlock)
+        // Grava os eventos na ordem do número da conta
         List<EventoConta> novosEventos = new ArrayList<>(List.of(eventoOrigem, eventoDestino));
         novosEventos.sort(Comparator.comparing(EventoConta::getObjetoId));
         novosEventos.forEach(repository::save);
@@ -607,16 +583,13 @@ public class ContaService {
         publicarEventoCqrs(eventoOrigem);
         publicarEventoCqrs(eventoDestino);
 
-        // Sem o novo saldo, como no saque e no depósito; o destino leva o nome enriquecido pelo Gateway
+        // Monta a resposta sem o novo saldo
         MovimentacaoResponseDTO resposta = montarOperacaoRealizada(contaOrigem.trim(), "TRANSFERENCIA", valorStr, agora);
         resposta.setDestino(new ParteTransferenciaDTO(contaDestino.trim(), cpfDestino, nomeDestino));
         return resposta;
     }
 
-    /**
-     * Requisito R5: Saque com replay dinâmico, posse obrigatória (X-User-CPF),
-     * 422 em saldo insuficiente e novo replay em conflito de versão.
-     */
+    /** R5: saque com replay e validação de posse e saldo */
     public MovimentacaoResponseDTO sacar(String numeroConta, MovimentacaoRequestDTO dto, String xUserCpf) {
         if (numeroConta == null || numeroConta.trim().isEmpty()) {
             throw new IllegalArgumentException("Número da conta é obrigatório.");
@@ -645,10 +618,10 @@ public class ContaService {
 
         EstadoConta estado = reconstruirEstadoPorReplay(eventos);
 
-        // Posse obrigatória (R5)
+        // Valida o titular (R5)
         validarPosse(estado, xUserCpf);
 
-        // Validação de saldo estritamente via replay (R5 -> 422 em saldo insuficiente)
+        // Valida o saldo pelo replay (422 se insuficiente)
         if (estado.getSaldo().compareTo(valorSaque) < 0) {
             throw new SaldoInsuficienteException("Saldo insuficiente para realizar o saque.");
         }
@@ -674,14 +647,11 @@ public class ContaService {
         repository.flush();
         publicarEventoCqrs(evento);
 
-        // Sem o novo saldo: o front-end reconsulta o lado query (CQRS)
+        // Monta a resposta sem o novo saldo
         return montarOperacaoRealizada(numeroConta.trim(), "SAQUE", valorStr, agora);
     }
 
-    /**
-     * Depósito (R4) com replay dinâmico, posse obrigatória (X-User-CPF)
-     * e novo replay em conflito de versão.
-     */
+    /** R4: depósito com replay e validação de posse */
     public MovimentacaoResponseDTO depositar(String numeroConta, MovimentacaoRequestDTO dto, String xUserCpf) {
         if (numeroConta == null || numeroConta.trim().isEmpty()) {
             throw new IllegalArgumentException("Número da conta é obrigatório.");
@@ -710,7 +680,7 @@ public class ContaService {
 
         EstadoConta estado = reconstruirEstadoPorReplay(eventos);
 
-        // Posse obrigatória (R4): ninguém deposita na conta de outro cliente
+        // Valida o titular (R4)
         validarPosse(estado, xUserCpf);
 
         int proximaVersao = eventos.get(eventos.size() - 1).getVersao() + 1;
@@ -734,11 +704,11 @@ public class ContaService {
         repository.flush();
         publicarEventoCqrs(evento);
 
-        // Sem o novo saldo: o front-end reconsulta o lado query (CQRS)
+        // Monta a resposta sem o novo saldo
         return montarOperacaoRealizada(numeroConta.trim(), "DEPOSITO", valorStr, agora);
     }
 
-    // Resposta das três operações (R4, R5, R6): o link "conta" é por onde o front reconsulta o saldo
+    // Monta a resposta das operações R4, R5 e R6 com o link da conta
     private MovimentacaoResponseDTO montarOperacaoRealizada(String numeroConta, String tipo, String valor, LocalDateTime dataHora) {
         MovimentacaoResponseDTO resposta = new MovimentacaoResponseDTO();
         resposta.setNumeroConta(numeroConta);
@@ -766,7 +736,7 @@ public class ContaService {
         return montarContaDTO(numeroConta, estado.getCpfCliente(), estado.getGerenteCpf(), estado.getSaldo(), estado.getDataCriacao());
     }
 
-    // Cliente so consulta a propria conta; gerente e a chamada interna do Gateway (sem identidade) consultam qualquer uma
+    // Busca a conta por número; cliente só acessa a própria
     @Transactional(readOnly = true)
     public ContaDTO buscarContaPorNumero(String numeroConta, String xUserCpf, String xUserTipo) {
         ContaDTO conta = buscarContaPorNumero(numeroConta);
@@ -776,7 +746,7 @@ public class ContaService {
         return ajustarLinksAoPerfil(conta, xUserTipo);
     }
 
-    // R3: conta do cliente pelo CPF (GET /clientes/{cpf}/conta), com a mesma regra de acesso da consulta por número
+    // R3: busca a conta do cliente pelo CPF
     @Transactional
     public ContaDTO buscarContaDoCliente(String cpf, String xUserCpf, String xUserTipo) {
         if (ehCliente(xUserTipo) && (xUserCpf == null || cpf == null || !xUserCpf.trim().equals(cpf.trim()))) {
@@ -785,7 +755,7 @@ public class ContaService {
         return ajustarLinksAoPerfil(buscarContaPorCpf(cpf), xUserTipo);
     }
 
-    // HATEOAS conforme o perfil: gerente consulta mas não movimenta, então não recebe os links das operações
+    // Remove os links de operações quando o perfil é gerente
     private ContaDTO ajustarLinksAoPerfil(ContaDTO conta, String xUserTipo) {
         if (ehGerente(xUserTipo)) {
             conta.get_links().keySet().removeAll(List.of("deposito", "saque", "transferencia"));
@@ -817,7 +787,7 @@ public class ContaService {
             }
         }
 
-        // Fallback pelo Event Store caso a projeção assíncrona ainda não tenha processado
+        // Busca no Event Store se a projeção ainda não existe
         return buscarNumeroContaNoEventStore(cpfLimpo)
                 .map(this::buscarContaPorNumero)
                 .orElseThrow(() -> new ContaNaoEncontradaException("Conta não encontrada para o cliente: " + cpfLimpo));
@@ -826,7 +796,7 @@ public class ContaService {
     @Transactional(readOnly = true)
     public List<ContaDTO> listarContas() {
         if (contaQueryRepository != null) {
-            // Ordem estável por número; quem ordena por nome do cliente (R11, R16) é o Gateway, que tem o nome
+            // Ordena por número da conta
             return contaQueryRepository.findAll(Sort.by("numeroConta")).stream().map(this::montarContaDTO).toList();
         }
         return repository.findByTipoIn(List.of("Criado", "CRIADO")).stream()
@@ -837,7 +807,7 @@ public class ContaService {
                 .toList();
     }
 
-    // Lado command: o evento Criado guarda o CPF do titular. Em ordem de número, para o resultado ser estável
+    // Busca no Event Store o número da conta do CPF
     private Optional<String> buscarNumeroContaNoEventStore(String cpfCliente) {
         return repository.findByTipoIn(List.of("Criado", "CRIADO")).stream()
                 .filter(evento -> {
@@ -870,11 +840,7 @@ public class ContaService {
         return dto;
     }
 
-    /**
-     * Requisito R7: Consulta de extrato no lado Query da arquitetura CQRS por período (início e fim),
-     * retornando saldo de abertura consolidado antes da data inicial, lista de movimentações (entradas e saídas)
-     * e links HATEOAS. O titular consulta o próprio extrato; o gerente, o de qualquer conta.
-     */
+    /** R7: extrato por período com saldo de abertura, movimentações e links */
     @Transactional
     public ExtratoResponseDTO consultarExtrato(
             String numeroConta,
@@ -891,11 +857,10 @@ public class ContaService {
         LocalDate fim = (fimStr != null && !fimStr.isBlank()) ? parseData(fimStr.trim(), "fim") : LocalDate.now();
         LocalDate inicio = (inicioStr != null && !inicioStr.isBlank()) ? parseData(inicioStr.trim(), "inicio") : fim.minusDays(30);
 
-        // 422 e não 400: as duas datas são válidas, o que falha é a regra do período
         if (inicio.isAfter(fim)) {
             throw new RegraNegocioException("A data de início deve ser anterior ou igual à data de fim.");
         }
-        // R7: intervalo máximo de 365 dias (2020-01-01 a 2020-12-31 ainda passa)
+        // R7: período máximo de 365 dias
         if (ChronoUnit.DAYS.between(inicio, fim) > MAX_DIAS_EXTRATO) {
             throw new RegraNegocioException("O intervalo do extrato não pode passar de " + MAX_DIAS_EXTRATO + " dias.");
         }
@@ -929,7 +894,7 @@ public class ContaService {
             }
         }
 
-        // Fallback direto a partir dos eventos caso os repositórios query não estejam injetados
+        // Monta o extrato direto dos eventos sem os repositórios query
         List<EventoConta> eventos = repository.findByObjetoIdOrderByVersaoAsc(num);
         if (eventos.isEmpty()) {
             throw new ContaNaoEncontradaException("Conta não encontrada: " + num);
@@ -972,18 +937,13 @@ public class ContaService {
         return montarExtratoResponse(num, inicio, fim, saldoAbertura, itens);
     }
 
-    /**
-     * Projeta de forma idempotente um EventoConta nas tabelas do lado Query (conta_query e movimentacao_query).
-     * Entrada dos eventos que chegam de fora do Event Store (fila ms.conta.events e seed do reboot).
-     */
+    /** Projeta um EventoConta nas tabelas do lado query de forma idempotente */
     @Transactional
     public void projetarEventoNoLadoQuery(EventoConta evento) {
         projetarEvento(evento, true);
     }
 
-    // recebidoDeFora = false quando o evento acabou de ser lido do Event Store pela sincronização: aí ele
-    // existe com certeza e uma lacuna não dispara outra sincronização (evita recursão se o Event Store
-    // tiver um buraco de versão)
+    // Projeta o evento; recebidoDeFora indica se pode disparar sincronização com o Event Store
     private void projetarEvento(EventoConta evento, boolean recebidoDeFora) {
         if (evento == null || evento.getVersao() == null
                 || contaQueryRepository == null || movimentacaoQueryRepository == null) {
@@ -1000,8 +960,7 @@ public class ContaService {
             if (conta.getUltimaVersao() != null && conta.getUltimaVersao() >= evento.getVersao()) {
                 return;
             }
-            // A compensação da R9 apaga a conta do Event Store e do lado query. Se o Criado ainda estava na
-            // fila, projetá-lo agora recriaria no lado query uma conta que não existe mais
+            // Ignora o Criado de conta já removida pela compensação da R9
             if (recebidoDeFora && !repository.existsById(evento.getId())) {
                 log.warn("Evento Criado {} da conta {} não está mais no Event Store (conta compensada). Ignorado.",
                         evento.getId(), numeroConta);
@@ -1038,9 +997,7 @@ public class ContaService {
                         numeroConta, ultimaVersaoProjetada + 1, ultimaVersaoProjetada);
                 return;
             }
-            // Lacuna: uma versão anterior não chegou (publicação perdida ou Criado ainda na fila). Aplicar
-            // esta fora de ordem adiantaria ultima_versao e a anterior nunca mais seria projetada. Refaz a
-            // partir do Event Store, a fonte da verdade, em ordem de versão (inclui este evento)
+            // Lacuna de versão: sincroniza a partir do Event Store
             log.warn("Lacuna na projeção da conta {}: projetada até v{}, recebida v{}. Sincronizando pelo Event Store.",
                     numeroConta, ultimaVersaoProjetada, evento.getVersao());
             sincronizarLadoQuerySeNecessario(numeroConta);
@@ -1048,10 +1005,7 @@ public class ContaService {
         }
         ContaQuery conta = contaOpt.get();
 
-        // A fila ms.conta.events e a sincronização feita nas consultas podem projetar a mesma versão ao mesmo
-        // tempo. Ler a conta, somar e salvar deixava a segunda transação regravar o saldo que ela tinha lido
-        // antes da primeira. Por isso a versão é aplicada num UPDATE que só vale para quem encontra a conta na
-        // versão anterior; quem chega depois não altera nada e sai
+        // Aplica a versão com UPDATE condicionado à versão anterior
         int versaoAnterior = evento.getVersao() - 1;
 
         if ("GERENTEALTERADO".equals(tipoNorm)) {
@@ -1065,7 +1019,7 @@ public class ContaService {
             return;
         }
 
-        // Evento sem efeito no saldo: só avança a versão, para não abrir lacuna
+        // Evento sem efeito no saldo: só avança a versão
         MovimentacaoQuery mov = construirMovimentacaoQuery(evento, conta.getCpfCliente());
         BigDecimal variacao = BigDecimal.ZERO;
         if (mov != null) {
@@ -1171,7 +1125,7 @@ public class ContaService {
         return soma;
     }
 
-    // origem e destino só existem na transferência; depósito e saque não têm contraparte
+    // Monta o item do extrato; origem e destino só na transferência
     private ItemExtratoDTO montarItemExtrato(MovimentacaoQuery mov) {
         boolean transferencia = "TRANSFERENCIA".equals(mov.getTipo());
         return new ItemExtratoDTO(
@@ -1299,9 +1253,7 @@ public class ContaService {
         return estado;
     }
 
-    // O lado query só pode ver eventos que foram de fato gravados. Dentro de uma transação a publicação
-    // espera o commit: se a R15 falhar na terceira conta, ou o depósito perder a disputa de versão, o
-    // rollback desfaz os eventos e nada chega a ms.conta.events
+    // Publica o evento em ms.conta.events após o commit da transação
     private void publicarEventoCqrs(EventoConta evento) {
         if (rabbitTemplate == null) {
             return;
@@ -1322,7 +1274,6 @@ public class ContaService {
         try {
             rabbitTemplate.convertAndSend(RabbitMQConfig.FILA_CONTA_EVENTS, evento);
         } catch (Exception e) {
-            // Sem retentativa aqui: a lacuna de versão é recuperada pelo Event Store no próximo evento ou consulta
             log.warn("Não foi possível publicar evento CQRS na fila {}: {}", RabbitMQConfig.FILA_CONTA_EVENTS, e.getMessage());
         }
     }
@@ -1331,7 +1282,7 @@ public class ContaService {
         return valor != null && FORMATO_VALOR.matcher(valor).matches();
     }
 
-    // R7: o titular consulta o extrato da própria conta e o gerente, o de qualquer cliente
+    // R7: titular consulta o próprio extrato e gerente qualquer um
     private void validarConsulta(String cpfTitular, String xUserCpf, String xUserTipo) {
         if (ehGerente(xUserTipo)) {
             return;
@@ -1344,7 +1295,7 @@ public class ContaService {
         }
     }
 
-    // Posse obrigatória (R4, R5, R6): só o titular movimenta a conta
+    // Valida que só o titular movimenta a conta (R4, R5, R6)
     private void validarPosse(EstadoConta estado, String xUserCpf) {
         if (xUserCpf == null || xUserCpf.trim().isEmpty()) {
             throw new AcessoNegadoException("Usuário não autenticado ou posse da conta não informada.");

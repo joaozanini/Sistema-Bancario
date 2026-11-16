@@ -17,7 +17,7 @@ import java.util.Optional;
 @Service
 public class GerenteService {
 
-    // tamanho das colunas da tabela gerente (V1__create_table_gerente.sql)
+    // Tamanho das colunas da tabela gerente
     private static final int TAMANHO_NOME = 100;
     private static final int TAMANHO_EMAIL = 100;
     private static final int TAMANHO_TELEFONE = 20;
@@ -28,7 +28,7 @@ public class GerenteService {
         this.repository = repository;
     }
 
-    // R12: devolve todos os gerentes; quem filtra os ativos e conta os clientes é a composição do Gateway
+    // R12: lista todos os gerentes
     @Transactional(readOnly = true)
     public List<GerenteDTO> listar() {
         return repository.findAll().stream()
@@ -41,7 +41,7 @@ public class GerenteService {
         return repository.findById(cpf).map(GerenteDTO::de);
     }
 
-    // SAGA Aprovar Cliente (R9): o MS Conta escolhe entre estes o gerente com menos clientes
+    // R9: lista os gerentes ativos
     @Transactional(readOnly = true)
     public List<String> listarCpfsAtivos() {
         return repository.findByAtivoTrueOrderByCpf().stream()
@@ -49,18 +49,18 @@ public class GerenteService {
                 .toList();
     }
 
-    // compensacao da SAGA Inserir Gerente (R13): remover quem nao existe tambem e sucesso
+    // Compensação de R13: remove o gerente
     @Transactional
     public void remover(String cpf) {
         repository.deleteById(cpf);
     }
 
-    // SAGA Remover Gerente (R15): o ultimo gerente ativo do banco nao pode ser removido
+    // R15: inativa o gerente, exceto o último ativo
     @Transactional
     public void inativar(String cpf) {
         Gerente gerente = repository.findById(cpf)
                 .orElseThrow(() -> new GerenteNaoEncontradoException("Gerente não encontrado."));
-        // gerente ja removido nao e removido de novo: a compensacao reativaria quem a SAGA nao inativou
+        // Gerente já inativo não é inativado de novo
         if (!gerente.isAtivo()) {
             throw new GerenteNaoEncontradoException("Gerente não encontrado.");
         }
@@ -71,7 +71,7 @@ public class GerenteService {
         repository.save(gerente);
     }
 
-    // compensacao da SAGA Remover Gerente (R15)
+    // Compensação de R15: reativa o gerente
     @Transactional
     public void reativar(String cpf) {
         repository.findById(cpf).ifPresent(gerente -> {
@@ -124,7 +124,7 @@ public class GerenteService {
         Gerente gerente = repository.findById(cpf)
                 .orElseThrow(() -> new GerenteNaoEncontradoException("Gerente não encontrado."));
 
-        // R14: e-mail (login) e CPF são imutáveis. Repetir no corpo o valor atual é aceito; outro valor é erro
+        // R14: e-mail e CPF não podem mudar
         if (dados.email() != null && !dados.email().trim().equalsIgnoreCase(gerente.getEmail())) {
             throw new IllegalArgumentException("O e-mail é o login do gerente e não pode ser alterado.");
         }
@@ -161,8 +161,7 @@ public class GerenteService {
         return validarTamanho("E-mail", emailLimpo, TAMANHO_EMAIL);
     }
 
-    // Sem conferir aqui, o valor maior que a coluna só estoura no INSERT: na SAGA isso vira falha técnica
-    // (retentativas e DLQ) e no PUT caía no tratamento de CPF/e-mail repetido
+    // Recusa valor maior que o tamanho da coluna
     private String validarTamanho(String campo, String valor, int maximo) {
         if (valor.length() > maximo) {
             throw new IllegalArgumentException(campo + " deve ter no máximo " + maximo + " caracteres.");

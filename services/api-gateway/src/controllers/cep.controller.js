@@ -1,7 +1,7 @@
 const cepService = require('../services/cep.service');
 const { responderErro } = require('../services/erro.service');
 
-// R1: a tela de autocadastro preenche o endereço a partir do CEP
+// R1: consulta o endereço pelo CEP
 async function consultar(req, res) {
   const cep = String(req.params.cep).replace(/\D/g, '');
   if (cep.length !== 8) {
@@ -15,7 +15,7 @@ async function consultar(req, res) {
     if (err instanceof cepService.CepNaoEncontradoError) {
       return responderErro(res, 404, err.message);
     }
-    // ViaCEP fora do ar ou sem resposta no prazo: a tela segue com o preenchimento manual
+    // falha do ViaCEP vira 502
     console.error('Falha ao consultar o CEP:', err.message);
     return responderErro(res, 502, 'Não foi possível consultar o CEP.');
   }

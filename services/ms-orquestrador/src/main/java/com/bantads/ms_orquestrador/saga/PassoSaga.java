@@ -8,13 +8,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-/**
- * Um passo da SAGA. Os montadores recebem os dados acumulados e devolvem o
- * payload da mensagem, o de compensação recebe tambem o erro que causou a falha.
- * Passo cuja condicao nao vale para os dados acumulados e pulado, e tambem nao
- * e compensado. As chaves exigidas precisam estar nos dados no momento do
- * envio; se faltar alguma, o passo falha e a SAGA compensa.
- */
+/** Passo da SAGA: comando, compensacao, condicao e chaves exigidas */
 public record PassoSaga(
         String fila,
         String tipoComando,
@@ -46,10 +40,7 @@ public record PassoSaga(
         return new PassoSaga(fila, tipoComando, payloadComando, null, null, true, SEMPRE, null, Set.of());
     }
 
-    /**
-     * Passo executado no proprio Orquestrador, sem mensagem: roda quando a SAGA
-     * chega nele, sem aguardar resposta e sem compensacao.
-     */
+    /** Passo executado no proprio Orquestrador, sem mensagem nem compensacao */
     public static PassoSaga local(String nome, Consumer<Map<String, Object>> acao) {
         return new PassoSaga(null, nome, dados -> Map.of(), null, null, true, SEMPRE, acao, Set.of());
     }

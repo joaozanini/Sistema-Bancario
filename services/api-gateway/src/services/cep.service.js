@@ -1,5 +1,4 @@
-// Consulta de endereço pelo CEP no serviço público ViaCEP. Quem chama é o Gateway
-// porque o front só pode conversar com ele (enunciado, seções 3 e 5.6).
+// consulta o endereço pelo CEP no ViaCEP
 const URL_VIACEP = 'https://viacep.com.br/ws';
 const TEMPO_LIMITE_MS = 5000;
 

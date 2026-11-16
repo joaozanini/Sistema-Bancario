@@ -21,7 +21,7 @@ public class EventoConta {
     @Column(nullable = false)
     private String tipo;
 
-    // Sem o JdbcTypeCode o Hibernate envia a String como varchar, e o Postgres recusa na coluna jsonb
+    // Grava o payload como jsonb
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private String payload;

@@ -11,7 +11,7 @@ public class ContaDTO {
     private String cpfCliente;
     private String cpfGerente;
     private String saldo;
-    // só a data (AAAA-MM-DD): é assim que o enunciado apresenta a criação da conta
+    // Data de criação no formato AAAA-MM-DD
     private String dataCriacao;
 
     @JsonProperty("_links")

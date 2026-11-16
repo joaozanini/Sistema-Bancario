@@ -23,11 +23,10 @@ export class ContaService {
 
   private readonly clientesUrl = `${environment.apiUrl}/clientes`;
 
-  // O número da conta não muda: fica guardado por CPF para o extrato e as
-  // operações não precisarem consultá-lo de novo. O saldo nunca é guardado.
+  // número da conta guardado por CPF
   private contaConhecida: { cpf: string; numero: string } | null = null;
 
-  /** R3: número da conta e saldo atual do cliente logado, lidos do lado query. */
+  /** R3: número da conta e saldo atual do cliente logado */
   obterResumo(): Observable<ResumoConta> {
     const cpf = this.cpfDoUsuario();
     if (!cpf) {

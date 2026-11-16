@@ -8,10 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @Configuration
 public class PasswordEncoderConfig {
 
-    /**
-     * Argon2id com os parametros recomendados pelo Spring Security
-     * (16 bytes de salt, 32 de hash, m=16384 KB, t=2, p=1). 
-     */
+    /** Encoder Argon2id */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();

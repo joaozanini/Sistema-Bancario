@@ -9,8 +9,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-// Entrada do autocadastro (R1) e saída das consultas de solicitação (R8): na entrada só chegam os dados
-// do cliente; status, motivo, data/hora e _links são preenchidos pelo serviço
+// Solicitação de autocadastro (R1, R8)
 @Getter
 @Setter
 public class SolicitacaoCadastroDTO {

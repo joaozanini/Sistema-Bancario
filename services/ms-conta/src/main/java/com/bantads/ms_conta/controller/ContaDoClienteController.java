@@ -8,10 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Requisito R3: a conta é um sub-recurso do cliente (cada cliente tem exatamente uma).
- * É por aqui que a tela inicial do cliente descobre o número da conta e o saldo.
- */
+/** R3: conta do cliente como sub-recurso do cliente */
 @RestController
 public class ContaDoClienteController {
 

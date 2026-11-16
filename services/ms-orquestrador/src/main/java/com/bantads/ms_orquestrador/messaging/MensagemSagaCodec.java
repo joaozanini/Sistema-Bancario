@@ -8,9 +8,7 @@ import com.bantads.ms_orquestrador.dto.MensagemSaga;
 
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Leitura e escrita explicitas do envelope.
- */
+/** Leitura e escrita do envelope da SAGA */
 @Component
 public class MensagemSagaCodec {
 

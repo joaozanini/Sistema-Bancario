@@ -31,12 +31,12 @@ public class ComandoSagaService {
 
     private static final Logger log = LoggerFactory.getLogger(ComandoSagaService.class);
 
-    // contrato com o AprovarClienteSaga do orquestrador (R9)
+    // Comando da SAGA Aprovar Cliente (R9)
     public static final String LISTAR_ATIVOS = "gerente.listar-ativos";
-    // contrato com o InserirGerenteSaga do orquestrador (R13)
+    // Comandos da SAGA Inserir Gerente (R13)
     public static final String INSERIR = "gerente.inserir";
     public static final String INSERIR_COMPENSAR = "gerente.inserir.compensar";
-    // contrato com o RemoverGerenteSaga do orquestrador (R15)
+    // Comandos da SAGA Remover Gerente (R15)
     public static final String INATIVAR = "gerente.inativar";
     public static final String INATIVAR_COMPENSAR = "gerente.inativar.compensar";
 
@@ -72,7 +72,7 @@ public class ComandoSagaService {
         };
     }
 
-    // recebe {} e responde { gerentes: [cpf, ...] }; consulta sem efeito colateral, dispensa deduplicacao
+    // Responde a lista de CPFs dos gerentes
     private MensagemSaga listarAtivos(MensagemSaga comando) {
         List<String> cpfs = gerenteService.listarCpfsAtivos();
         if (cpfs.isEmpty()) {
@@ -83,7 +83,7 @@ public class ComandoSagaService {
         return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of("gerentes", cpfs));
     }
 
-    // enunciado 5.7: o mesmo (sagaId, tipo) reentregue devolve a resposta guardada em vez de executar de novo
+    // Devolve a resposta guardada se o comando já foi executado
     private MensagemSaga umaVez(MensagemSaga comando, Function<MensagemSaga, MensagemSaga> passo) {
         Optional<SagaIdempotencia> registrado = idempotenciaRepository.findBySagaIdAndTipo(comando.sagaId(), comando.tipo());
         if (registrado.isPresent()) {
@@ -96,7 +96,7 @@ public class ComandoSagaService {
         return resposta;
     }
 
-    // comando que chega depois da propria compensacao (passo que estourou o timeout) nao pode mais ser executado
+    // Recusa comando cuja SAGA já foi compensada
     private MensagemSaga seNaoCompensado(MensagemSaga comando, String tipoCompensacao,
             Function<MensagemSaga, MensagemSaga> passo) {
         if (idempotenciaRepository.findBySagaIdAndTipo(comando.sagaId(), tipoCompensacao).isPresent()) {
@@ -106,8 +106,7 @@ public class ComandoSagaService {
         return passo.apply(comando);
     }
 
-    // a compensacao so desfaz o que esta SAGA fez: o timeout compensa tambem o passo que nao respondeu,
-    // e ele pode ter falhado (CPF repetido) ou nem ter sido executado
+    // Verifica se o passo foi concluído com sucesso
     private boolean passoConcluido(String sagaId, String tipo) {
         return idempotenciaRepository.findBySagaIdAndTipo(sagaId, tipo)
                 .map(registro -> jsonMapper.readValue(registro.getResposta(), MensagemSaga.class))
@@ -115,7 +114,7 @@ public class ComandoSagaService {
                 .isPresent();
     }
 
-    // recebe { cpf, nome, email, telefone } e responde { cpf }; CPF ou e-mail repetido e FALHA (R13)
+    // R13: insere o gerente; CPF ou e-mail repetido é FALHA
     private MensagemSaga inserir(MensagemSaga comando) {
         Gerente gerente = new Gerente();
         gerente.setCpf(campo(comando, "cpf"));
@@ -132,7 +131,7 @@ public class ComandoSagaService {
         }
     }
 
-    // recebe { cpf } e remove o gerente
+    // Remove o gerente
     private MensagemSaga inserirCompensar(MensagemSaga comando) {
         String cpf = campo(comando, "cpf");
         if (passoConcluido(comando.sagaId(), INSERIR)) {
@@ -144,7 +143,7 @@ public class ComandoSagaService {
         return MensagemSaga.sucesso(comando.sagaId(), comando.tipo(), agora(), Map.of());
     }
 
-    // recebe { cpf } e responde { cpf }; o ultimo gerente ativo e FALHA (R15)
+    // R15: inativa o gerente; o último ativo é FALHA
     private MensagemSaga inativar(MensagemSaga comando) {
         String cpf = campo(comando, "cpf");
         try {
@@ -157,7 +156,7 @@ public class ComandoSagaService {
         }
     }
 
-    // recebe { cpf } e reativa o gerente
+    // Reativa o gerente
     private MensagemSaga inativarCompensar(MensagemSaga comando) {
         String cpf = campo(comando, "cpf");
         if (passoConcluido(comando.sagaId(), INATIVAR)) {

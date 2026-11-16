@@ -2,8 +2,7 @@ const contaService = require('../services/conta.service');
 const clienteService = require('../services/cliente.service');
 const { responderErro } = require('../services/erro.service');
 
-// R6: só o titular transfere. A posse volta a ser conferida no MS Conta, que é quem
-// decide; conferir aqui primeiro evita responder a quem não é dono se a conta destino existe.
+// R6: confere se a conta de origem é do usuário logado
 async function validarContaOrigem(req, res, next) {
   try {
     const cpfTitular = await contaService.buscarCpfTitular(req.params.numero);
@@ -21,7 +20,7 @@ async function validarContaOrigem(req, res, next) {
   return next();
 }
 
-// R6: a conta destino tem de existir — o Gateway resolve o CPF do titular antes de rotear ao MS Conta
+// R6: adiciona ao corpo o CPF do titular da conta destino
 async function enriquecerCpfDestino(req, res, next) {
   const { contaDestino } = req.body || {};
   if (!contaDestino) {
@@ -32,7 +31,6 @@ async function enriquecerCpfDestino(req, res, next) {
     req.body.cpfDestino = await contaService.buscarCpfTitular(contaDestino);
   } catch (err) {
     if (err instanceof contaService.ContaNaoEncontradaError) {
-      // 422 e não 404: o recurso da URL (a conta de origem) existe; o que falha é a regra do R6
       return responderErro(res, 422, 'Conta destino não encontrada.');
     }
     console.error('Falha ao consultar a conta destino:', err.message);
@@ -42,8 +40,7 @@ async function enriquecerCpfDestino(req, res, next) {
   return next();
 }
 
-// R6: o MS Conta grava os nomes no evento mas não os conhece — quem resolve é o
-// Gateway. Sem isso o extrato (R7) fica sem o nome da contraparte.
+// R6: adiciona ao corpo o CPF e os nomes de origem e destino
 async function enriquecerNomes(req, res, next) {
   const cpfOrigem = req.user.cpf;
   const { cpfDestino } = req.body;

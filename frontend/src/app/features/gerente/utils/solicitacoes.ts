@@ -46,7 +46,7 @@ export function paraSolicitacao(dto: SolicitacaoDto): Solicitacao {
   const status = normalizarStatus(dto.status);
 
   return {
-    // cada CPF tem no máximo uma solicitação, então ele identifica a linha da tabela
+    // identifica a linha da tabela pelo CPF
     id: dto.cpf,
     cpf: dto.cpf,
     nome: dto.nome,

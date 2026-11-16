@@ -23,8 +23,7 @@ async function buscar(jobId) {
   return bruto ? JSON.parse(bruto) : null;
 }
 
-// O TTL volta aos 5 min na conclusão: senão o front teria só o que sobrou do
-// tempo que a composição levou para buscar o resultado.
+// atualiza o job e renova o TTL
 async function atualizar(jobId, mudancas) {
   const job = await buscar(jobId);
   if (!job) {
@@ -36,7 +35,7 @@ async function atualizar(jobId, mudancas) {
   return atualizado;
 }
 
-// mesmo formato que o Orquestrador grava nas SAGAs (Job.concluidoInline)
+// conclui o job com resultado inline
 function concluirInline(jobId, resultado) {
   return atualizar(jobId, { status: 'CONCLUIDO', resultType: 'inline', resultado });
 }

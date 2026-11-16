@@ -4,9 +4,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-/**
- * Envelope das filas da SAGA (enunciado 5.7), igual ao do orquestrador.
- */
+/** Envelope das mensagens da SAGA */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record MensagemSaga(
         String sagaId,

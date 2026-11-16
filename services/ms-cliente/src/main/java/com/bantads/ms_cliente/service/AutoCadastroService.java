@@ -47,7 +47,7 @@ public class AutoCadastroService {
         String cpf = solicitacao.getCpf();
         String email = solicitacao.getEmail();
 
-        // Unicidade de CPF contra solicitações e contra clientes já cadastrados (R1)
+        // R1: CPF único entre solicitações e clientes
         if (solicitacaoRepository.existsByCpf(cpf)) {
             throw new CadastroDuplicadoException("CPF já possui uma solicitação de cadastro.");
         }
@@ -55,7 +55,7 @@ public class AutoCadastroService {
             throw new CadastroDuplicadoException("CPF já cadastrado como cliente no sistema.");
         }
 
-        // Unicidade de E-mail contra solicitações e contra clientes já cadastrados (R1)
+        // R1: e-mail único entre solicitações e clientes
         if (solicitacaoRepository.existsByEmail(email) || solicitacaoRepository.existsByEmailIgnoreCase(email)) {
             throw new CadastroDuplicadoException("E-mail já utilizado em outra solicitação.");
         }
@@ -74,7 +74,7 @@ public class AutoCadastroService {
         if (solicitacao.getNome() == null || solicitacao.getNome().trim().isBlank()) {
             throw new IllegalArgumentException("Nome é obrigatório.");
         }
-        // Espaço nas pontas jogaria o cliente para o início da listagem ordenada por nome (R11, R16)
+        // Remove espaços nas pontas do nome
         solicitacao.setNome(solicitacao.getNome().trim());
         exigirTamanhoMaximo(solicitacao.getNome(), 100, "Nome");
         if (solicitacao.getCpf() == null || solicitacao.getCpf().trim().isBlank()) {
@@ -116,7 +116,7 @@ public class AutoCadastroService {
         solicitacao.setNumero(solicitacao.getNumero().trim());
         exigirTamanhoMaximo(solicitacao.getNumero(), 10, "Número");
 
-        // Complemento é opcional: em branco vira null, como no contrato
+        // Complemento em branco vira null
         String complemento = solicitacao.getComplemento() == null ? "" : solicitacao.getComplemento().trim();
         exigirTamanhoMaximo(complemento, 100, "Complemento");
         solicitacao.setComplemento(complemento.isEmpty() ? null : complemento);
@@ -124,7 +124,7 @@ public class AutoCadastroService {
         if (solicitacao.getCep() == null || solicitacao.getCep().trim().isBlank()) {
             throw new IllegalArgumentException("CEP é obrigatório.");
         }
-        // O contrato usa o CEP só com dígitos; a máscara 80000-000 do formulário é aceita e removida
+        // Remove a máscara do CEP
         String cepLimpo = solicitacao.getCep().replaceAll("\\D", "");
         if (cepLimpo.length() != 8) {
             throw new IllegalArgumentException("CEP deve conter 8 dígitos numéricos.");
@@ -147,7 +147,7 @@ public class AutoCadastroService {
         solicitacao.setUf(uf);
     }
 
-    // Sem esta checagem o texto longo só falharia no banco, e o erro de tamanho viraria um 409 de duplicidade
+    // Recusa texto maior que o tamanho máximo
     private void exigirTamanhoMaximo(String valor, int maximo, String campo) {
         if (valor != null && valor.length() > maximo) {
             throw new IllegalArgumentException(campo + " deve ter no máximo " + maximo + " caracteres.");
@@ -165,17 +165,14 @@ public class AutoCadastroService {
         return solicitacaoRepository.findByStatusIgnoreCase(filtro);
     }
 
-    // R8: consulta de uma solicitação pelo CPF, que é a chave usada nas rotas de aprovação e rejeição
+    // R8: consulta uma solicitação pelo CPF
     public SolicitacaoCadastro buscarPorCpf(String cpf) {
         String cpfLimpo = cpf == null ? "" : cpf.replaceAll("\\D", "");
         return solicitacaoRepository.findByCpf(cpfLimpo)
                 .orElseThrow(() -> new NoSuchElementException("Solicitação não encontrada."));
     }
 
-    /**
-     * R10: rejeição síncrona. Só solicitação Pendente pode ser rejeitada; o motivo é obrigatório.
-     * O e-mail ao cliente é fire-and-forget: falha na publicação não desfaz a rejeição.
-     */
+    /** R10: rejeita a solicitação pendente e publica o e-mail ao cliente */
     public SolicitacaoCadastro rejeitarSolicitacao(String cpf, String motivo) {
         if (motivo == null || motivo.trim().isBlank()) {
             throw new IllegalArgumentException("Motivo da rejeição é obrigatório.");
@@ -194,7 +191,7 @@ public class AutoCadastroService {
         return salva;
     }
 
-    // sem sagaId: a rejeição não é SAGA (enunciado 5.7, mensagens fora da SAGA)
+    // Publica o e-mail de rejeição sem sagaId
     private void publicarEmailRejeicao(SolicitacaoCadastro solicitacao) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("email", solicitacao.getEmail());
@@ -203,7 +200,7 @@ public class AutoCadastroService {
 
         Map<String, Object> mensagem = new LinkedHashMap<>();
         mensagem.put("tipo", TIPO_EMAIL_REJEICAO);
-        // formatter explícito: LocalDateTime.toString() omite os segundos quando são zero
+        // Data e hora com segundos
         mensagem.put("timestamp", DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)));
         mensagem.put("payload", payload);
 

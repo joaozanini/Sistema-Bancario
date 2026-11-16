@@ -8,10 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.bantads.ms_auth.dto.StatusResposta;
 
-/**
- * Registro de deduplicacao dos comandos de SAGA por (sagaId, tipo).
- * Guarda so o desfecho: a senha gerada nunca e persistida.
- */
+/** Registro de deduplicação dos comandos de SAGA por (sagaId, tipo) */
 @Document(collection = "comandos_processados")
 @CompoundIndex(name = "saga_tipo", def = "{'sagaId': 1, 'tipo': 1}", unique = true)
 public class ComandoProcessado {

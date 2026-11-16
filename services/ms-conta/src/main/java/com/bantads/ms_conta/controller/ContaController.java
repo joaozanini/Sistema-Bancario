@@ -29,7 +29,6 @@ public class ContaController {
             @RequestHeader(value = "X-User-CPF", required = false) String xUserCpf
     ) {
         MovimentacaoResponseDTO resposta = service.transferir(numeroContaOrigem, dto, xUserCpf);
-        // 201, como saque e depósito: a transferência cria os eventos TransferênciaOrigem/Destino
         return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
     }
 
@@ -65,7 +64,7 @@ public class ContaController {
         return ResponseEntity.ok(resposta);
     }
 
-    // Uso interno do Gateway nas composições (R11, R12, R16); não é exposto ao front
+    // Lista todas as contas (uso interno do Gateway)
     @GetMapping
     public ResponseEntity<List<ContaDTO>> listarContas() {
         List<ContaDTO> contas = service.listarContas();

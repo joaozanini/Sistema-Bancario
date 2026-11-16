@@ -15,9 +15,7 @@ public interface ContaQueryRepository extends JpaRepository<ContaQuery, String> 
 
     Optional<ContaQuery> findByCpfCliente(String cpfCliente);
 
-    // Projeção de uma versão do Event Store. O UPDATE só vale se a conta ainda estiver na versão anterior:
-    // devolve 0 quando outra transação já aplicou esta versão, e aí quem chamou não mexe no saldo. O contexto
-    // de persistência é limpo depois, para a próxima leitura da conta vir do banco e não da memória
+    // Aplica a versão só se a conta estiver na anterior; devolve 0 se já aplicada
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update ContaQuery c set c.saldo = c.saldo + :variacao, c.ultimaVersao = :versao "
             + "where c.numeroConta = :numeroConta and c.ultimaVersao = :versaoAnterior")

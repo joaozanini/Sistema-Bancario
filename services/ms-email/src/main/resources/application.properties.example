@@ -7,9 +7,7 @@ spring.rabbitmq.port=${RABBITMQ_PORT:5672}
 spring.rabbitmq.username=${RABBITMQ_USER:admin}
 spring.rabbitmq.password=${RABBITMQ_PASSWORD:}
 
-# Retentativa a cada 5s (enunciado 5.7). ms.email.cmd nao tem DLQ: esgotadas as
-# tentativas a mensagem e descartada, porque e-mail e nao-critico e nao pode
-# voltar para a fila em loop.
+# Retentativa a cada 5s, sem DLQ
 spring.rabbitmq.listener.simple.retry.enabled=true
 spring.rabbitmq.listener.simple.retry.max-retries=3
 spring.rabbitmq.listener.simple.retry.initial-interval=5s
@@ -17,8 +15,7 @@ spring.rabbitmq.listener.simple.retry.multiplier=1
 spring.rabbitmq.listener.simple.retry.max-interval=5s
 spring.rabbitmq.listener.simple.default-requeue-rejected=false
 
-# SMTP do Gmail. A senha de aplicativo vem SO de variavel de ambiente — nunca
-# no codigo nem no .zip entregue (enunciado 5.2).
+# SMTP do Gmail
 spring.mail.host=${SMTP_HOST:smtp.gmail.com}
 spring.mail.port=${SMTP_PORT:587}
 spring.mail.username=${GMAIL_USERNAME:}
